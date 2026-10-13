@@ -17,7 +17,7 @@ opens a Rerun viewer showing the field, plants, lanes, the moving rover, probe p
 - [x] M0 Repository scaffold, tooling and CI. (2026-10-13) uv project, pinned deps, ruff/mypy/pytest config, CI matrix, licence gate, git hooks blocking Claude attribution.
 - [x] M1 Configuration models and field layout. (2026-10-13)
 - [x] M2 Ground-truth soil-moisture generator. (2026-10-13)
-- [ ] M3 Moisture probe sensor model.
+- [x] M3 Moisture probe sensor model. (2026-10-13)
 - [ ] M4 Rover kinematics, lane planner, path follower and plant-contact safety.
 - [ ] M5 Mapping (kriging) and metrics.
 - [ ] M6 Simulation runner, CLI, run outputs and Rerun visualisation.
@@ -39,6 +39,7 @@ opens a Rerun viewer showing the field, plants, lanes, the moving rover, probe p
 - M2: `shapely.union_all` of ~900 canopy discs takes 0.1 to 0.26 s per layout and dominated test time (28 s suite). `FieldLayout.free_space` is now a lazy `cached_property`; nothing in the simulation loop needs it. Suite now ~2 s.
 - M2: The probe footprint (r = 0.05 m) is smaller than a soil cell (0.25 m), so averaging cell centres inside the disc would find none. `mean_over_disc` instead averages the bilinear field over a sunflower point pattern (16 points minimum, more as r/resolution grows).
 - M2: Measured lag-1 m correlation along x for a 4 m exponential field matches exp(-1/4) within 0.08 (averaged over 20 seeds), so the FFT generator reproduces the configured covariance.
+- M3: Nothing unexpected. The probe draws both the failure coin and the noise sample on every read, so a failure does not shift the random stream for later reads.
 
 ## Decision Log
 
@@ -84,6 +85,7 @@ opens a Rerun viewer showing the field, plants, lanes, the moving rover, probe p
 - Decision (M1): Rows are centred in y, with n_rows = floor(width_y / row_spacing) - 1 so the two outer lanes are full lanes inside the field (demo: 15 rows, 16 lanes). Plants run from x = headland to x = length_x - headland; lane centrelines run from x = headland/2 to length_x - headland/2, where the rover turns. Date: 2026-10-13.
 - Decision (M1): Added a second geometry check: headland >= 2 * (turn-in-place radius + safety_margin + canopy_radius_max), because the plan turns in place on the headland centreline. Added `wet_patch_radius` and `wet_patch_height` to SoilConfig (the plan lists wet_patch_count only) so wet-patch numbers live in config, not code. Date: 2026-10-13.
 - Decision (M2): GRF by FFT circulant embedding on a grid padded by 3 correlation lengths; small negative eigenvalues from truncation are clipped to zero (an approximation), and each realisation is renormalised to zero mean, unit variance. Correlation length is sampled uniformly from `corr_length_range`. Drip stripes are cos^2 in distance to the nearest row (peak on the row, zero at lane centres), only over the planted x span. Dry and wet patches are compact raised-cosine bumps, so "inside the radius" is well defined. Date: 2026-10-13.
+- Decision (M3): Probe value = mean over footprint disc + bias + N(0, noise_std), rounded to resolution, clipped to [0, 1]. Failure returns valid=False, value=None. `ProbeReading` is a frozen dataclass with fields x, y, t, value, valid, sensor_id only (test enforces no truth field). Date: 2026-10-13.
 
 ## Outcomes & Retrospective
 
@@ -92,6 +94,7 @@ opens a Rerun viewer showing the field, plants, lanes, the moving rover, probe p
 - M0: `uv sync` installs everything on Windows 11 with no compiler. ruff, ruff format, mypy (strict), pytest (4 tests) and the licence gate pass locally. `uv run agrisim version` works. CI workflow written for windows-latest and ubuntu-latest; first CI result pending the first push. Open: project licence for `agrisim` itself not chosen. CI run on the first push: success on windows-latest and ubuntu-latest.
 - M1: Config models validate geometry with messages that state the numbers; `FieldLayout.generate` and `candidate_probe_sites` work. 14 tests pass (row count, lane-to-stem clearance over 5 seeds, determinism, keep-out, oversized rover and short headland rejected).
 - M2: `SoilTruth.generate` produces a float32 (80, 120) grid for the demo field; tests cover determinism, clip range, correlation ordering (25 m smoother than 4 m), dry-patch effect, bilinear and disc sampling. 19 tests pass.
+- M3: `MoistureProbe.read` done. Over 4000 reads the mean error matches the configured bias and the error std matches noise_std within 5%; failure rate matches failure_prob. 22 tests pass.
 
 ## Context and Orientation
 
