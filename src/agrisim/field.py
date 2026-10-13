@@ -6,6 +6,7 @@ Rows are centred in y so the outer lanes (beyond the first and last rows) are fu
 
 import math
 from dataclasses import dataclass
+from functools import cached_property
 
 import numpy as np
 import numpy.typing as npt
@@ -37,7 +38,6 @@ class FieldLayout:
     lanes: tuple[LineString, ...]  # lane centrelines, x from headland/2 to length_x - headland/2
     headlands: tuple[Polygon, Polygon]  # west, east
     boundary: Polygon
-    free_space: shapely.Geometry  # boundary minus canopy discs
 
     @classmethod
     def generate(cls, cfg: FieldConfig, rng: np.random.Generator) -> "FieldLayout":
@@ -57,8 +57,6 @@ class FieldLayout:
 
         x0, x1 = h / 2, cfg.length_x - h / 2
         lanes = tuple(LineString([(x0, y), (x1, y)]) for y in lane_y)
-        boundary = box(0.0, 0.0, cfg.length_x, cfg.width_y)
-        canopies = shapely.union_all(shapely.buffer(shapely.points(stems), radii))
         return cls(
             cfg=cfg,
             row_y=row_y,
@@ -70,9 +68,14 @@ class FieldLayout:
                 box(0.0, 0.0, h, cfg.width_y),
                 box(cfg.length_x - h, 0.0, cfg.length_x, cfg.width_y),
             ),
-            boundary=boundary,
-            free_space=boundary.difference(canopies),
+            boundary=box(0.0, 0.0, cfg.length_x, cfg.width_y),
         )
+
+    @cached_property
+    def free_space(self) -> shapely.Geometry:
+        """Field minus canopy discs. Lazy: the union of ~900 discs is the slowest step here."""
+        canopies = shapely.buffer(shapely.points(self.stems), self.canopy_radius)
+        return self.boundary.difference(shapely.union_all(canopies))
 
     def candidate_probe_sites(self, spacing: float) -> list[ProbeSite]:
         """Points every `spacing` m along each lane centreline, at least stem_keepout from stems."""

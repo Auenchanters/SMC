@@ -16,7 +16,7 @@ opens a Rerun viewer showing the field, plants, lanes, the moving rover, probe p
 
 - [x] M0 Repository scaffold, tooling and CI. (2026-10-13) uv project, pinned deps, ruff/mypy/pytest config, CI matrix, licence gate, git hooks blocking Claude attribution.
 - [x] M1 Configuration models and field layout. (2026-10-13)
-- [ ] M2 Ground-truth soil-moisture generator.
+- [x] M2 Ground-truth soil-moisture generator. (2026-10-13)
 - [ ] M3 Moisture probe sensor model.
 - [ ] M4 Rover kinematics, lane planner, path follower and plant-contact safety.
 - [ ] M5 Mapping (kriging) and metrics.
@@ -35,6 +35,9 @@ opens a Rerun viewer showing the field, plants, lanes, the moving rover, probe p
 - M0: mypy 2.4.0 (dev only) pulls `pathspec` 1.1.1, licensed MPL-2.0 (file-level weak copyleft). It is not GPL/AGPL/LGPL, so the gate passes, but it is outside the CLAUDE.md permitted list. It is a dev tool, never shipped or modified. Flagged for the team.
 - M0: pip-licenses `--fail-on` with `--partial-match` needs both "GPL" and "General Public License" because the AGPL trove classifier ("GNU Affero General Public License v3") does not contain the substring "GPL". Negative control: `--fail-on "Mozilla"` correctly fails on pathspec.
 - M1: Shapely has no inline type hints; mypy strict needs `types-shapely` (typeshed, Apache-2.0). Its latest is 2.1.0.20260728 while shapely is 2.2.0; no mismatch hit so far.
+- M2: `shapely.union_all` of ~900 canopy discs takes 0.1 to 0.26 s per layout and dominated test time (28 s suite). `FieldLayout.free_space` is now a lazy `cached_property`; nothing in the simulation loop needs it. Suite now ~2 s.
+- M2: The probe footprint (r = 0.05 m) is smaller than a soil cell (0.25 m), so averaging cell centres inside the disc would find none. `mean_over_disc` instead averages the bilinear field over a sunflower point pattern (16 points minimum, more as r/resolution grows).
+- M2: Measured lag-1 m correlation along x for a 4 m exponential field matches exp(-1/4) within 0.08 (averaged over 20 seeds), so the FFT generator reproduces the configured covariance.
 - M0: All 64 locked packages have a `win_amd64` cp313/abi3 wheel or a pure-Python wheel (checked by parsing uv.lock); nothing builds from source.
 
 ## Decision Log
@@ -79,6 +82,7 @@ opens a Rerun viewer showing the field, plants, lanes, the moving rover, probe p
 - Decision (M0): Licence gate is `pip-licenses --partial-match --fail-on "GPL;General Public License"`, run in CI and via `scripts/check_licenses.ps1` / `.sh`. The `agrisim` package itself reports UNKNOWN because the team has not chosen a project licence yet [Q]. Date: 2026-10-13.
 - Decision (M1): Rows are centred in y, with n_rows = floor(width_y / row_spacing) - 1 so the two outer lanes are full lanes inside the field (demo: 15 rows, 16 lanes). Plants run from x = headland to x = length_x - headland; lane centrelines run from x = headland/2 to length_x - headland/2, where the rover turns. Date: 2026-10-13.
 - Decision (M1): Added a second geometry check: headland >= 2 * (turn-in-place radius + safety_margin + canopy_radius_max), because the plan turns in place on the headland centreline. Added `wet_patch_radius` and `wet_patch_height` to SoilConfig (the plan lists wet_patch_count only) so wet-patch numbers live in config, not code. Date: 2026-10-13.
+- Decision (M2): GRF by FFT circulant embedding on a grid padded by 3 correlation lengths; small negative eigenvalues from truncation are clipped to zero (an approximation), and each realisation is renormalised to zero mean, unit variance. Correlation length is sampled uniformly from `corr_length_range`. Drip stripes are cos^2 in distance to the nearest row (peak on the row, zero at lane centres), only over the planted x span. Dry and wet patches are compact raised-cosine bumps, so "inside the radius" is well defined. Date: 2026-10-13.
 - Decision (M0): Git authorship is restricted to the team (see CLAUDE.md); `.githooks/commit-msg` and `.githooks/pre-push` reject Claude/Anthropic attribution. Enable after cloning with `git config core.hooksPath .githooks`. Date: 2026-10-13.
 
 ## Outcomes & Retrospective
@@ -86,6 +90,7 @@ opens a Rerun viewer showing the field, plants, lanes, the moving rover, probe p
 (Fill in at each milestone and at completion: what works, what does not, what was learned, what remains.)
 
 - M0: `uv sync` installs everything on Windows 11 with no compiler. ruff, ruff format, mypy (strict), pytest (4 tests) and the licence gate pass locally. `uv run agrisim version` works. CI workflow written for windows-latest and ubuntu-latest; first CI result pending the first push. Open: project licence for `agrisim` itself not chosen. CI run on the first push: success on windows-latest and ubuntu-latest.
+- M2: `SoilTruth.generate` produces a float32 (80, 120) grid for the demo field; tests cover determinism, clip range, correlation ordering (25 m smoother than 4 m), dry-patch effect, bilinear and disc sampling. 19 tests pass.
 - M1: Config models validate geometry with messages that state the numbers; `FieldLayout.generate` and `candidate_probe_sites` work. 14 tests pass (row count, lane-to-stem clearance over 5 seeds, determinism, keep-out, oversized rover and short headland rejected).
 
 ## Context and Orientation
