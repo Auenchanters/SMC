@@ -18,7 +18,7 @@ opens a Rerun viewer showing the field, plants, lanes, the moving rover, probe p
 - [x] M1 Configuration models and field layout. (2026-10-13)
 - [x] M2 Ground-truth soil-moisture generator. (2026-10-13)
 - [x] M3 Moisture probe sensor model. (2026-10-13)
-- [ ] M4 Rover kinematics, lane planner, path follower and plant-contact safety.
+- [x] M4 Rover kinematics, lane planner, path follower and plant-contact safety. (2026-10-13)
 - [ ] M5 Mapping (kriging) and metrics.
 - [ ] M6 Simulation runner, CLI, run outputs and Rerun visualisation.
 - [ ] M7 Benchmark harness and baseline probing strategies.
@@ -40,6 +40,9 @@ opens a Rerun viewer showing the field, plants, lanes, the moving rover, probe p
 - M2: The probe footprint (r = 0.05 m) is smaller than a soil cell (0.25 m), so averaging cell centres inside the disc would find none. `mean_over_disc` instead averages the bilinear field over a sunflower point pattern (16 points minimum, more as r/resolution grows).
 - M2: Measured lag-1 m correlation along x for a 4 m exponential field matches exp(-1/4) within 0.08 (averaged over 20 seeds), so the FFT generator reproduces the configured covariance.
 - M3: Nothing unexpected. The probe draws both the failure coin and the noise sample on every read, so a failure does not shift the random stream for later reads.
+- M4: The demo plan is 466 m of driving and 21,699 steps at dt = 0.05 s. A Python-level step loop costs about 70 µs per step (~1.5 s per full drive), so the 20-seed zero-contact test takes ~30 s. Acceptable for now; revisit if the benchmark is too slow.
+- M4: Measured on seeds 0-4: with the footprint inflated by safety_margin on every side there are still zero canopy overlaps, and the maximum lateral tracking error inside lanes is 0.36 mm (turn-in-place then pure pursuit along straight segments).
+- M4: scipy-stubs types `KDTree.query_ball_point` loosely; a `cast(list[list[int]], ...)` is needed under mypy strict.
 
 ## Decision Log
 
@@ -86,6 +89,8 @@ opens a Rerun viewer showing the field, plants, lanes, the moving rover, probe p
 - Decision (M1): Added a second geometry check: headland >= 2 * (turn-in-place radius + safety_margin + canopy_radius_max), because the plan turns in place on the headland centreline. Added `wet_patch_radius` and `wet_patch_height` to SoilConfig (the plan lists wet_patch_count only) so wet-patch numbers live in config, not code. Date: 2026-10-13.
 - Decision (M2): GRF by FFT circulant embedding on a grid padded by 3 correlation lengths; small negative eigenvalues from truncation are clipped to zero (an approximation), and each realisation is renormalised to zero mean, unit variance. Correlation length is sampled uniformly from `corr_length_range`. Drip stripes are cos^2 in distance to the nearest row (peak on the row, zero at lane centres), only over the planted x span. Dry and wet patches are compact raised-cosine bumps, so "inside the radius" is well defined. Date: 2026-10-13.
 - Decision (M3): Probe value = mean over footprint disc + bias + N(0, noise_std), rounded to resolution, clipped to [0, 1]. Failure returns valid=False, value=None. `ProbeReading` is a frozen dataclass with fields x, y, t, value, valid, sensor_id only (test enforces no truth field). Date: 2026-10-13.
+- Decision (M4): The full-coverage plan places a candidate stop every probe_spacing m per lane (16 lanes x 14 = 224 on the demo field), then thins them evenly along the route to the probe budget (60 in demo.yaml, or --budget in the bench). Rationale: the plan text asks for both a probe_spacing and a probe_budget; thinning along the boustrophedon gives a staggered, roughly uniform pattern with the same budget as the adaptive strategies. Date: 2026-10-13.
+- Decision (M4): Path following = turn in place until heading error <= 0.15 rad, then pure pursuit (lookahead 0.3 m) along each straight segment; a segment ends within 1 cm of its end point. `contacts` is an analytic rectangle-vs-circle test on (S, 3) pose arrays with a KD-tree for candidates, cross-checked against Shapely on 300 random poses. `LaneGraph` is closed form (same lane: |dx|; else min over the west and east headlands), which is exact for straight parallel lanes, instead of a general graph search. Date: 2026-10-13.
 
 ## Outcomes & Retrospective
 
@@ -95,6 +100,7 @@ opens a Rerun viewer showing the field, plants, lanes, the moving rover, probe p
 - M1: Config models validate geometry with messages that state the numbers; `FieldLayout.generate` and `candidate_probe_sites` work. 14 tests pass (row count, lane-to-stem clearance over 5 seeds, determinism, keep-out, oversized rover and short headland rejected).
 - M2: `SoilTruth.generate` produces a float32 (80, 120) grid for the demo field; tests cover determinism, clip range, correlation ordering (25 m smoother than 4 m), dry-patch effect, bilinear and disc sampling. 19 tests pass.
 - M3: `MoistureProbe.read` done. Over 4000 reads the mean error matches the configured bias and the error std matches noise_std within 5%; failure rate matches failure_prob. 22 tests pass.
+- M4: Kinematics, full-coverage planner, pure-pursuit follower, contact detection and lane-graph shortest paths done. Full plan driven on 20 seeds with zero plant contacts; shortest paths only use lane and headland centrelines; oversized rover rejected (M1). 46 tests pass (~43 s).
 
 ## Context and Orientation
 
