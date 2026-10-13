@@ -65,19 +65,21 @@ def _adaptive_legs(
     budget: int,
     readings: list[ProbeReading],
     rng: np.random.Generator,
+    model: Path | None,
 ) -> Iterator[list[Waypoint]]:
     """One leg per probe: lane-graph path from the current site to the chosen one.
 
     `readings` is the live list the driver appends to, so each choice sees every earlier probe.
     """
-    policy = make_policy(policy_name, cfg, rng)
+    policy = make_policy(policy_name, cfg, rng, model)
     graph = LaneGraph.from_layout(layout)
     sites = tuple(layout.candidate_probe_sites(cfg.survey.candidate_spacing))
     site_xy = np.array([(s.x, s.y) for s in sites])
     visited = np.zeros(len(sites), dtype=bool)
     here = graph.start_site()
     for _ in range(min(budget, len(sites))):
-        k = policy.choose(Context(here, sites, site_xy, visited.copy(), tuple(readings), graph))
+        ctx = Context(here, sites, site_xy, visited.copy(), tuple(readings), graph, budget)
+        k = policy.choose(ctx)
         visited[k] = True
         wps, _ = graph.shortest_path(here, sites[k])
         yield [*wps[:-1], Waypoint(wps[-1].x, wps[-1].y, probe=True)]
@@ -93,8 +95,10 @@ def run_survey(
     budget: int | None = None,
     rrd_path: Path | None = None,
     spawn: bool = True,
+    model: Path | None = None,
 ) -> RunResult:
-    """Simulate one survey. `policy` is one of policies.STRATEGIES ("full_coverage" = fixed)."""
+    """Simulate one survey. `policy`: one of policies.STRATEGIES ("full_coverage" = fixed) or
+    "ppo" with `model` = path to a trained MaskablePPO zip."""
     policy = FIXED if policy == "full_coverage" else policy
     budget = cfg.survey.probe_budget if budget is None else budget
     rng_field, rng_soil, rng_probe, rng_policy = world_rngs(seed)
@@ -111,7 +115,7 @@ def run_survey(
     if policy == FIXED:
         legs = iter([list(LanePlanner.plan_full_coverage(layout, cfg, budget).waypoints)])
     else:
-        legs = _adaptive_legs(policy, cfg, layout, budget, readings, rng_policy)
+        legs = _adaptive_legs(policy, cfg, layout, budget, readings, rng_policy, model)
 
     viz = None
     if rerun:

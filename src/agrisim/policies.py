@@ -5,6 +5,7 @@ choose the next candidate site, and the rover drives there along the lane graph.
 """
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Protocol
 
 import numpy as np
@@ -21,6 +22,7 @@ BoolArray = npt.NDArray[np.bool_]
 
 FIXED = "fixed_spacing"
 STRATEGIES = (FIXED, "random", "greedy_variance", "greedy_variance_per_cost")
+LEARNED = "ppo"  # needs a trained model (agrisim train)
 
 
 @dataclass(frozen=True, eq=False)
@@ -31,6 +33,7 @@ class Context:
     visited: BoolArray  # (N,) sites already probed (the action mask is ~visited)
     readings: tuple[ProbeReading, ...]
     graph: LaneGraph
+    budget: int  # total probes for the mission (failed probes count as used)
 
 
 class Policy(Protocol):
@@ -89,11 +92,19 @@ class GreedyVariancePerCost:
         return _best(uncertainty(self.cfg, ctx) / cost, ctx.visited)
 
 
-def make_policy(name: str, cfg: SimConfig, rng: np.random.Generator) -> Policy:
+def make_policy(
+    name: str, cfg: SimConfig, rng: np.random.Generator, model: Path | None = None
+) -> Policy:
+    if name == LEARNED:
+        if model is None:
+            raise ValueError("policy 'ppo' needs a model path")
+        from agrisim.env import LearnedPolicy  # torch is imported only when needed
+
+        return LearnedPolicy.load(model, cfg)
     if name == "random":
         return Random(rng)
     if name == "greedy_variance":
         return GreedyMaxVariance(cfg)
     if name == "greedy_variance_per_cost":
         return GreedyVariancePerCost(cfg)
-    raise ValueError(f"unknown adaptive policy {name!r}; choose from {STRATEGIES}")
+    raise ValueError(f"unknown policy {name!r}; choose from {(*STRATEGIES, LEARNED)}")

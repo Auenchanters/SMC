@@ -66,10 +66,10 @@ def _baseline_rmse(result: RunResult, mapper: Mapper) -> float:
     return map_metrics(result.truth_grid, mean, var, result.cfg.mapping.dry_threshold).rmse
 
 
-def bench_one(job: tuple[SimConfig, int, str, int]) -> BenchRow:
+def bench_one(job: tuple[SimConfig, int, str, int, Path | None]) -> BenchRow:
     """Top-level so it pickles for Windows `spawn` workers."""
-    cfg, seed, strategy, budget = job
-    res = run_survey(cfg, seed, strategy, budget=budget)
+    cfg, seed, strategy, budget, model = job
+    res = run_survey(cfg, seed, strategy, budget=budget, model=model)
     m, r = res.map_metrics, res.run_metrics
     return BenchRow(
         strategy=strategy,
@@ -88,8 +88,10 @@ def run_benchmark(
     budget: int,
     strategies: Sequence[str] = STRATEGIES,
     workers: int = 1,
+    model: Path | None = None,
 ) -> list[BenchRow]:
-    jobs = [(cfg, s, name, budget) for name in strategies for s in seeds]
+    """Rows in strategy-major order. `model` is needed only for the "ppo" strategy."""
+    jobs = [(cfg, s, name, budget, model) for name in strategies for s in seeds]
     if workers <= 1:
         return [bench_one(j) for j in jobs]
     ctx = multiprocessing.get_context("spawn")  # same behaviour on Windows and Linux

@@ -93,5 +93,54 @@ def bench(
     typer.echo(f"wrote {out_dir}")
 
 
+@app.command()
+def train(
+    config: ConfigOpt,
+    timesteps: Annotated[int, typer.Option(help="Total environment steps")] = 200_000,
+    seed: Annotated[int, typer.Option(help="Training seed")] = 0,
+    budget: Annotated[int, typer.Option(help="Probe budget per episode")] = 30,
+    n_envs: Annotated[int, typer.Option(help="Parallel envs (>1 uses spawn subprocesses)")] = 1,
+    out: Annotated[Path, typer.Option(help="Output folder")] = Path("runs/ppo_v1"),
+) -> None:
+    """Train a MaskablePPO probing policy (episodes use seeds >= 1000)."""
+    from agrisim.config import load
+    from agrisim.env import train as train_ppo
+
+    path = train_ppo(load(config), timesteps, seed, out, budget, n_envs)
+    typer.echo(f"saved {path}")
+
+
+@app.command(name="eval")
+def evaluate(
+    model: Annotated[Path, typer.Option(exists=True, dir_okay=False, help="model.zip")],
+    config: ConfigOpt,
+    seeds: Annotated[str, typer.Option(help="Held-out seeds (< 1000)")] = "100-149",
+    budget: Annotated[int, typer.Option(help="Probe budget, same for every strategy")] = 30,
+    workers: Annotated[int, typer.Option(help="Worker processes (1 = serial)")] = 1,
+    out: Annotated[Path, typer.Option(help="Root folder for outputs")] = Path("runs"),
+) -> None:
+    """Evaluate a trained model and every baseline on the same held-out seeds and budget."""
+    from datetime import UTC, datetime
+
+    from agrisim.bench import parse_seeds, run_benchmark, summary_markdown, write_results
+    from agrisim.config import load
+    from agrisim.env import TRAIN_SEED_OFFSET
+    from agrisim.io import new_dir
+    from agrisim.policies import LEARNED, STRATEGIES
+
+    seed_list = parse_seeds(seeds)
+    if max(seed_list) >= TRAIN_SEED_OFFSET:
+        raise typer.BadParameter(f"evaluation seeds must be < {TRAIN_SEED_OFFSET} (held out)")
+    cfg = load(config)
+    out_dir = new_dir(out, f"eval_{datetime.now(UTC):%Y%m%dT%H%M%SZ}")
+    names = [*STRATEGIES, LEARNED]
+    rows = run_benchmark(cfg, seed_list, budget, names, workers, model=model.resolve())
+    write_results(rows, out_dir)
+    text = summary_markdown(rows, f"agrisim eval: {model}, {config.name}, budget {budget}")
+    (out_dir / "summary.md").write_text(text, encoding="utf-8")
+    typer.echo(text)
+    typer.echo(f"wrote {out_dir}")
+
+
 if __name__ == "__main__":
     app()
