@@ -1,4 +1,9 @@
-"""Path following: turn in place to face the segment, then pure pursuit along it."""
+"""Path following: turn in place to face the segment, then pure pursuit along it.
+
+If the segment points behind the rover (heading error > 90 deg + reverse_margin), the rover
+reverses along it instead of turning around: a 180 deg turn in place inside a lane would sweep
+the footprint's corners into the canopies.
+"""
 
 import math
 from dataclasses import dataclass
@@ -18,6 +23,7 @@ class PurePursuit:
     k_turn: float = 3.0  # yaw-rate gain while turning in place
     k_slow: float = 1.5  # 1/s; v <= k_slow * remaining distance near the end
     v_min: float = 0.05  # m/s floor so the rover always reaches the end
+    reverse_margin: float = 0.3  # rad beyond 90 deg before choosing to reverse
 
     def command(
         self, state: RoverState, start: tuple[float, float], end: tuple[float, float]
@@ -30,6 +36,9 @@ class PurePursuit:
             return 0.0, 0.0
         ux, uy = dx / seg, dy / seg
         err = wrap_angle(math.atan2(dy, dx) - state.theta)
+        reverse = abs(err) > math.pi / 2 + self.reverse_margin
+        eff = state.theta + math.pi if reverse else state.theta  # direction of travel
+        err = wrap_angle(math.atan2(dy, dx) - eff)
         if abs(err) > self.turn_tol:
             return 0.0, self.k_turn * err
         along = (state.x - sx) * ux + (state.y - sy) * uy
@@ -39,13 +48,13 @@ class PurePursuit:
         ld = math.hypot(tx, ty)
         if ld < 1e-9:
             return 0.0, 0.0
-        alpha = wrap_angle(math.atan2(ty, tx) - state.theta)
+        alpha = wrap_angle(math.atan2(ty, tx) - eff)
         v = min(self.rover.max_speed, max(self.v_min, self.k_slow * remaining))
         w = v * 2 * math.sin(alpha) / ld
         if abs(w) > self.rover.max_yaw_rate:  # keep curvature, slow down
             v *= self.rover.max_yaw_rate / abs(w)
             w = math.copysign(self.rover.max_yaw_rate, w)
-        return v, w
+        return (-v, w) if reverse else (v, w)
 
     def done(self, state: RoverState, start: tuple[float, float], end: tuple[float, float]) -> bool:
         dx, dy = end[0] - start[0], end[1] - start[1]

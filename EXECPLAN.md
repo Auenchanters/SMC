@@ -21,7 +21,7 @@ opens a Rerun viewer showing the field, plants, lanes, the moving rover, probe p
 - [x] M4 Rover kinematics, lane planner, path follower and plant-contact safety. (2026-10-13)
 - [x] M5 Mapping (kriging) and metrics. (2026-10-13)
 - [x] M6 Simulation runner, CLI, run outputs and Rerun visualisation. (2026-10-13)
-- [ ] M7 Benchmark harness and baseline probing strategies.
+- [x] M7 Benchmark harness and baseline probing strategies. (2026-10-13)
 - [ ] M8 Gymnasium environment, MaskablePPO training and evaluation.
 - [ ] M9 Team-facing README and demo script.
 
@@ -47,6 +47,8 @@ opens a Rerun viewer showing the field, plants, lanes, the moving rover, probe p
 - M6: The first full-coverage waypoint is itself a probe stop; the first loop version only probed on arrival and silently used 59 of 60 probes. Fixed, and the CLI test now asserts probes_used == probe_budget.
 - M6: `np.clip` on Python scalars inside `rover.step` cost ~90% of simulation time. Plain min/max made `run_survey` ~10x faster (0.2 s per demo survey, identical results).
 - M6: rerun-sdk 0.39 API used: `rr.RecordingStream`, `rec.spawn(connect=False)`, `rec.set_sinks(rr.GrpcSink(), rr.FileSink(path))`, `rec.set_time('sim_time', duration=t)`, `rr.LineStrips2D`, `rr.Boxes2D`, `rr.Points2D`, `rr.Image`, `rr.Scalars`. The spawned viewer is a detached process that inherits stdout; when the command's output is piped (as in an agent tool) the pipe stays open until the viewer closes, although the run itself has finished. In an interactive PowerShell the command returns normally.
+- M7: Adaptive strategies first produced plant contacts (up to 76 per run): to reach a site behind it in the same lane, the rover turned 180 deg in place, and the footprint's turning circle (0.32 m) is wider than the clear half-lane (0.30 m). The follower now reverses along a segment that points behind it (heading error > 90 deg + 0.3 rad), so in-lane heading never flips; rotations only happen on headland centrelines. New test covers in-lane backtracking. All 200 bench runs now have zero contacts.
+- M7: Benchmark (seeds 0-49, budget 30): fixed spacing has the lowest RMSE (0.0323 +/- 0.0016) and is not beaten by any adaptive strategy on map error. Greedy max-variance matches it on RMSE (0.0327 +/- 0.0019) and has the best dry-cell F1 (0.44 vs 0.33) but drives 69% further (785 m vs 466 m). Greedy variance-per-cost is the cheapest (152 m, 652 s vs 1351 s) but has the worst RMSE (0.0387). Random is worse than fixed spacing on every map metric. Dry-cell precision is undefined (no predicted dry cell) on 11-17 of 50 seeds per strategy: kriging smooths out small dry patches.
 
 ## Decision Log
 
@@ -97,6 +99,8 @@ opens a Rerun viewer showing the field, plants, lanes, the moving rover, probe p
 - Decision (M4): Path following = turn in place until heading error <= 0.15 rad, then pure pursuit (lookahead 0.3 m) along each straight segment; a segment ends within 1 cm of its end point. `contacts` is an analytic rectangle-vs-circle test on (S, 3) pose arrays with a KD-tree for candidates, cross-checked against Shapely on 300 random poses. `LaneGraph` is closed form (same lane: |dx|; else min over the west and east headlands), which is exact for straight parallel lanes, instead of a general graph search. Date: 2026-10-13.
 - Decision (M5): IDW variance is NaN everywhere (IDW has no uncertainty model; no invented proxy). GlobalMean variance is the sample variance (ddof=1). Dry precision/recall are NaN when undefined (no predicted / no true dry cells); F1 is NaN if either is NaN and 0 if both are 0. Calibration = fraction of cells with |truth - mean| <= 1.96 sqrt(var), NaN when there is no variance. Lane coverage = fraction of lane-centreline points (every 0.1 m) within 0.1 m of a driven pose. Truth is resampled to the output grid by bilinear sampling at output cell centres (exact 2x2 block mean for 0.25 m -> 0.5 m). Date: 2026-10-13.
 - Decision (M6): Each seed is split with `SeedSequence(seed).spawn(4)` into independent streams for layout, soil, probe noise and policy, so every policy sees the identical field and soil for a given seed. Maps are coloured with fixed ranges (VWC: vwc_clip; abs error: [0, 2 std_vwc]; variance: [0, (2 std_vwc)^2]) in both the PNG and Rerun. `truth.npy` is truth resampled to the output grid so it aligns with `estimate.npy` and `variance.npy`. The probe reads at the rover's actual stopping pose (within 1 cm of the stop), not the nominal site. NaN metrics are written as null in metrics.json. Date: 2026-10-13.
+- Decision (M7): Adaptive strategies start at the west end of lane 0 and stop after the last probe (no return leg); fixed spacing drives the whole full-coverage route, so its path length includes lanes after its last probe. Uncertainty for the greedy strategies is ordinary-kriging variance at the candidate sites from the readings so far; before kriging is usable (< min_readings) it is the distance to the nearest probe (maximin spread). Variance-per-cost divides by (lane-graph distance / max_speed + insertion_time_s). The bench also reports global-mean and IDW RMSE on each strategy's own readings. Intervals are 95% Student-t over seeds; undefined values (NaN) are dropped and n is shown. Parallel workers use an explicit spawn context on every OS. Date: 2026-10-13.
+- Decision (M7): Differential-drive rover may drive in reverse along a segment (see Surprises). Rationale: safer than an in-lane U-turn and cheaper than detouring through a headland. Date: 2026-10-13.
 
 ## Outcomes & Retrospective
 
@@ -109,6 +113,7 @@ opens a Rerun viewer showing the field, plants, lanes, the moving rover, probe p
 - M4: Kinematics, full-coverage planner, pure-pursuit follower, contact detection and lane-graph shortest paths done. Full plan driven on 20 seeds with zero plant contacts; shortest paths only use lane and headland centrelines; oversized rover rejected (M1). 46 tests pass (~43 s).
 - M5: Mapper protocol with GlobalMean, IDW and Kriging (with global-mean fallback) done; metrics done. On a smooth synthetic field with 80 samples, kriging RMSE is below a quarter of the global-mean RMSE. 51 tests pass.
 - M6: `agrisim run` works headless and with `--rerun` (viewer opened, recording.rrd 1.5 MB). Seed 7 demo: zero contacts, lane coverage 1.000, 60 probes. Two runs with the same seed give byte-identical metrics.json. 54 tests pass.
+- M7: `agrisim bench` runs 4 strategies x 50 seeds in 41 s with 4 spawn workers; serial and parallel results are identical (test). Acceptance: zero plant contacts on every seed and strategy; kriging RMSE below global-mean RMSE on 50/50 seeds for fixed spacing (target >= 90%). Honest result: no adaptive strategy beats fixed spacing on RMSE at budget 30 on this placeholder field. 59 tests pass.
 
 ## Context and Orientation
 
@@ -233,6 +238,16 @@ Every command writes to a new timestamped folder under `runs/` and never overwri
     path / time    465.7 m / 1685 s
     lane coverage  1.000
     plant contacts 0
+    > uv run agrisim bench --config configs/demo.yaml --seeds 0-49 --budget 30 --workers 4   (M7, 2026-10-13; full table in runs/bench_*/summary.md)
+    | metric          | fixed_spacing      | random             | greedy_variance    | greedy_variance_per_cost |
+    | rmse            | 0.03225 +/- 0.0016 | 0.03671 +/- 0.0018 | 0.0327 +/- 0.0019  | 0.03866 +/- 0.0024 |
+    | r2              | 0.5835 +/- 0.043   | 0.4588 +/- 0.055   | 0.5653 +/- 0.055   | 0.391 +/- 0.078    |
+    | dry_f1          | 0.3254 (n=39)      | 0.22 (n=38)        | 0.4357 (n=33)      | 0.3707 (n=35)      |
+    | calibration_95  | 0.9673             | 0.9637             | 0.9605             | 0.9522             |
+    | path_length_m   | 465.7              | 737.8              | 785.2              | 151.5              |
+    | mission_time_s  | 1351               | 1965               | 2023               | 652.1              |
+    | plant_contacts  | 0                  | 0                  | 0                  | 0                  |
+    Kriging RMSE < global-mean RMSE: 50/50, 50/50, 49/50, 48/50 seeds.
 
 ## Interfaces and Dependencies
 

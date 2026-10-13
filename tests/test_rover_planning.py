@@ -9,7 +9,7 @@ from scipy.spatial import KDTree
 from agrisim.config import SimConfig
 from agrisim.control import PurePursuit, drive_segment, poses
 from agrisim.field import FieldLayout
-from agrisim.planning import LaneGraph, LanePlanner, Plan
+from agrisim.planning import LaneGraph, LanePlanner, Plan, Waypoint
 from agrisim.rover import RoverState, footprint, step
 from agrisim.safety import contacts
 
@@ -100,3 +100,14 @@ def test_shortest_path_stays_on_lanes_and_headlands(cfg: SimConfig) -> None:
     # Driving a cross-field path touches no plant.
     wps, _ = graph.shortest_path(sites[3], sites[-5])
     assert contacts(_drive(Plan(tuple(wps)), cfg), cfg.rover, lay) == []
+
+
+def test_backtracking_in_a_lane_reverses_without_contact(cfg: SimConfig) -> None:
+    lay = _layout(cfg, 0)
+    y = float(lay.lane_y[3])
+    wps = (Waypoint(5.0, y), Waypoint(20.0, y), Waypoint(8.0, y))
+    p = _drive(Plan(wps), cfg)
+    assert contacts(p, cfg.rover, lay) == []
+    assert abs(p[-1, 0] - 8.0) < 0.02
+    # Heading never flips: the rover reversed instead of turning around.
+    assert np.abs(p[:, 2]).max() < 0.2

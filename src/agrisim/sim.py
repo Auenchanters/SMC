@@ -1,6 +1,6 @@
 """Survey simulation: drive, probe, map, score."""
 
-import math
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -12,7 +12,8 @@ from agrisim.control import PurePursuit, drive_segment, poses
 from agrisim.field import FieldLayout
 from agrisim.mapping import GridSpec, make_mapper
 from agrisim.metrics import MapMetrics, RunMetrics, map_metrics, run_metrics, truth_on_grid
-from agrisim.planning import LanePlanner
+from agrisim.planning import LaneGraph, LanePlanner, Waypoint
+from agrisim.policies import FIXED, Context, make_policy
 from agrisim.rover import RoverState
 from agrisim.safety import PlantContact, contacts
 from agrisim.sensor import MoistureProbe, ProbeReading
@@ -57,27 +58,60 @@ def world_rngs(seed: int) -> tuple[np.random.Generator, ...]:
     return tuple(np.random.default_rng(s) for s in np.random.SeedSequence(seed).spawn(4))
 
 
+def _adaptive_legs(
+    policy_name: str,
+    cfg: SimConfig,
+    layout: FieldLayout,
+    budget: int,
+    readings: list[ProbeReading],
+    rng: np.random.Generator,
+) -> Iterator[list[Waypoint]]:
+    """One leg per probe: lane-graph path from the current site to the chosen one.
+
+    `readings` is the live list the driver appends to, so each choice sees every earlier probe.
+    """
+    policy = make_policy(policy_name, cfg, rng)
+    graph = LaneGraph.from_layout(layout)
+    sites = tuple(layout.candidate_probe_sites(cfg.survey.candidate_spacing))
+    site_xy = np.array([(s.x, s.y) for s in sites])
+    visited = np.zeros(len(sites), dtype=bool)
+    here = graph.start_site()
+    for _ in range(min(budget, len(sites))):
+        k = policy.choose(Context(here, sites, site_xy, visited.copy(), tuple(readings), graph))
+        visited[k] = True
+        wps, _ = graph.shortest_path(here, sites[k])
+        yield [*wps[:-1], Waypoint(wps[-1].x, wps[-1].y, probe=True)]
+        here = sites[k]
+
+
 def run_survey(
     cfg: SimConfig,
     seed: int,
-    policy: str = "full_coverage",
+    policy: str = FIXED,
     rerun: bool = False,
     *,
     budget: int | None = None,
     rrd_path: Path | None = None,
     spawn: bool = True,
 ) -> RunResult:
-    if policy != "full_coverage":
-        raise ValueError(f"unknown policy {policy!r}")
-    rng_field, rng_soil, rng_probe, _ = world_rngs(seed)
+    """Simulate one survey. `policy` is one of policies.STRATEGIES ("full_coverage" = fixed)."""
+    policy = FIXED if policy == "full_coverage" else policy
+    budget = cfg.survey.probe_budget if budget is None else budget
+    rng_field, rng_soil, rng_probe, rng_policy = world_rngs(seed)
     layout = FieldLayout.generate(cfg.field, rng_field)
     truth = SoilTruth.generate(cfg.soil, layout, rng_soil)
     grid = GridSpec.for_field(cfg.field, cfg.mapping.output_resolution)
     truth_grid = truth_on_grid(truth, grid)
-    plan = LanePlanner.plan_full_coverage(layout, cfg, budget)
     mapper = make_mapper(cfg.mapping)
     probe = MoistureProbe(cfg.probe)
     follower = PurePursuit(cfg.rover)
+    readings: list[ProbeReading] = []
+
+    legs: Iterator[list[Waypoint]]
+    if policy == FIXED:
+        legs = iter([list(LanePlanner.plan_full_coverage(layout, cfg, budget).waypoints)])
+    else:
+        legs = _adaptive_legs(policy, cfg, layout, budget, readings, rng_policy)
 
     viz = None
     if rerun:
@@ -85,21 +119,22 @@ def run_survey(
 
         viz = RerunLogger(cfg, layout, seed, rrd_path, spawn)
 
-    wps = plan.waypoints
-    state = RoverState(wps[0].x, wps[0].y, math.atan2(wps[1].y - wps[0].y, wps[1].x - wps[0].x))
-    states, times, readings = [state], [0.0], []
+    start = LaneGraph.from_layout(layout).start_site()
+    prev = Waypoint(start.x, start.y)
+    states, times = [RoverState(start.x, start.y, 0.0)], [0.0]
     t = 0.0
-    for i, b in enumerate(wps):
-        if i > 0:
-            a = wps[i - 1]
-            seg = drive_segment(states[-1], (a.x, a.y), (b.x, b.y), follower, cfg.dt)
+    for leg in legs:
+        for b in leg:
+            seg = drive_segment(states[-1], (prev.x, prev.y), (b.x, b.y), follower, cfg.dt)
             seg_times = [t + cfg.dt * (k + 1) for k in range(len(seg))]
             t = seg_times[-1] if seg else t
             states += seg
             times += seg_times
+            prev = b
             if viz:
                 viz.log_drive(seg_times, seg)
-        if b.probe:
+            if not b.probe:
+                continue
             t += cfg.probe.insertion_time_s
             here = states[-1]
             reading = probe.read(truth, here.x, here.y, t, rng_probe)

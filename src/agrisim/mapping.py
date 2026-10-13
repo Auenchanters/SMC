@@ -107,28 +107,41 @@ class KrigingMapper(_Readings):
         super().__init__()
         self.cfg = cfg
 
-    def estimate(self, grid: GridSpec) -> tuple[FloatArray, FloatArray]:
+    def _krige(
+        self, style: str, x: FloatArray, y: FloatArray
+    ) -> tuple[FloatArray, FloatArray] | None:
+        """Kriging mean and variance, or None when the fallback applies."""
         xyz = self.xyz
-        if len(xyz) >= self.cfg.min_readings and np.ptp(xyz[:, 2]) > 0:
-            try:
-                with warnings.catch_warnings():
-                    warnings.simplefilter("ignore")
-                    ok = OrdinaryKriging(
-                        xyz[:, 0],
-                        xyz[:, 1],
-                        xyz[:, 2],
-                        variogram_model=self.cfg.variogram_model,
-                        pseudo_inv=True,
-                    )
-                    z, ss = ok.execute("grid", grid.x_centres, grid.y_centres)
-                mean = np.asarray(z, dtype=np.float64)
-                var = np.maximum(np.asarray(ss, dtype=np.float64), 0.0)
-                if np.isfinite(mean).all() and np.isfinite(var).all():
-                    return mean, var
-                log.warning("kriging returned non-finite values; using global mean")
-            except (ValueError, np.linalg.LinAlgError) as exc:
-                log.warning("kriging failed (%s); using global mean", exc)
-        return _global_mean(xyz[:, 2], grid)
+        if len(xyz) < self.cfg.min_readings or np.ptp(xyz[:, 2]) == 0:
+            return None
+        try:
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                ok = OrdinaryKriging(
+                    xyz[:, 0],
+                    xyz[:, 1],
+                    xyz[:, 2],
+                    variogram_model=self.cfg.variogram_model,
+                    pseudo_inv=True,
+                )
+                z, ss = ok.execute(style, x, y)
+        except (ValueError, np.linalg.LinAlgError) as exc:
+            log.warning("kriging failed (%s); using global mean", exc)
+            return None
+        mean = np.asarray(z, dtype=np.float64)
+        var = np.maximum(np.asarray(ss, dtype=np.float64), 0.0)
+        if not (np.isfinite(mean).all() and np.isfinite(var).all()):
+            log.warning("kriging returned non-finite values; using global mean")
+            return None
+        return mean, var
+
+    def estimate(self, grid: GridSpec) -> tuple[FloatArray, FloatArray]:
+        out = self._krige("grid", grid.x_centres, grid.y_centres)
+        return out if out is not None else _global_mean(self.xyz[:, 2], grid)
+
+    def predict_points(self, x: FloatArray, y: FloatArray) -> tuple[FloatArray, FloatArray] | None:
+        """Kriging mean and variance at points, or None if kriging is not usable yet."""
+        return self._krige("points", x, y)
 
 
 def make_mapper(cfg: MappingConfig) -> Mapper:

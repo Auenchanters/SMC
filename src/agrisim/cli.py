@@ -31,6 +31,9 @@ def run(
     seed: Annotated[int, typer.Option(help="Run seed")] = 0,
     rerun: Annotated[bool, typer.Option("--rerun", help="Open a Rerun viewer, save .rrd")] = False,
     budget: Annotated[int | None, typer.Option(help="Probe budget (default: config)")] = None,
+    policy: Annotated[
+        str, typer.Option(help="fixed_spacing, random, greedy_variance, greedy_variance_per_cost")
+    ] = "fixed_spacing",
     out: Annotated[Path, typer.Option(help="Root folder for run outputs")] = Path("runs"),
 ) -> None:
     """Run one survey and write runs/<UTC timestamp>_seed<seed>/."""
@@ -40,7 +43,8 @@ def run(
 
     cfg = load(config)
     out_dir = new_dir(out, run_dir_name(seed))
-    result = run_survey(cfg, seed, rerun=rerun, budget=budget, rrd_path=out_dir / "recording.rrd")
+    rrd = out_dir / "recording.rrd"
+    result = run_survey(cfg, seed, policy, rerun=rerun, budget=budget, rrd_path=rrd)
     save_run(result, out_dir)
     m, r = result.map_metrics, result.run_metrics
     typer.echo(f"run folder     {out_dir}")
@@ -56,6 +60,37 @@ def run(
     typer.echo(f"lane coverage  {r.lane_coverage:.3f}")
     typer.echo(f"plant contacts {r.plant_contacts}")
     typer.echo("Note: soil and probe parameters are placeholders until calibrated.")
+
+
+@app.command()
+def bench(
+    config: ConfigOpt,
+    seeds: Annotated[str, typer.Option(help="Seeds, e.g. 0-49 or 1,5,9")] = "0-49",
+    budget: Annotated[int, typer.Option(help="Probe budget, same for every strategy")] = 30,
+    strategies: Annotated[str, typer.Option(help="Comma-separated; default all")] = "",
+    workers: Annotated[int, typer.Option(help="Worker processes (1 = serial)")] = 1,
+    out: Annotated[Path, typer.Option(help="Root folder for outputs")] = Path("runs"),
+) -> None:
+    """Run every strategy on every seed; write runs/bench_<timestamp>/results.csv and summary.md."""
+    from datetime import UTC, datetime
+
+    from agrisim.bench import parse_seeds, run_benchmark, summary_markdown, write_results
+    from agrisim.config import load
+    from agrisim.io import new_dir
+    from agrisim.policies import STRATEGIES
+
+    names = [s.strip() for s in strategies.split(",") if s.strip()] or list(STRATEGIES)
+    unknown = set(names) - set(STRATEGIES)
+    if unknown:
+        raise typer.BadParameter(f"unknown strategies {sorted(unknown)}; choose from {STRATEGIES}")
+    cfg = load(config)
+    out_dir = new_dir(out, f"bench_{datetime.now(UTC):%Y%m%dT%H%M%SZ}")
+    rows = run_benchmark(cfg, parse_seeds(seeds), budget, names, workers)
+    write_results(rows, out_dir)
+    text = summary_markdown(rows, f"agrisim bench: {config.name}, budget {budget}")
+    (out_dir / "summary.md").write_text(text, encoding="utf-8")
+    typer.echo(text)
+    typer.echo(f"wrote {out_dir}")
 
 
 if __name__ == "__main__":
