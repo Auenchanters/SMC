@@ -98,7 +98,7 @@ Soil moisture is volumetric water content (VWC): cubic metres of water per cubic
 
 The adaptive strategies drive between spots along lanes and headlands only. They reverse along a lane instead of turning around inside it, because turning on the spot in a lane would brush the plants.
 
-Results so far (50 fields, 30 probes each) are in EXECPLAN.md under "Artifacts and Notes". The short version: on this placeholder field, plain fixed spacing gives the lowest map error. Greedy max-variance matches it and finds dry patches better, but drives about 70% further. Variance-per-cost is the cheapest mission but less accurate.
+Results so far (50 fields, 30 probes each) are in EXECPLAN.md under "Artifacts and Notes". The short version: on this placeholder field, plain fixed spacing gives the lowest map error. Greedy max-variance matches it and finds dry patches better, but drives about 70% further. Variance-per-cost is the cheapest mission but less accurate. The first trained PPO policy (200k steps) did not beat these baselines on held-out fields; it behaves close to random.
 
 ## Optional: train on the NVIDIA GPU
 

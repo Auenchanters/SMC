@@ -22,8 +22,8 @@ opens a Rerun viewer showing the field, plants, lanes, the moving rover, probe p
 - [x] M5 Mapping (kriging) and metrics. (2026-10-13)
 - [x] M6 Simulation runner, CLI, run outputs and Rerun visualisation. (2026-10-13)
 - [x] M7 Benchmark harness and baseline probing strategies. (2026-10-13)
-- [ ] M8 Gymnasium environment, MaskablePPO training and evaluation.
-- [ ] M9 Team-facing README and demo script.
+- [x] M8 Gymnasium environment, MaskablePPO training and evaluation. (2026-10-13) Training and held-out evaluation done; the learned policy does not beat the baselines (see Outcomes).
+- [x] M9 Team-facing README and demo script. (2026-10-13)
 
 ## Surprises & Discoveries
 
@@ -49,6 +49,8 @@ opens a Rerun viewer showing the field, plants, lanes, the moving rover, probe p
 - M6: rerun-sdk 0.39 API used: `rr.RecordingStream`, `rec.spawn(connect=False)`, `rec.set_sinks(rr.GrpcSink(), rr.FileSink(path))`, `rec.set_time('sim_time', duration=t)`, `rr.LineStrips2D`, `rr.Boxes2D`, `rr.Points2D`, `rr.Image`, `rr.Scalars`. The spawned viewer is a detached process that inherits stdout; when the command's output is piped (as in an agent tool) the pipe stays open until the viewer closes, although the run itself has finished. In an interactive PowerShell the command returns normally.
 - M7: Adaptive strategies first produced plant contacts (up to 76 per run): to reach a site behind it in the same lane, the rover turned 180 deg in place, and the footprint's turning circle (0.32 m) is wider than the clear half-lane (0.30 m). The follower now reverses along a segment that points behind it (heading error > 90 deg + 0.3 rad), so in-lane heading never flips; rotations only happen on headland centrelines. New test covers in-lane backtracking. All 200 bench runs now have zero contacts.
 - M7: Benchmark (seeds 0-49, budget 30): fixed spacing has the lowest RMSE (0.0323 +/- 0.0016) and is not beaten by any adaptive strategy on map error. Greedy max-variance matches it on RMSE (0.0327 +/- 0.0019) and has the best dry-cell F1 (0.44 vs 0.33) but drives 69% further (785 m vs 466 m). Greedy variance-per-cost is the cheapest (152 m, 652 s vs 1351 s) but has the worst RMSE (0.0387). Random is worse than fixed spacing on every map metric. Dry-cell precision is undefined (no predicted dry cell) on 11-17 of 50 seeds per strategy: kriging smooths out small dry patches.
+- M8: Env step costs ~21 ms, almost all of it kriging (variogram fit + 2400-cell grid). With 6 spawn SubprocVecEnv workers, 200k steps took 24.5 min on the 16-thread laptop CPU. PPO updates showed high approx_kl (~0.09) and clip fraction (~0.67) early on: large policy steps.
+- M8: Training episode reward rose from -0.04 (about random) to ~0.2 within ~60k steps, then plateaued noisily between 0.09 and 0.25 up to 200k steps. On held-out seeds the policy behaves close to random (similar path length and RMSE). Likely causes, untested: a 128-d global CNN feature followed by a linear head over 464 site actions is weak at spatial choice (a fully convolutional per-cell action head would fit better); 200k steps is only ~6.7k episodes; per-step RMSE-change rewards are noisy. Not tuned further, per CLAUDE.md (no tuning to make results look good).
 
 ## Decision Log
 
@@ -101,6 +103,8 @@ opens a Rerun viewer showing the field, plants, lanes, the moving rover, probe p
 - Decision (M6): Each seed is split with `SeedSequence(seed).spawn(4)` into independent streams for layout, soil, probe noise and policy, so every policy sees the identical field and soil for a given seed. Maps are coloured with fixed ranges (VWC: vwc_clip; abs error: [0, 2 std_vwc]; variance: [0, (2 std_vwc)^2]) in both the PNG and Rerun. `truth.npy` is truth resampled to the output grid so it aligns with `estimate.npy` and `variance.npy`. The probe reads at the rover's actual stopping pose (within 1 cm of the stop), not the nominal site. NaN metrics are written as null in metrics.json. Date: 2026-10-13.
 - Decision (M7): Adaptive strategies start at the west end of lane 0 and stop after the last probe (no return leg); fixed spacing drives the whole full-coverage route, so its path length includes lanes after its last probe. Uncertainty for the greedy strategies is ordinary-kriging variance at the candidate sites from the readings so far; before kriging is usable (< min_readings) it is the distance to the nearest probe (maximin spread). Variance-per-cost divides by (lane-graph distance / max_speed + insertion_time_s). The bench also reports global-mean and IDW RMSE on each strategy's own readings. Intervals are 95% Student-t over seeds; undefined values (NaN) are dropped and n is shown. Parallel workers use an explicit spawn context on every OS. Date: 2026-10-13.
 - Decision (M7): Differential-drive rover may drive in reverse along a segment (see Surprises). Rationale: safer than an in-lane U-turn and cheaper than detouring through a headland. Date: 2026-10-13.
+- Decision (M8): Observation = 6 x 40 x 60 float32 channels on the 0.5 m mapping grid: kriging mean ((m - mean_vwc) / std_vwc), variance / std_vwc^2, probed-cell mask, rover cell, budget fraction left, normalised time; clipped to [-10, 10]. Before kriging is usable the map is the config prior (mean_vwc, std_vwc^2). Reward = 100 x (RMSE before - RMSE after) - 0.001 x travel seconds; time_penalty and reward_scale are constructor arguments, not soil placeholders. The env abstracts driving as lane-graph distance / max_speed; evaluation instead runs the trained model inside run_survey with the full kinematic drive, so it is compared with the baselines under identical conditions. Training episodes draw seeds >= 1000; eval refuses seeds >= 1000. MaskablePPO: SmallCNN (3 conv + linear 128), net_arch pi=[256], vf=[256], n_steps 1024/n_envs, batch 64, ent_coef 0.01, CPU. Date: 2026-10-13.
+- Decision (M9): README documents an optional CUDA torch swap with `uv pip install --reinstall torch==2.14.1 --index-url https://download.pytorch.org/whl/cu126` plus `uv run --no-sync`, leaving the lockfile CPU-only. torch 2.14.1 publishes Windows cp313 wheels for cu126 and cu130 (not cu128), checked 2026-10-13. Not verified on the RTX 3050 in this session: `agrisim train` uses device="cpu". Date: 2026-10-13.
 
 ## Outcomes & Retrospective
 
@@ -114,6 +118,9 @@ opens a Rerun viewer showing the field, plants, lanes, the moving rover, probe p
 - M5: Mapper protocol with GlobalMean, IDW and Kriging (with global-mean fallback) done; metrics done. On a smooth synthetic field with 80 samples, kriging RMSE is below a quarter of the global-mean RMSE. 51 tests pass.
 - M6: `agrisim run` works headless and with `--rerun` (viewer opened, recording.rrd 1.5 MB). Seed 7 demo: zero contacts, lane coverage 1.000, 60 probes. Two runs with the same seed give byte-identical metrics.json. 54 tests pass.
 - M7: `agrisim bench` runs 4 strategies x 50 seeds in 41 s with 4 spawn workers; serial and parallel results are identical (test). Acceptance: zero plant contacts on every seed and strategy; kriging RMSE below global-mean RMSE on 50/50 seeds for fixed spacing (target >= 90%). Honest result: no adaptive strategy beats fixed spacing on RMSE at budget 30 on this placeholder field. 59 tests pass.
+- M8: `AdaptiveProbingEnv` passes gymnasium `check_env`, is deterministic per episode seed, and masks probed sites. `agrisim train` (MaskablePPO, 200k steps, seed 0) and `agrisim eval` (seeds 100-149, budget 30, same as every baseline) both ran. Result on held-out seeds: PPO RMSE 0.0357 +/- 0.0020 vs greedy max-variance 0.0333 +/- 0.0019, fixed spacing 0.0338 +/- 0.0018, random 0.0354 +/- 0.0019, variance-per-cost 0.0364 +/- 0.0023. PPO drives 689 m (random 733 m, fixed 466 m, variance-per-cost 149 m). Zero plant contacts for every strategy. The learned policy does not beat the simple baselines; the greedy-variance baseline remains the best adaptive strategy (context.md risk: "the baseline alone is a valid product").
+- M9: README for beginners (install, the commands, outputs, every metric, placeholder warning, optional GPU) and scripts/demo.ps1 + demo.sh done. 62 tests pass; ruff, mypy strict and licence gate pass.
+- Overall (2026-10-13): All of M0-M9 work on Windows 11 natively (no WSL, Docker or compiler) and pass CI on windows-latest and ubuntu-latest. Acceptance met: deterministic runs, zero plant contacts on all evaluated seeds and strategies, full lane coverage for fixed spacing, kriging beats global mean on 50/50 seeds. What remains: calibrate soil/probe placeholders with real data; choose a project licence for agrisim; try a fully convolutional action head or longer training if adaptive probing matters; verify the optional CUDA path on the RTX 3050; Phase 2 (Gazebo/ROS 2) is a separate plan.
 
 ## Context and Orientation
 
@@ -248,6 +255,15 @@ Every command writes to a new timestamped folder under `runs/` and never overwri
     | mission_time_s  | 1351               | 1965               | 2023               | 652.1              |
     | plant_contacts  | 0                  | 0                  | 0                  | 0                  |
     Kriging RMSE < global-mean RMSE: 50/50, 50/50, 49/50, 48/50 seeds.
+    > uv run agrisim train --config configs/demo.yaml --timesteps 200000 --seed 0 --n-envs 6 --out runs/ppo_v1   (M8; 1467 s; ep_rew_mean -0.04 -> ~0.2)
+    > uv run agrisim eval --model runs/ppo_v1/model.zip --config configs/demo.yaml --seeds 100-149 --budget 30 --workers 6
+    | metric          | fixed_spacing      | random             | greedy_variance    | greedy_var_per_cost | ppo               |
+    | rmse            | 0.03378 +/- 0.0018 | 0.03544 +/- 0.0019 | 0.03328 +/- 0.0019 | 0.03637 +/- 0.0023  | 0.03573 +/- 0.002 |
+    | r2              | 0.5438             | 0.4974             | 0.5534             | 0.4644              | 0.4864            |
+    | dry_f1          | 0.2393 (n=36)      | 0.251 (n=33)       | 0.3265 (n=42)      | 0.2802 (n=34)       | 0.268 (n=36)      |
+    | path_length_m   | 465.7              | 733.4              | 774.9              | 149.3               | 689.2             |
+    | mission_time_s  | 1351               | 1955               | 1999               | 647.8               | 1860              |
+    | plant_contacts  | 0                  | 0                  | 0                  | 0                   | 0                 |
 
 ## Interfaces and Dependencies
 
