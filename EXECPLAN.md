@@ -19,7 +19,7 @@ opens a Rerun viewer showing the field, plants, lanes, the moving rover, probe p
 - [x] M2 Ground-truth soil-moisture generator. (2026-10-13)
 - [x] M3 Moisture probe sensor model. (2026-10-13)
 - [x] M4 Rover kinematics, lane planner, path follower and plant-contact safety. (2026-10-13)
-- [ ] M5 Mapping (kriging) and metrics.
+- [x] M5 Mapping (kriging) and metrics. (2026-10-13)
 - [ ] M6 Simulation runner, CLI, run outputs and Rerun visualisation.
 - [ ] M7 Benchmark harness and baseline probing strategies.
 - [ ] M8 Gymnasium environment, MaskablePPO training and evaluation.
@@ -43,6 +43,7 @@ opens a Rerun viewer showing the field, plants, lanes, the moving rover, probe p
 - M4: The demo plan is 466 m of driving and 21,699 steps at dt = 0.05 s. A Python-level step loop costs about 70 µs per step (~1.5 s per full drive), so the 20-seed zero-contact test takes ~30 s. Acceptable for now; revisit if the benchmark is too slow.
 - M4: Measured on seeds 0-4: with the footprint inflated by safety_margin on every side there are still zero canopy overlaps, and the maximum lateral tracking error inside lanes is 0.36 mm (turn-in-place then pure pursuit along straight segments).
 - M4: scipy-stubs types `KDTree.query_ball_point` loosely; a `cast(list[list[int]], ...)` is needed under mypy strict.
+- M5: PyKrige 1.7.3 ships no type information; mypy override `ignore_missing_imports` for `pykrige.*`. PyKrige emits warnings during variogram fitting on small samples; they are silenced inside `KrigingMapper.estimate`. `pseudo_inv=True` is used so repeated probe locations do not make the kriging system singular.
 
 ## Decision Log
 
@@ -91,6 +92,7 @@ opens a Rerun viewer showing the field, plants, lanes, the moving rover, probe p
 - Decision (M3): Probe value = mean over footprint disc + bias + N(0, noise_std), rounded to resolution, clipped to [0, 1]. Failure returns valid=False, value=None. `ProbeReading` is a frozen dataclass with fields x, y, t, value, valid, sensor_id only (test enforces no truth field). Date: 2026-10-13.
 - Decision (M4): The full-coverage plan places a candidate stop every probe_spacing m per lane (16 lanes x 14 = 224 on the demo field), then thins them evenly along the route to the probe budget (60 in demo.yaml, or --budget in the bench). Rationale: the plan text asks for both a probe_spacing and a probe_budget; thinning along the boustrophedon gives a staggered, roughly uniform pattern with the same budget as the adaptive strategies. Date: 2026-10-13.
 - Decision (M4): Path following = turn in place until heading error <= 0.15 rad, then pure pursuit (lookahead 0.3 m) along each straight segment; a segment ends within 1 cm of its end point. `contacts` is an analytic rectangle-vs-circle test on (S, 3) pose arrays with a KD-tree for candidates, cross-checked against Shapely on 300 random poses. `LaneGraph` is closed form (same lane: |dx|; else min over the west and east headlands), which is exact for straight parallel lanes, instead of a general graph search. Date: 2026-10-13.
+- Decision (M5): IDW variance is NaN everywhere (IDW has no uncertainty model; no invented proxy). GlobalMean variance is the sample variance (ddof=1). Dry precision/recall are NaN when undefined (no predicted / no true dry cells); F1 is NaN if either is NaN and 0 if both are 0. Calibration = fraction of cells with |truth - mean| <= 1.96 sqrt(var), NaN when there is no variance. Lane coverage = fraction of lane-centreline points (every 0.1 m) within 0.1 m of a driven pose. Truth is resampled to the output grid by bilinear sampling at output cell centres (exact 2x2 block mean for 0.25 m -> 0.5 m). Date: 2026-10-13.
 
 ## Outcomes & Retrospective
 
@@ -101,6 +103,7 @@ opens a Rerun viewer showing the field, plants, lanes, the moving rover, probe p
 - M2: `SoilTruth.generate` produces a float32 (80, 120) grid for the demo field; tests cover determinism, clip range, correlation ordering (25 m smoother than 4 m), dry-patch effect, bilinear and disc sampling. 19 tests pass.
 - M3: `MoistureProbe.read` done. Over 4000 reads the mean error matches the configured bias and the error std matches noise_std within 5%; failure rate matches failure_prob. 22 tests pass.
 - M4: Kinematics, full-coverage planner, pure-pursuit follower, contact detection and lane-graph shortest paths done. Full plan driven on 20 seeds with zero plant contacts; shortest paths only use lane and headland centrelines; oversized rover rejected (M1). 46 tests pass (~43 s).
+- M5: Mapper protocol with GlobalMean, IDW and Kriging (with global-mean fallback) done; metrics done. On a smooth synthetic field with 80 samples, kriging RMSE is below a quarter of the global-mean RMSE. 51 tests pass.
 
 ## Context and Orientation
 
