@@ -20,7 +20,7 @@ opens a Rerun viewer showing the field, plants, lanes, the moving rover, probe p
 - [x] M3 Moisture probe sensor model. (2026-10-13)
 - [x] M4 Rover kinematics, lane planner, path follower and plant-contact safety. (2026-10-13)
 - [x] M5 Mapping (kriging) and metrics. (2026-10-13)
-- [ ] M6 Simulation runner, CLI, run outputs and Rerun visualisation.
+- [x] M6 Simulation runner, CLI, run outputs and Rerun visualisation. (2026-10-13)
 - [ ] M7 Benchmark harness and baseline probing strategies.
 - [ ] M8 Gymnasium environment, MaskablePPO training and evaluation.
 - [ ] M9 Team-facing README and demo script.
@@ -44,6 +44,9 @@ opens a Rerun viewer showing the field, plants, lanes, the moving rover, probe p
 - M4: Measured on seeds 0-4: with the footprint inflated by safety_margin on every side there are still zero canopy overlaps, and the maximum lateral tracking error inside lanes is 0.36 mm (turn-in-place then pure pursuit along straight segments).
 - M4: scipy-stubs types `KDTree.query_ball_point` loosely; a `cast(list[list[int]], ...)` is needed under mypy strict.
 - M5: PyKrige 1.7.3 ships no type information; mypy override `ignore_missing_imports` for `pykrige.*`. PyKrige emits warnings during variogram fitting on small samples; they are silenced inside `KrigingMapper.estimate`. `pseudo_inv=True` is used so repeated probe locations do not make the kriging system singular.
+- M6: The first full-coverage waypoint is itself a probe stop; the first loop version only probed on arrival and silently used 59 of 60 probes. Fixed, and the CLI test now asserts probes_used == probe_budget.
+- M6: `np.clip` on Python scalars inside `rover.step` cost ~90% of simulation time. Plain min/max made `run_survey` ~10x faster (0.2 s per demo survey, identical results).
+- M6: rerun-sdk 0.39 API used: `rr.RecordingStream`, `rec.spawn(connect=False)`, `rec.set_sinks(rr.GrpcSink(), rr.FileSink(path))`, `rec.set_time('sim_time', duration=t)`, `rr.LineStrips2D`, `rr.Boxes2D`, `rr.Points2D`, `rr.Image`, `rr.Scalars`. The spawned viewer is a detached process that inherits stdout; when the command's output is piped (as in an agent tool) the pipe stays open until the viewer closes, although the run itself has finished. In an interactive PowerShell the command returns normally.
 
 ## Decision Log
 
@@ -93,6 +96,7 @@ opens a Rerun viewer showing the field, plants, lanes, the moving rover, probe p
 - Decision (M4): The full-coverage plan places a candidate stop every probe_spacing m per lane (16 lanes x 14 = 224 on the demo field), then thins them evenly along the route to the probe budget (60 in demo.yaml, or --budget in the bench). Rationale: the plan text asks for both a probe_spacing and a probe_budget; thinning along the boustrophedon gives a staggered, roughly uniform pattern with the same budget as the adaptive strategies. Date: 2026-10-13.
 - Decision (M4): Path following = turn in place until heading error <= 0.15 rad, then pure pursuit (lookahead 0.3 m) along each straight segment; a segment ends within 1 cm of its end point. `contacts` is an analytic rectangle-vs-circle test on (S, 3) pose arrays with a KD-tree for candidates, cross-checked against Shapely on 300 random poses. `LaneGraph` is closed form (same lane: |dx|; else min over the west and east headlands), which is exact for straight parallel lanes, instead of a general graph search. Date: 2026-10-13.
 - Decision (M5): IDW variance is NaN everywhere (IDW has no uncertainty model; no invented proxy). GlobalMean variance is the sample variance (ddof=1). Dry precision/recall are NaN when undefined (no predicted / no true dry cells); F1 is NaN if either is NaN and 0 if both are 0. Calibration = fraction of cells with |truth - mean| <= 1.96 sqrt(var), NaN when there is no variance. Lane coverage = fraction of lane-centreline points (every 0.1 m) within 0.1 m of a driven pose. Truth is resampled to the output grid by bilinear sampling at output cell centres (exact 2x2 block mean for 0.25 m -> 0.5 m). Date: 2026-10-13.
+- Decision (M6): Each seed is split with `SeedSequence(seed).spawn(4)` into independent streams for layout, soil, probe noise and policy, so every policy sees the identical field and soil for a given seed. Maps are coloured with fixed ranges (VWC: vwc_clip; abs error: [0, 2 std_vwc]; variance: [0, (2 std_vwc)^2]) in both the PNG and Rerun. `truth.npy` is truth resampled to the output grid so it aligns with `estimate.npy` and `variance.npy`. The probe reads at the rover's actual stopping pose (within 1 cm of the stop), not the nominal site. NaN metrics are written as null in metrics.json. Date: 2026-10-13.
 
 ## Outcomes & Retrospective
 
@@ -104,6 +108,7 @@ opens a Rerun viewer showing the field, plants, lanes, the moving rover, probe p
 - M3: `MoistureProbe.read` done. Over 4000 reads the mean error matches the configured bias and the error std matches noise_std within 5%; failure rate matches failure_prob. 22 tests pass.
 - M4: Kinematics, full-coverage planner, pure-pursuit follower, contact detection and lane-graph shortest paths done. Full plan driven on 20 seeds with zero plant contacts; shortest paths only use lane and headland centrelines; oversized rover rejected (M1). 46 tests pass (~43 s).
 - M5: Mapper protocol with GlobalMean, IDW and Kriging (with global-mean fallback) done; metrics done. On a smooth synthetic field with 80 samples, kriging RMSE is below a quarter of the global-mean RMSE. 51 tests pass.
+- M6: `agrisim run` works headless and with `--rerun` (viewer opened, recording.rrd 1.5 MB). Seed 7 demo: zero contacts, lane coverage 1.000, 60 probes. Two runs with the same seed give byte-identical metrics.json. 54 tests pass.
 
 ## Context and Orientation
 
@@ -219,6 +224,15 @@ Every command writes to a new timestamped folder under `runs/` and never overwri
 ## Artifacts and Notes
 
 (Paste short command transcripts, sample metric outputs and screenshots of the Rerun view here as milestones complete.)
+    > uv run agrisim run --config configs/demo.yaml --seed 7   (M6, 2026-10-13)
+    policy         full_coverage
+    RMSE / MAE     0.0299 / 0.0230 m3/m3   R2 0.677
+    dry cells      precision 0.870  recall 0.116  F1 0.205  (truth dry fraction 0.072)
+    calibration95  0.979
+    probes         59 valid / 60 used
+    path / time    465.7 m / 1685 s
+    lane coverage  1.000
+    plant contacts 0
 
 ## Interfaces and Dependencies
 
