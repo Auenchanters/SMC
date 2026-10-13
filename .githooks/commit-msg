@@ -1,0 +1,11 @@
+#!/bin/sh
+# Reject commits that credit Claude/Anthropic (see CLAUDE.md, "Git authorship").
+if grep -qiE 'co-authored-by:.*(claude|anthropic)|noreply@anthropic\.com|generated with \[?claude' "$1"; then
+    echo "commit-msg: Claude/Anthropic attribution is not allowed in this repository." >&2
+    exit 1
+fi
+ident="$(git var GIT_AUTHOR_IDENT) $(git var GIT_COMMITTER_IDENT)"
+if echo "$ident" | grep -qiE 'claude|anthropic'; then
+    echo "commit-msg: Claude/Anthropic may not be author or committer." >&2
+    exit 1
+fi

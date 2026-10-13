@@ -1,0 +1,15 @@
+#!/bin/sh
+# Block pushes containing any commit that credits Claude/Anthropic (see CLAUDE.md, "Git authorship").
+zero=0000000000000000000000000000000000000000
+while read -r local_ref local_sha remote_ref remote_sha; do
+    [ "$local_sha" = "$zero" ] && continue
+    if [ "$remote_sha" = "$zero" ]; then range="$local_sha"; else range="$remote_sha..$local_sha"; fi
+    bad_ident=$(git log --format='%h %an <%ae> / %cn <%ce>' "$range" | grep -iE 'claude|anthropic')
+    bad_msg=$(git log --format='%h %B' "$range" | grep -iE 'co-authored-by:.*(claude|anthropic)|noreply@anthropic\.com|generated with \[?claude')
+    if [ -n "$bad_ident$bad_msg" ]; then
+        echo "pre-push: Claude/Anthropic attribution found; push blocked:" >&2
+        printf '%s\n%s\n' "$bad_ident" "$bad_msg" >&2
+        exit 1
+    fi
+done
+exit 0
