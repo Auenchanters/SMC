@@ -1,121 +1,204 @@
-# agrisim
+<div align="center">
 
-A pure-Python simulator of a planted tomato field. A small rover drives the lanes between plant rows without touching any plant, stops to push a moisture probe into the soil, and builds a moisture map of the whole field plus a map of how uncertain that estimate is. It also has a Gymnasium environment for training a rover to choose where to probe.
+# 🌱 agrisim: soil-moisture survey simulator
 
-This is "Layer A" of the AgriRover project: no ROS, no 3D engine. Background and design are in [context.md](context.md); the build plan and its results are in [EXECPLAN.md](EXECPLAN.md).
+**A rover drives the lanes of a tomato field without touching a plant, probes the soil, and maps where the field is too dry.**
 
-> **All soil and probe numbers are placeholders.** Soil moisture levels, noise, dry-patch sizes, row spacing and the "dry" threshold in `configs/demo.yaml` are not yet calibrated against a real field or a real probe. Use the results to compare strategies inside the simulator. Do not present them as field accuracy.
+[![CI](https://github.com/Auenchanters/SMC/actions/workflows/ci.yml/badge.svg)](https://github.com/Auenchanters/SMC/actions/workflows/ci.yml)
+[![Python 3.13](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Windows native](https://img.shields.io/badge/Windows-native,_no_WSL-0078D4?logo=windows&logoColor=white)](#quickstart)
+[![tests](https://img.shields.io/badge/tests-64_passing-3FB950)](tests/)
+[![Gymnasium](https://img.shields.io/badge/Gymnasium-1.3-0081A5)](https://gymnasium.farama.org/)
+[![Rerun](https://img.shields.io/badge/Rerun-0.39-6E40C9)](https://rerun.io/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-## Install (Windows, PowerShell)
+A pure-Python simulator of a planted tomato field. A small differential-drive rover follows the lanes between plant rows, stops to push a moisture probe into the soil, and turns a few dozen noisy readings into a **full-field moisture map plus an uncertainty map**. The same world is a **Gymnasium environment**, so you can train a rover to decide *where* to probe and compare it honestly with simple strategies.
 
-You need [uv](https://docs.astral.sh/uv/) and git. Nothing else: no WSL, Docker or compiler.
+> **On 50 held-out fields with 30 probes each: zero plant contacts in all 250 runs, and the kriged map beats a field-average map on 248 of 250. The trained RL policy did *not* beat the simple baselines, and we say so.**
+
+![A full-coverage survey: the rover (red) drives every lane, each probe updates the map, the hidden truth is on the right](docs/img/survey.gif)
+
+<sub>Real simulator output, seed 7. Higher-quality video: [docs/media/survey.mp4](docs/media/survey.mp4). Soil parameters are placeholders until calibrated.</sub>
+
+</div>
+
+---
+
+## Table of contents
+
+- [Why this exists](#why-this-exists)
+- [Results](#results)
+- [How it works](#how-it-works)
+- [Architecture](#architecture)
+- [Screenshots](#screenshots)
+- [Quickstart](#quickstart)
+- [What a run produces](#what-a-run-produces)
+- [Testing](#testing)
+- [Regenerating the images and video](#regenerating-the-images-and-video)
+- [Optional: NVIDIA GPU](#optional-nvidia-gpu)
+- [Project structure](#project-structure)
+- [Limitations and honest notes](#limitations-and-honest-notes)
+- [Roadmap](#roadmap)
+- [Handover](#handover)
+- [License](#license)
+
+---
+
+## Why this exists
+
+Farmers usually water a whole field the same way, and dry patches show up only once the plants suffer. A soil-moisture survey fixes that, but a probe reads one spot at a time and each insertion takes about 10 seconds. The questions this project answers in simulation, before any hardware is bought:
+
+1. **Can a small rover cover a planted field without touching a single plant?** It may only drive the lanes between rows and turn in the headlands at the field edges.
+2. **How few probes are enough to map the whole field, and how sure is the map?** Every map comes with its own uncertainty.
+3. **Does choosing probe spots adaptively (or with reinforcement learning) beat a plain evenly-spaced survey?** It has to be tested on the same fields and with the same probe budget.
+
+This is **Layer A** of the AgriRover project (MSRIT, first-year AI & DS team): pure Python, no ROS and no 3D engine, so it runs headless on any laptop. The idea of a scouting rover is not new (see [context.md §4](context.md)); the value here is doing these three things carefully and reporting them honestly.
+
+## Results
+
+All numbers below come from `agrisim eval` (held-out fields, seeds 100-149, budget 30 probes) and `agrisim bench` (seeds 0-49). Transcripts are in [EXECPLAN.md, *Artifacts and Notes*](EXECPLAN.md#artifacts-and-notes).
+
+![Held-out results: RMSE, distance driven, and dry-zone F1 per strategy with 95% intervals](docs/img/results.png)
+
+| Strategy | Map error (RMSE, VWC) | R² | Dry-zone F1 | Distance | Mission time | Plant contacts |
+|---|---|---|---|---|---|---|
+| **greedy_variance** | **0.0333 ± 0.0019** | **0.55** | **0.33** | 775 m | 33 min | 0 |
+| fixed_spacing (full coverage) | 0.0338 ± 0.0018 | 0.54 | 0.24 | 466 m | 23 min | 0 |
+| random | 0.0354 ± 0.0019 | 0.50 | 0.25 | 733 m | 33 min | 0 |
+| ppo (MaskablePPO, 200k steps) | 0.0357 ± 0.0020 | 0.49 | 0.27 | 689 m | 31 min | 0 |
+| greedy_variance_per_cost | 0.0364 ± 0.0023 | 0.46 | 0.28 | **149 m** | **11 min** | 0 |
+
+<sub>Mean ± 95% Student-t interval over 50 held-out fields. A single field-average value would score RMSE ≈ 0.052 with the same readings. Dry-zone F1 is undefined on fields where a map predicts no dry cell (8 to 17 fields per strategy); those are left out of its mean.</sub>
+
+**What this means:**
+
+- **Safety holds.** No strategy ever touched a plant: 250 held-out runs plus 200 bench runs, all with zero contacts.
+- **The map is honest about its uncertainty.** About 96% of cells fall inside the map's own 95% band (target 95%).
+- **The simple survey is hard to beat.** Even spacing and greedy "probe where the map is least sure" are statistically tied on map error. Greedy finds dry zones best, but drives 66% further.
+- **Cheap but rougher.** Variance-per-cost finishes in less than half the time and is about 8% worse on map error.
+- **RL did not win yet.** The first learned policy behaves close to random. Likely causes are listed in the [ExecPlan](EXECPLAN.md#surprises--discoveries).
+
+## How it works
+
+Per mission, from one config file and one integer seed:
+
+1. **Build a field.** Rows, plants with random canopy sizes and gaps, lanes, headlands ([field.py](src/agrisim/field.py)). Config validation refuses a rover that would not fit in a lane or could not turn in the headland, and the error message states the numbers.
+2. **Hide a believable moisture field.** A spatially correlated Gaussian random field made with FFT, with wetter drip-line stripes along the rows plus random dry patches (a clogged emitter) and wet patches (a leak) ([soil.py](src/agrisim/soil.py)). Only the probe, the metrics and the RL reward may read it.
+3. **Choose where to probe.** Fixed spacing, random, greedy max-variance, variance per travel cost, or a trained PPO policy ([policies.py](src/agrisim/policies.py)).
+4. **Drive there safely.** Paths use only lane and headland centrelines ([planning.py](src/agrisim/planning.py)). The rover turns in place in headlands, follows lanes with pure pursuit, and **reverses** instead of making a U-turn inside a lane ([control.py](src/agrisim/control.py)). Every pose is checked against every nearby canopy ([safety.py](src/agrisim/safety.py)).
+5. **Probe.** The reading is the footprint average plus bias, Gaussian noise and quantisation, and probes sometimes fail ([sensor.py](src/agrisim/sensor.py)).
+6. **Map.** Ordinary kriging with a fitted variogram gives a mean map and a variance map. With too few readings it falls back to the field average; it never crashes ([mapping.py](src/agrisim/mapping.py)).
+7. **Score.** RMSE, MAE, R², dry-cell precision/recall/F1, uncertainty calibration, distance, time, lane coverage and plant contacts ([metrics.py](src/agrisim/metrics.py)).
+
+The same config and seed always give a byte-identical `metrics.json`.
+
+## Architecture
+
+![agrisim architecture](docs/img/architecture.svg)
+
+Everything is driven by one YAML file ([configs/demo.yaml](configs/demo.yaml)). Every physical number in it is marked `# PLACEHOLDER: calibrate`.
+
+## Screenshots
+
+| | |
+|:---:|:---:|
+| ![Strategies on one field](docs/img/strategies.png) **Same field, same budget.** Where each strategy drives (blue) and probes (black). | ![Maps](docs/img/maps.png) **One run's output.** Truth, estimate, absolute error and kriging variance, all on fixed colour scales. |
+
+![Final frame of the survey](docs/img/hero.png)
+
+**Live view:** `--rerun` opens the [Rerun](https://rerun.io/) viewer. It shows the field, the moving rover, probes coloured by reading, the four maps updating after each probe, and RMSE over time. Scrub the `sim_time` timeline to replay a mission.
+
+## Quickstart
+
+Windows PowerShell (Linux and macOS use the same commands). You need [uv](https://docs.astral.sh/uv/) and git. You do not need WSL, Docker or a compiler.
 
 ```powershell
 powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
-```
-
-Then, in the repository folder:
-
-```powershell
+git clone git@github.com:Auenchanters/SMC.git
+cd SMC
 uv sync
 git config core.hooksPath .githooks
 ```
 
-`uv sync` installs Python 3.13 and every pinned dependency into `.venv`. The second command turns on the repository's git hooks (see [CLAUDE.md](CLAUDE.md)). The same commands work on Linux and macOS.
+`uv sync` installs Python 3.13 and every pinned dependency into `.venv`. The last line turns on the repository's git hooks (see [CLAUDE.md](CLAUDE.md)).
 
-## The commands
-
-Run one survey with seed 7 and watch it live in the Rerun viewer:
+**1. One survey** (add `--rerun` to watch it live):
 
 ```powershell
-uv run agrisim run --config configs/demo.yaml --seed 7 --rerun
+uv run agrisim run --config configs/demo.yaml --seed 7
 ```
 
-Leave out `--rerun` to run without a window. Add `--policy greedy_variance` (or `random`, `greedy_variance_per_cost`) to try another probing strategy, and `--budget 30` to change the number of probes.
+```text
+run folder     runs\20261013T173847Z_seed7
+policy         fixed_spacing
+RMSE / MAE     0.0299 / 0.0230 m3/m3   R2 0.677
+dry cells      precision 0.870  recall 0.116  F1 0.205  (truth dry fraction 0.072)
+calibration95  0.979
+probes         59 valid / 60 used
+path / time    465.7 m / 1685 s
+lane coverage  1.000
+plant contacts 0
+```
 
-Compare all probing strategies over 50 random fields with the same probe budget:
+Other options: `--policy random|greedy_variance|greedy_variance_per_cost`, `--budget 30`, or the shipped learned policy with `--policy ppo --model models/ppo_v1/model.zip`.
+
+**2. Compare strategies** on 50 random fields with the same probe budget (about 40 s with 4 workers):
 
 ```powershell
 uv run agrisim bench --config configs/demo.yaml --seeds 0-49 --budget 30 --workers 4
 ```
 
-Train a learned probing policy, then evaluate it next to every baseline on 50 fields it never saw:
+**3. Train and evaluate a learned policy.** Training takes about 25 min on a 16-thread laptop CPU. Evaluation runs every baseline on the same 50 held-out fields:
 
 ```powershell
 uv run agrisim train --config configs/demo.yaml --timesteps 200000 --seed 0 --n-envs 6 --out runs/ppo_v1
-uv run agrisim eval --model runs/ppo_v1/model.zip --config configs/demo.yaml --seeds 100-149 --budget 30
+uv run agrisim eval --model runs/ppo_v1/model.zip --config configs/demo.yaml --seeds 100-149 --budget 30 --workers 6
 ```
 
-Training uses field seeds 1000 and above; `eval` refuses seeds of 1000 or more, so evaluation fields are always held out.
+The model behind the results table ships in [models/ppo_v1/](models/ppo_v1/), so you can run `eval` without training first.
 
-A ready-made demo: `scripts/demo.ps1` (Windows) or `scripts/demo.sh` (Linux/macOS).
+Training draws field seeds of 1000 and above, and `eval` refuses seeds of 1000 or more, so evaluation fields are always unseen.
+
+There is also a ready-made demo: [scripts/demo.ps1](scripts/demo.ps1) (Windows) or [scripts/demo.sh](scripts/demo.sh).
 
 ## What a run produces
 
-Each run writes a new folder `runs/<UTC time>_seed<seed>/` (for example `runs/20261013T173847Z_seed7/`). Earlier runs are never overwritten.
+Each run writes a new folder `runs/<UTC time>_seed<seed>/`, for example `runs/20261013T173847Z_seed7/`. The name has no `:`, so it is valid on Windows, and earlier runs are never overwritten.
 
 | File | Contents |
 |---|---|
 | `config.yaml` | The exact configuration used |
-| `metrics.json` | All metrics below, plus the hidden soil field's correlation length and dry/wet patches |
-| `truth.npy` | The hidden true moisture map on the output grid (0.5 m cells; rows = y, columns = x) |
-| `estimate.npy` | The reconstructed moisture map |
-| `variance.npy` | The uncertainty of the estimate (kriging variance, (m³/m³)²) |
+| `metrics.json` | Every metric below, plus the hidden field's correlation length and its dry and wet patches |
+| `truth.npy` / `estimate.npy` / `variance.npy` | Truth, estimate and kriging variance on the 0.5 m output grid (rows = y, columns = x) |
 | `probes.csv` | Every probe: time, position, reading, whether it worked |
-| `path.csv` | The rover's pose every 0.05 s |
-| `maps.png` | Truth, estimate, absolute error and variance side by side, with fixed colour scales |
-| `recording.rrd` | The Rerun recording (only with `--rerun`); reopen with `uv run rerun runs/<folder>/recording.rrd` |
-
-In the Rerun viewer, scrub the `sim_time` timeline to replay the mission: the field outline, headlands, lanes, plant canopies (green), the rover (red box) and its trail, probe points coloured by reading (red = failed probe), the four maps updating after each probe, and the map error (RMSE) over time.
+| `path.csv` | The rover pose every 0.05 s |
+| `maps.png` | Truth, estimate, error and variance with fixed colour scales |
+| `recording.rrd` | Rerun recording (only with `--rerun`); reopen it with `uv run rerun <file>` |
 
 `bench` and `eval` write `runs/bench_<time>/` or `runs/eval_<time>/` with `results.csv` (one row per strategy and seed) and `summary.md` (mean and 95% interval per strategy).
 
-## What the metrics mean
+<details>
+<summary><b>What every metric means</b></summary>
 
 Soil moisture is volumetric water content (VWC): cubic metres of water per cubic metre of soil, so 0.25 means 25%.
 
 | Metric | Meaning | Better |
 |---|---|---|
-| `rmse`, `mae` | Typical error of the moisture map in VWC, over every 0.5 m cell (root-mean-square and mean absolute) | Lower |
-| `r2` | Share of the field's moisture variation the map explains (1 = perfect, 0 = no better than one average value) | Higher |
-| `dry_precision` | Of the cells the map calls dry (below `dry_threshold`), the fraction that really are dry. Empty when the map calls nothing dry | Higher |
+| `rmse`, `mae` | Typical error of the map over every 0.5 m cell (root-mean-square and mean absolute) | Lower |
+| `r2` | Share of the field's moisture variation the map explains (1 = perfect, 0 = no better than one average) | Higher |
+| `dry_precision` | Of the cells the map calls dry (below `dry_threshold`), the fraction that really are. Empty if the map calls nothing dry | Higher |
 | `dry_recall` | Of the truly dry cells, the fraction the map found | Higher |
-| `dry_f1` | Balance of the two above | Higher |
-| `calibration_95` | Fraction of cells where the truth falls inside the map's own 95% uncertainty band. About 0.95 means the uncertainty map is honest | Close to 0.95 |
-| `rmse_global_mean`, `rmse_idw` | (bench only) Map error if the same readings were turned into a map by a single average, or by inverse-distance weighting, instead of kriging | For comparison |
-| `probes_used`, `valid_probes` | Probes taken, and how many returned a reading (probes can fail) | |
-| `path_length_m`, `mission_time_s` | Distance driven and total time including probe insertions | Lower |
-| `lane_coverage` | Fraction of all lane length the rover drove | 1.0 for a full survey |
-| `plant_contacts` | Times the rover's body overlapped a plant canopy | Must be 0 |
+| `dry_f1` | The balance of the two above | Higher |
+| `calibration_95` | Fraction of cells whose truth lies inside the map's own 95% band | ≈ 0.95 |
+| `rmse_global_mean`, `rmse_idw` | (bench) Error if the same readings were mapped by one average or by inverse-distance weighting | Comparison |
+| `probes_used`, `valid_probes` | Probes taken, and how many returned a value (probes can fail) | |
+| `path_length_m`, `mission_time_s` | Distance driven; total time including 10 s per probe insertion | Lower |
+| `lane_coverage` | Fraction of all lane length driven | 1.0 for a full survey |
+| `plant_contacts` | Times the rover body overlapped a canopy | **Must be 0** |
 
-## Probing strategies
+</details>
 
-- `fixed_spacing`: drive every lane end to end (back and forth), probing at evenly spread stops. This is the full-coverage survey.
-- `random`: probe random spots in the lanes.
-- `greedy_variance`: always probe where the map is currently most uncertain.
-- `greedy_variance_per_cost`: the same, but divide uncertainty by the time it takes to get there.
-- `ppo`: a learned policy from `agrisim train` (MaskablePPO).
-
-The adaptive strategies drive between spots along lanes and headlands only. They reverse along a lane instead of turning around inside it, because turning on the spot in a lane would brush the plants.
-
-Results so far (50 fields, 30 probes each) are in EXECPLAN.md under "Artifacts and Notes". The short version: on this placeholder field, plain fixed spacing gives the lowest map error. Greedy max-variance matches it and finds dry patches better, but drives about 70% further. Variance-per-cost is the cheapest mission but less accurate. The first trained PPO policy (200k steps) did not beat these baselines on held-out fields; it behaves close to random.
-
-## Optional: train on the NVIDIA GPU
-
-Not needed: the default PyTorch install is the CPU build and the models are small. NVIDIA's CUDA libraries are free but not open source, so the CPU build is the fully open path.
-
-To try the GPU on Windows, replace torch inside `.venv` with a CUDA build from the official PyTorch index (CUDA 12.6 works with older drivers; `cu130` is also published):
-
-```powershell
-uv pip install --reinstall torch==2.14.1 --index-url https://download.pytorch.org/whl/cu126
-uv run --no-sync python -c "import torch; print(torch.cuda.is_available())"
-```
-
-Use `uv run --no-sync ...` afterwards; a plain `uv run` or `uv sync` puts the CPU build back. Note that `agrisim train` currently pins training to the CPU (`device="cpu"`), because the small CNN trains about as fast there; changing that is a one-line edit in `src/agrisim/env.py`.
-
-## Developer checks
-
-A task is done when all of these pass:
+## Testing
 
 ```powershell
 uv run ruff check .
@@ -125,15 +208,97 @@ uv run pytest -q
 .\scripts\check_licenses.ps1
 ```
 
-The last one fails if any installed package is GPL, AGPL or LGPL. CI runs the same checks on Windows and Ubuntu.
+There are 64 tests, about 75 s, with no network needed. They cover:
 
-## Layout
+- geometry validation;
+- field determinism;
+- the soil generator's correlation structure, checked against the exponential covariance;
+- probe bias, noise and failure rates;
+- **zero plant contacts over a full survey on 20 random fields**;
+- shortest paths that never cross a row;
+- in-lane reversing;
+- kriging beating the field average;
+- hand-checked dry-cell metrics;
+- byte-identical repeat runs;
+- the Rerun recording;
+- serial and parallel bench giving identical results;
+- clean CLI errors for bad configs and policies;
+- Gymnasium's `check_env`;
+- an end-to-end train-and-eval smoke test.
+
+`mypy` runs in strict mode. The licence gate fails on any GPL, AGPL or LGPL package. CI runs all of this on **windows-latest and ubuntu-latest** on every push.
+
+## Regenerating the images and video
+
+Everything in [docs/img](docs/img) and [docs/media](docs/media) is real simulator output, made by one script:
+
+```powershell
+uv run python scripts/make_media.py --model runs/ppo_v1/model.zip
+```
+
+It re-runs seed 7 and writes `survey.gif`, `survey.mp4` (needs `ffmpeg` on PATH), `hero.png`, `maps.png` and `strategies.png`. It draws `results.png` from the newest `runs/eval_*/results.csv`, or pass `--results <file>`. Without `--model`, the PPO panel is skipped. It takes about 8 minutes, mostly frame rendering. [architecture.svg](docs/img/architecture.svg) is edited by hand.
+
+## Optional: NVIDIA GPU
+
+You don't need a GPU. The default PyTorch is the CPU build and the models are small; NVIDIA's CUDA libraries are free but not open source, so the CPU build is the fully open path. To try the RTX 3050 anyway (torch 2.14.1 publishes Windows CUDA 12.6 and 13.0 builds):
+
+```powershell
+uv pip install --reinstall torch==2.14.1 --index-url https://download.pytorch.org/whl/cu126
+uv run --no-sync python -c "import torch; print(torch.cuda.is_available())"
+```
+
+After that, use `uv run --no-sync ...`, because a plain `uv run` or `uv sync` restores the CPU build. Also note that `agrisim train` pins `device="cpu"` in [env.py](src/agrisim/env.py). *Not yet verified on the team laptop.*
+
+## Project structure
 
 ```
-src/agrisim/   config, field, soil, sensor, rover, planning, control, safety,
-               mapping, metrics, policies, sim, env, bench, viz, io, cli
-configs/       demo.yaml (placeholder numbers marked "PLACEHOLDER: calibrate")
-tests/         pytest suite
-scripts/       demo and licence-check scripts (.ps1 and .sh)
-runs/          outputs (not committed)
+src/agrisim/
+  config.py     pydantic models + geometry validation, load(path)
+  field.py      rows, plants, lanes, headlands, candidate probe sites
+  soil.py       hidden truth: FFT Gaussian random field + drip stripes + dry/wet patches
+  sensor.py     moisture probe: footprint mean, bias, noise, quantisation, failures
+  rover.py      differential-drive kinematics, footprint
+  planning.py   boustrophedon full-coverage planner, closed-form lane graph
+  control.py    turn-in-place + pure pursuit, reverse along lanes
+  safety.py     rectangle-vs-canopy contact test (KD-tree, vectorised)
+  mapping.py    Mapper protocol: GlobalMean, IDW, Kriging (PyKrige)
+  metrics.py    map and run metrics (may read the truth)
+  policies.py   fixed, random, greedy variance, variance per cost
+  sim.py        run_survey(): drive, probe, map, score
+  env.py        Gymnasium env, MaskablePPO training, learned policy
+  bench.py      multi-seed benchmark, 95% intervals, Markdown summary
+  viz.py        Rerun logging
+  io.py         Windows-safe run folders and outputs
+  cli.py        agrisim run | bench | train | eval
+configs/demo.yaml   all placeholder numbers, marked "PLACEHOLDER: calibrate"
+scripts/            demo.ps1 / demo.sh, check_licenses.ps1 / .sh, make_media.py
+tests/              pytest suite
+docs/img, docs/media  README images and video
+models/ppo_v1/      trained MaskablePPO policy + its held-out evaluation
+hardware/rover-v1/  rover hardware design (drawings, interactive anatomy figure, BOM)
 ```
+
+The planning documents are [context.md](context.md) (verified research, licence and platform rules; the source of truth), [EXECPLAN.md](EXECPLAN.md) (the milestone plan with every decision, surprise and result) and [CLAUDE.md](CLAUDE.md) (rules for the coding agent).
+
+## Limitations and honest notes
+
+- **Every soil and probe number is a placeholder.** Moisture levels, noise, patch sizes, row spacing and the "dry" threshold are not yet calibrated to a real field or probe. The results compare strategies *inside the simulator*; they are not field accuracy.
+- **Kriging smooths away small dry patches.** On 8 to 17 of every 50 fields, the map calls no cell dry at all.
+- **The first RL policy does not beat the baselines.** Likely fixes are a fully convolutional action head and longer training. These are untested.
+- **The RL environment abstracts driving** as lane-graph distance divided by speed. Evaluation, however, runs the policy through the full kinematic simulation, under the same conditions as every baseline.
+- **Moisture does not change over time** within a mission (no irrigation or evaporation dynamics yet).
+
+## Roadmap
+
+- **Calibrate.** Agronomist input for tomato dry thresholds, real row and plant spacing, the chosen probe's accuracy and insertion time ([context.md §12](context.md)).
+- **Better learned policy.** A per-cell (fully convolutional) action head and longer training, compared on the same held-out seeds.
+- **Phase 2.** A Gazebo Jetty and ROS 2 Lyrical world (in WSL2) that calls this package for probe readings, so soil logic lives in one place.
+- **Phase 3 and later.** Cameras and disease detection evaluated on real, expert-labelled field images; then the physical rover. Its first design (a soil-probe module on a 4WD skid-steer chassis, with drawings, an interactive anatomy figure and the bill of materials) is in [hardware/rover-v1/](hardware/rover-v1/).
+
+## Handover
+
+Taking the project over? Start with [HANDOVER.md](HANDOVER.md). It has a step-by-step test plan, the expected results, and the known open items.
+
+## License
+
+[MIT](LICENSE) © 2026 Auenchanters

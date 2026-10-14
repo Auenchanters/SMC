@@ -1,0 +1,6 @@
+{
+  "timesteps": 200000,
+  "seed": 0,
+  "budget": 30,
+  "n_envs": 6
+}

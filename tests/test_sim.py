@@ -50,3 +50,22 @@ def test_rerun_recording_written(cfg: SimConfig, tmp_path: Path) -> None:
     save_run(result, out)
     rrd = out / "recording.rrd"
     assert rrd.exists() and rrd.stat().st_size > 10_000
+
+
+def test_cli_bad_config_is_a_clean_error(tmp_path: Path, demo_path: Path) -> None:
+    wide = tmp_path / "wide.yaml"
+    text = demo_path.read_text(encoding="utf-8").replace("  width: 0.40 ", "  width: 0.60 ")
+    wide.write_text(text, encoding="utf-8")
+    out = tmp_path / "runs"
+    res = CliRunner().invoke(app, ["run", "--config", str(wide), "--out", str(out)])
+    assert res.exit_code == 2
+    assert "clear lane width" in res.output
+    assert not out.exists()  # nothing written for a rejected config
+
+
+def test_cli_unknown_policy_is_a_clean_error(tmp_path: Path, demo_path: Path) -> None:
+    args = ["run", "--config", str(demo_path), "--policy", "nonsense", "--out", str(tmp_path)]
+    res = CliRunner().invoke(app, args)
+    assert res.exit_code == 2
+    assert "unknown policy" in res.output
+    assert list(tmp_path.iterdir()) == []

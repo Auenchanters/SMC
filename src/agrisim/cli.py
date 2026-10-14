@@ -1,17 +1,33 @@
 """Typer command-line interface: run, bench, train, eval (added milestone by milestone)."""
 
 from pathlib import Path
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 import typer
 
 from agrisim import __version__
+
+if TYPE_CHECKING:
+    from agrisim.config import SimConfig
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)
 
 ConfigOpt = Annotated[
     Path, typer.Option("--config", exists=True, dir_okay=False, help="YAML config")
 ]
+
+
+def _load(config: Path) -> "SimConfig":
+    """Load a config; report validation problems as one clean CLI error, not a traceback."""
+    from pydantic import ValidationError
+
+    from agrisim.config import load
+
+    try:
+        return load(config)
+    except ValidationError as exc:
+        msgs = "; ".join(e["msg"].removeprefix("Value error, ") for e in exc.errors())
+        raise typer.BadParameter(f"{config}: {msgs}", param_hint="--config") from None
 
 
 @app.callback()
@@ -32,19 +48,30 @@ def run(
     rerun: Annotated[bool, typer.Option("--rerun", help="Open a Rerun viewer, save .rrd")] = False,
     budget: Annotated[int | None, typer.Option(help="Probe budget (default: config)")] = None,
     policy: Annotated[
-        str, typer.Option(help="fixed_spacing, random, greedy_variance, greedy_variance_per_cost")
+        str,
+        typer.Option(help="fixed_spacing, random, greedy_variance, greedy_variance_per_cost, ppo"),
     ] = "fixed_spacing",
+    model: Annotated[
+        Path | None, typer.Option(exists=True, dir_okay=False, help="model.zip for --policy ppo")
+    ] = None,
     out: Annotated[Path, typer.Option(help="Root folder for run outputs")] = Path("runs"),
 ) -> None:
     """Run one survey and write runs/<UTC timestamp>_seed<seed>/."""
-    from agrisim.config import load
     from agrisim.io import new_dir, run_dir_name, save_run
+    from agrisim.policies import LEARNED, STRATEGIES
     from agrisim.sim import run_survey
 
-    cfg = load(config)
+    valid = (*STRATEGIES, LEARNED, "full_coverage")
+    if policy not in valid:
+        raise typer.BadParameter(f"unknown policy {policy!r}; choose from {valid}")
+    if policy == LEARNED and model is None:
+        raise typer.BadParameter("--policy ppo needs --model <model.zip>")
+    if budget is not None and budget < 1:
+        raise typer.BadParameter("--budget must be at least 1")
+    cfg = _load(config)
     out_dir = new_dir(out, run_dir_name(seed))
     rrd = out_dir / "recording.rrd"
-    result = run_survey(cfg, seed, policy, rerun=rerun, budget=budget, rrd_path=rrd)
+    result = run_survey(cfg, seed, policy, rerun=rerun, budget=budget, rrd_path=rrd, model=model)
     save_run(result, out_dir)
     m, r = result.map_metrics, result.run_metrics
     typer.echo(f"run folder     {out_dir}")
@@ -75,7 +102,6 @@ def bench(
     from datetime import UTC, datetime
 
     from agrisim.bench import parse_seeds, run_benchmark, summary_markdown, write_results
-    from agrisim.config import load
     from agrisim.io import new_dir
     from agrisim.policies import STRATEGIES
 
@@ -83,7 +109,9 @@ def bench(
     unknown = set(names) - set(STRATEGIES)
     if unknown:
         raise typer.BadParameter(f"unknown strategies {sorted(unknown)}; choose from {STRATEGIES}")
-    cfg = load(config)
+    if budget < 1:
+        raise typer.BadParameter("--budget must be at least 1")
+    cfg = _load(config)
     out_dir = new_dir(out, f"bench_{datetime.now(UTC):%Y%m%dT%H%M%SZ}")
     rows = run_benchmark(cfg, parse_seeds(seeds), budget, names, workers)
     write_results(rows, out_dir)
@@ -103,10 +131,9 @@ def train(
     out: Annotated[Path, typer.Option(help="Output folder")] = Path("runs/ppo_v1"),
 ) -> None:
     """Train a MaskablePPO probing policy (episodes use seeds >= 1000)."""
-    from agrisim.config import load
     from agrisim.env import train as train_ppo
 
-    path = train_ppo(load(config), timesteps, seed, out, budget, n_envs)
+    path = train_ppo(_load(config), timesteps, seed, out, budget, n_envs)
     typer.echo(f"saved {path}")
 
 
@@ -123,7 +150,6 @@ def evaluate(
     from datetime import UTC, datetime
 
     from agrisim.bench import parse_seeds, run_benchmark, summary_markdown, write_results
-    from agrisim.config import load
     from agrisim.env import TRAIN_SEED_OFFSET
     from agrisim.io import new_dir
     from agrisim.policies import LEARNED, STRATEGIES
@@ -131,7 +157,7 @@ def evaluate(
     seed_list = parse_seeds(seeds)
     if max(seed_list) >= TRAIN_SEED_OFFSET:
         raise typer.BadParameter(f"evaluation seeds must be < {TRAIN_SEED_OFFSET} (held out)")
-    cfg = load(config)
+    cfg = _load(config)
     out_dir = new_dir(out, f"eval_{datetime.now(UTC):%Y%m%dT%H%M%SZ}")
     names = [*STRATEGIES, LEARNED]
     rows = run_benchmark(cfg, seed_list, budget, names, workers, model=model.resolve())

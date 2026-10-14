@@ -3,6 +3,9 @@ name = "agrisim"
 version = "0.1.0"
 description = "Soil-moisture survey simulator for a tomato-field rover (Layer A)."
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Auenchanters" }]
 requires-python = ">=3.13,<3.14"
 dependencies = [
     "numpy==2.5.4",

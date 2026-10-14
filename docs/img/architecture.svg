@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1036 480" width="1036" height="480" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <title>agrisim architecture: world setup, mission loop, scoring</title>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#52514e"/>
+    </marker>
+    <marker id="t" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#c23b3a"/>
+    </marker>
+    <style>
+      .box { fill: #ffffff; stroke: #c9c8c2; stroke-width: 1.2; }
+      .loop { fill: #eef4fc; stroke: #2a78d6; stroke-width: 1.2; }
+      .truth { fill: #fdf0f0; stroke: #c23b3a; stroke-width: 1.4; stroke-dasharray: 5 3; }
+      .h { font-size: 13px; font-weight: 600; fill: #0b0b0b; }
+      .s { font-size: 11px; fill: #52514e; }
+      .lbl { font-size: 10.5px; fill: #52514e; }
+      .tl { font-size: 10.5px; fill: #c23b3a; }
+      .sec { font-size: 11px; font-weight: 600; fill: #8a8984; letter-spacing: 0.08em; }
+      .e { stroke: #52514e; stroke-width: 1.4; fill: none; marker-end: url(#a); }
+      .te { stroke: #c23b3a; stroke-width: 1.4; fill: none; stroke-dasharray: 5 3; marker-end: url(#t); }
+    </style>
+  </defs>
+  <rect width="900" height="480" fill="#fcfcfb"/>
+
+  <text class="sec" x="30" y="22">WORLD SETUP (per seed)</text>
+  <text class="sec" x="30" y="142">MISSION LOOP</text>
+  <text class="sec" x="284" y="262">SENSE, MAP, SCORE</text>
+
+    <!-- Boxes -->
+  <rect class="box" x="30" y="32" width="214" height="54" rx="8"/>
+  <text class="h" x="137" y="55" text-anchor="middle">Config YAML + seed</text>
+  <text class="s" x="137" y="73" text-anchor="middle">config.py · configs/demo.yaml</text>
+  <rect class="box" x="284" y="32" width="214" height="54" rx="8"/>
+  <text class="h" x="391" y="55" text-anchor="middle">Field layout</text>
+  <text class="s" x="391" y="73" text-anchor="middle">rows, plants, lanes · field.py</text>
+  <rect class="truth" x="538" y="32" width="214" height="54" rx="8"/>
+  <text class="h" x="645" y="55" text-anchor="middle">Soil-moisture truth</text>
+  <text class="s" x="645" y="73" text-anchor="middle">hidden FFT field · soil.py</text>
+  <rect class="loop" x="30" y="152" width="214" height="54" rx="8"/>
+  <text class="h" x="137" y="175" text-anchor="middle">Probing policy</text>
+  <text class="s" x="137" y="193" text-anchor="middle">fixed · random · greedy · PPO</text>
+  <rect class="loop" x="284" y="152" width="214" height="54" rx="8"/>
+  <text class="h" x="391" y="175" text-anchor="middle">Lane planner + graph</text>
+  <text class="s" x="391" y="193" text-anchor="middle">lanes and headlands only</text>
+  <rect class="loop" x="538" y="152" width="214" height="54" rx="8"/>
+  <text class="h" x="645" y="175" text-anchor="middle">Path follower</text>
+  <text class="s" x="645" y="193" text-anchor="middle">pure pursuit · control.py, rover.py</text>
+  <rect class="box" x="792" y="152" width="214" height="54" rx="8"/>
+  <text class="h" x="899" y="175" text-anchor="middle">Plant-contact check</text>
+  <text class="s" x="899" y="193" text-anchor="middle">footprint vs canopies · safety.py</text>
+  <rect class="loop" x="284" y="272" width="214" height="54" rx="8"/>
+  <text class="h" x="391" y="295" text-anchor="middle">Mapper: kriging</text>
+  <text class="s" x="391" y="313" text-anchor="middle">mean + variance · mapping.py</text>
+  <rect class="loop" x="538" y="272" width="214" height="54" rx="8"/>
+  <text class="h" x="645" y="295" text-anchor="middle">Moisture probe</text>
+  <text class="s" x="645" y="313" text-anchor="middle">noise, bias, failures · sensor.py</text>
+  <rect class="box" x="792" y="272" width="214" height="54" rx="8"/>
+  <text class="h" x="899" y="295" text-anchor="middle">Metrics vs truth</text>
+  <text class="s" x="899" y="313" text-anchor="middle">RMSE, dry F1 · metrics.py</text>
+  <rect class="box" x="538" y="392" width="468" height="62" rx="8"/>
+  <text class="h" x="772" y="415" text-anchor="middle">Outputs</text>
+  <text class="s" x="772" y="433" text-anchor="middle">runs/&lt;time&gt;_seed&lt;n&gt;/ (metrics.json, maps, CSVs) · io.py</text>
+  <text class="s" x="772" y="448" text-anchor="middle">Rerun viewer · viz.py   |   bench / eval tables · bench.py</text>
+
+  <!-- Edges -->
+  <path class="e" d="M244,59 H280"/>
+  <path class="e" d="M498,59 H534"/>
+  <path class="e" d="M391,86 V148"/>
+  <path class="e" d="M244,179 H280"/>
+  <text class="lbl" x="264" y="171" text-anchor="middle">site</text>
+  <path class="e" d="M498,179 H534"/>
+  <text class="lbl" x="518" y="171" text-anchor="middle">path</text>
+  <path class="e" d="M752,179 H788"/>
+  <path class="e" d="M605,206 V268"/>
+  <text class="lbl" x="611" y="242">at each stop</text>
+  <path class="e" d="M538,299 H502"/>
+  <text class="lbl" x="518" y="291" text-anchor="middle">reading</text>
+  <path class="e" d="M284,299 H137 V210"/>
+  <text class="lbl" x="145" y="242">estimate + variance</text>
+  <path class="e" d="M899,206 V268"/>
+  <text class="lbl" x="905" y="242">contacts</text>
+  <path class="e" d="M391,326 V360 H859 V330"/>
+  <text class="lbl" x="399" y="374">final map</text>
+  <path class="e" d="M939,326 V388"/>
+  <path class="te" d="M752,72 H772 V254 H695 V268"/>
+  <path class="te" d="M772,254 V311 H788"/>
+  <text class="tl" x="777" y="107">truth</text>
+
+  <line x1="30" y1="420" x2="60" y2="420" stroke="#c23b3a" stroke-width="1.4" stroke-dasharray="5 3"/>
+  <text class="lbl" x="68" y="424">ground truth: read only by the probe,</text>
+  <text class="lbl" x="68" y="438">metrics and the RL training reward (env.py)</text>
+  <rect class="loop" x="30" y="452" width="30" height="14" rx="3"/>
+  <text class="lbl" x="68" y="463">repeats until the probe budget is spent</text>
+</svg>
