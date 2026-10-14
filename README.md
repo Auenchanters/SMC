@@ -7,7 +7,7 @@
 [![CI](https://github.com/Auenchanters/SMC/actions/workflows/ci.yml/badge.svg)](https://github.com/Auenchanters/SMC/actions/workflows/ci.yml)
 [![Python 3.13](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Windows native](https://img.shields.io/badge/Windows-native,_no_WSL-0078D4?logo=windows&logoColor=white)](#quickstart)
-[![tests](https://img.shields.io/badge/tests-64_passing-3FB950)](tests/)
+[![tests](https://img.shields.io/badge/tests-66_passing-3FB950)](tests/)
 [![Gymnasium](https://img.shields.io/badge/Gymnasium-1.3-0081A5)](https://gymnasium.farama.org/)
 [![Rerun](https://img.shields.io/badge/Rerun-0.39-6E40C9)](https://rerun.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -19,6 +19,8 @@ A pure-Python simulator of a planted tomato field. A small differential-drive ro
 ![A full-coverage survey: the rover (red) drives every lane, each probe updates the map, the hidden truth is on the right](docs/img/survey.gif)
 
 <sub>Real simulator output, seed 7. Higher-quality video: [docs/media/survey.mp4](docs/media/survey.mp4). Soil parameters are placeholders until calibrated.</sub>
+
+**Demo video (2 min 46 s):** [docs/media/agrisim-demo.mp4](docs/media/agrisim-demo.mp4) shows the CLI, a run's outputs, the Rerun replay and the rover hardware figures.
 
 </div>
 
@@ -208,7 +210,7 @@ uv run pytest -q
 .\scripts\check_licenses.ps1
 ```
 
-There are 64 tests, about 75 s, with no network needed. They cover:
+There are 66 tests, about 50 to 140 s, with no network needed. They cover:
 
 - geometry validation;
 - field determinism;
@@ -271,7 +273,7 @@ src/agrisim/
   io.py         Windows-safe run folders and outputs
   cli.py        agrisim run | bench | train | eval
 configs/demo.yaml   all placeholder numbers, marked "PLACEHOLDER: calibrate"
-scripts/            demo.ps1 / demo.sh, check_licenses.ps1 / .sh, make_media.py
+scripts/            demo.ps1 / demo.sh, check_licenses.ps1 / .sh, make_media.py, demo_video/
 tests/              pytest suite
 docs/img, docs/media  README images and video
 models/ppo_v1/      trained MaskablePPO policy + its held-out evaluation

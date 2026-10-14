@@ -1,0 +1,67 @@
+<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="style.css">
+<style>
+.win { position: absolute; left: 40px; right: 40px; top: 112px; bottom: 30px; background: #0c0c0c; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.bar { height: 34px; background: #1b1f24; display: flex; align-items: center; padding: 0 14px; gap: 8px; color: var(--dim); font-size: 14px; }
+.bar i { width: 11px; height: 11px; border-radius: 50%; background: #3a4048; display: inline-block; }
+.bar span { margin-left: 8px; }
+.bar b { margin-left: auto; font-weight: 400; font-variant-numeric: tabular-nums; }
+pre { margin: 0; padding: 14px 18px; font: 14.5px/1.38 "Cascadia Mono", Consolas, monospace; white-space: pre-wrap; word-break: break-word; color: #cccccc; height: calc(100% - 34px); overflow: hidden; }
+.ps { color: #f9f1a5; } .cmd { color: #ffffff; } .ok { color: var(--accent); } .err { color: #ff7b72; }
+.fast { color: var(--warn); }
+.cur { display: inline-block; width: 8px; height: 16px; background: #ccc; vertical-align: -3px; animation: blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+</style>
+<div class="cap" id="cap"></div>
+<div class="win"><div class="bar"><i></i><i></i><i></i><span>Windows PowerShell — SMC</span><b id="clock"></b></div><pre id="out"></pre></div>
+<script>
+const CAPS = __CAPS__;
+const SESSION = __SESSION__;
+const out = document.getElementById("out"), cap = document.getElementById("cap"), clock = document.getElementById("clock");
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const esc = (s) => s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
+const PROMPT = '<span class="ps">PS C:\\Projects\\SMC&gt; </span>';
+function paint(lines, tail = "") { out.innerHTML = lines.join("\n") + tail; out.scrollTop = out.scrollHeight; }
+function color(l) {
+  if (/plant contacts 0|10\/10 seeds|^\| plant_contacts/.test(l)) return `<span class="ok">${esc(l)}</span>`;
+  if (/Error|Invalid value/.test(l)) return `<span class="err">${esc(l)}</span>`;
+  return esc(l);
+}
+(async () => {
+  const MAX_GAP = 1.6; // s of screen time for any longer silent wait; the clock shows real time
+  for (const [k, s] of SESSION.entries()) {
+    const c = CAPS[k];
+    cap.style.opacity = 0; await sleep(350);
+    cap.innerHTML = `<span class="step">${c.n}</span>${c.title}<small>${c.sub}</small>`;
+    cap.style.opacity = 1; paint([PROMPT], "<span class=\"cur\"></span>");
+    let lines = [];
+    let typed = "";
+    await sleep(600);
+    for (const ch of s.cmd) { typed += ch; paint([PROMPT + `<span class="cmd">${esc(typed)}</span>`], '<span class="cur"></span>'); await sleep(22); }
+    await sleep(350);
+    lines = [PROMPT + `<span class="cmd">${esc(s.cmd)}</span>`];
+    paint(lines);
+    let shown = 0, real = 0;
+    const t0 = performance.now();
+    for (const [t, text] of s.lines) {
+      const gap = t - real;
+      if (gap > MAX_GAP) {
+        const start = performance.now();
+        while (performance.now() - start < MAX_GAP * 1000) {
+          const f = (performance.now() - start) / (MAX_GAP * 1000);
+          const now = real + f * gap;
+          clock.textContent = `${now.toFixed(1)} s`;
+          paint(lines, `\n<span class="fast">… running (${now.toFixed(1)} s real time, wait sped up ${Math.round(gap / MAX_GAP)}x)</span>`);
+          await sleep(33);
+        }
+      } else if (gap > 0) await sleep(gap * 1000);
+      real = t; clock.textContent = `${real.toFixed(1)} s`;
+      lines.push(color(text)); paint(lines);
+      await sleep(18);
+    }
+    clock.textContent = `${s.total.toFixed(1)} s · exit ${s.exit}`;
+    paint(lines, "\n" + PROMPT + '<span class="cur"></span>');
+    await sleep(c.hold * 1000);
+  }
+  window.done = true;
+})();
+</script>

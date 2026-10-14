@@ -11,9 +11,12 @@ Claude must never appear as an author, committer or contributor of this reposito
 ## Read first
 - @context.md: full project context, verified research, licence and platform rules, architecture. Source of truth.
 - @EXECPLAN.md: the living execution plan. Work milestone by milestone. Keep its Progress, Surprises & Discoveries, Decision Log and Outcomes & Retrospective sections up to date as you work.
+- HANDOVER.md: current state, the step-by-step test plan with expected numbers, and open items. Read its section 0 before your first change.
 
 ## What this repo is
 `agrisim`: a pure-Python simulator of a planted tomato field where a small rover drives inter-row lanes without touching plants, probes soil moisture, and reconstructs a moisture grid plus an uncertainty grid. It also exposes a Gymnasium environment for training adaptive probing. Layer A only; no ROS or Gazebo code in this package.
+
+`hardware/rover-v1/` is the physical rover design, in Node.js (not part of the Python package). `model.mjs` is its single source of truth. The SVG drawings and anatomy HTML figures are generated from it: never edit them by hand. Rebuild, audit and commit them as described in its README; CI fails if they are stale.
 
 ## Platform (hard rule)
 - Primary platform: **Windows (x86-64)**, run from PowerShell. Everything must install and run natively on Windows with no WSL, Docker or compiler toolchain. Linux must also work (CI).

@@ -5,6 +5,7 @@ from pathlib import Path
 import numpy as np
 import numpy.typing as npt
 import rerun as rr
+import rerun.blueprint as rrb
 from matplotlib import colormaps
 
 from agrisim.config import SimConfig
@@ -51,12 +52,39 @@ class RerunLogger:
         if rrd_path is not None:
             sinks.append(rr.FileSink(rrd_path))
         self.rec.set_sinks(*sinks)
+        self.rec.send_blueprint(self._blueprint())
         self._trail: list[tuple[float, float]] = []
         self._probes: list[ProbeReading] = []
         self._log_static(layout)
 
+    def _blueprint(self) -> rrb.Blueprint:
+        """Field view (rover, plants, probes) beside the four maps, RMSE below; plays at 30x."""
+        whole_run = rr.encodings.TimeRange(
+            start=rrb.TimeRangeBoundary.infinite(), end=rrb.TimeRangeBoundary.infinite()
+        )
+        maps = (rrb.Spatial2DView(origin=f"maps/{n}", name=n) for n in map_ranges(self.cfg))
+        return rrb.Blueprint(
+            rrb.Horizontal(
+                rrb.Vertical(
+                    rrb.Spatial2DView(origin="/", contents="/field/**", name="field (north up)"),
+                    rrb.TimeSeriesView(
+                        origin="metrics",
+                        name="map RMSE vs truth",
+                        axis_x=rrb.TimeAxis(view_range=whole_run),
+                    ),
+                    row_shares=[3, 1],
+                ),
+                rrb.Grid(*maps),
+                column_shares=[3, 2],
+            ),
+            rrb.TimePanel(state="collapsed", timeline="sim_time", playback_speed=30.0),
+            collapse_panels=True,
+        )
+
     def _log_static(self, layout: FieldLayout) -> None:
         f, log = self.cfg.field, self.rec.log
+        # 2D views draw y downwards; flip the field so north (high y) is up, like the maps.
+        log("field", rr.Transform3D(translation=[0, f.width_y, 0], scale=[1, -1, 1]), static=True)
         outline = [(0, 0), (f.length_x, 0), (f.length_x, f.width_y), (0, f.width_y), (0, 0)]
         log("field/outline", rr.LineStrips2D([outline], colors=[200, 200, 200]), static=True)
         log(
