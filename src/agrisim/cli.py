@@ -30,6 +30,15 @@ def _load(config: Path) -> "SimConfig":
         raise typer.BadParameter(f"{config}: {msgs}", param_hint="--config") from None
 
 
+def _seeds(text: str) -> list[int]:
+    from agrisim.bench import parse_seeds
+
+    try:
+        return parse_seeds(text)
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc), param_hint="--seeds") from None
+
+
 @app.callback()
 def main() -> None:
     """agrisim: soil-moisture survey simulator."""
@@ -101,7 +110,7 @@ def bench(
     """Run every strategy on every seed; write runs/bench_<timestamp>/results.csv and summary.md."""
     from datetime import UTC, datetime
 
-    from agrisim.bench import parse_seeds, run_benchmark, summary_markdown, write_results
+    from agrisim.bench import run_benchmark, summary_markdown, write_results
     from agrisim.io import new_dir
     from agrisim.policies import STRATEGIES
 
@@ -111,9 +120,10 @@ def bench(
         raise typer.BadParameter(f"unknown strategies {sorted(unknown)}; choose from {STRATEGIES}")
     if budget < 1:
         raise typer.BadParameter("--budget must be at least 1")
+    seed_list = _seeds(seeds)
     cfg = _load(config)
     out_dir = new_dir(out, f"bench_{datetime.now(UTC):%Y%m%dT%H%M%SZ}")
-    rows = run_benchmark(cfg, parse_seeds(seeds), budget, names, workers)
+    rows = run_benchmark(cfg, seed_list, budget, names, workers)
     write_results(rows, out_dir)
     text = summary_markdown(rows, f"agrisim bench: {config.name}, budget {budget}")
     (out_dir / "summary.md").write_text(text, encoding="utf-8")
@@ -149,12 +159,14 @@ def evaluate(
     """Evaluate a trained model and every baseline on the same held-out seeds and budget."""
     from datetime import UTC, datetime
 
-    from agrisim.bench import parse_seeds, run_benchmark, summary_markdown, write_results
+    from agrisim.bench import run_benchmark, summary_markdown, write_results
     from agrisim.env import TRAIN_SEED_OFFSET
     from agrisim.io import new_dir
     from agrisim.policies import LEARNED, STRATEGIES
 
-    seed_list = parse_seeds(seeds)
+    seed_list = _seeds(seeds)
+    if budget < 1:
+        raise typer.BadParameter("--budget must be at least 1")
     if max(seed_list) >= TRAIN_SEED_OFFSET:
         raise typer.BadParameter(f"evaluation seeds must be < {TRAIN_SEED_OFFSET} (held out)")
     cfg = _load(config)

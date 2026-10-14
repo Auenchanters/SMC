@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 from agrisim.bench import mean_ci95, parse_seeds, run_benchmark
@@ -12,6 +13,17 @@ def test_parse_seeds() -> None:
     assert parse_seeds("0-3") == [0, 1, 2, 3]
     assert parse_seeds("1,5,9") == [1, 5, 9]
     assert parse_seeds("0-1,7") == [0, 1, 7]
+    for bad in ("5-3", "abc", "", "-1"):
+        with pytest.raises(ValueError, match="bad seed range"):
+            parse_seeds(bad)
+
+
+def test_bad_seeds_are_a_clean_cli_error(tmp_path: Path, demo_path: Path) -> None:
+    args = ["bench", "--config", str(demo_path), "--seeds", "5-3", "--out", str(tmp_path)]
+    res = CliRunner().invoke(app, args)
+    assert res.exit_code == 2
+    assert "bad seed range" in res.output
+    assert not any(tmp_path.iterdir())  # no empty output folder left behind
 
 
 def test_mean_ci95() -> None:

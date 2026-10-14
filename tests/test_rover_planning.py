@@ -111,3 +111,11 @@ def test_backtracking_in_a_lane_reverses_without_contact(cfg: SimConfig) -> None
     assert abs(p[-1, 0] - 8.0) < 0.02
     # Heading never flips: the rover reversed instead of turning around.
     assert np.abs(p[:, 2]).max() < 0.2
+
+
+def test_lanes_without_probe_sites_get_no_stops(cfg: SimConfig) -> None:
+    # A stem keep-out wider than half the row spacing leaves no candidate site on any lane.
+    far = cfg.model_copy(update={"field": cfg.field.model_copy(update={"stem_keepout": 5.0})})
+    plan = LanePlanner.plan_full_coverage(_layout(far, 0), far)
+    assert plan.stops == ()
+    assert len(plan.waypoints) == 2 * len(_layout(far, 0).lanes)

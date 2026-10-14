@@ -152,9 +152,18 @@ def summary_markdown(rows: Sequence[BenchRow], title: str) -> str:
 
 
 def parse_seeds(text: str) -> list[int]:
-    """'0-49' -> [0..49]; '1,5,9' -> [1, 5, 9]; mixtures like '0-2,7' work too."""
+    """'0-49' -> [0..49]; '1,5,9' -> [1, 5, 9]; mixtures like '0-2,7' work too.
+
+    Raises ValueError for anything else, including reversed ranges such as '5-3'.
+    """
     seeds: list[int] = []
     for part in text.split(","):
         lo, _, hi = part.strip().partition("-")
-        seeds += range(int(lo), int(hi or lo) + 1)
+        try:
+            a, b = int(lo), int(hi or lo)
+        except ValueError:
+            raise ValueError(f"bad seed range {part.strip()!r}; use e.g. 0-49 or 1,5,9") from None
+        if a < 0 or b < a:
+            raise ValueError(f"bad seed range {part.strip()!r}; use e.g. 0-49 or 1,5,9")
+        seeds += range(a, b + 1)
     return seeds

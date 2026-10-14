@@ -66,8 +66,8 @@ class LanePlanner:
             lane_x = np.array([s.x for s in sites if s.lane == lane])
             n_targets = int(abs(end - start) // cfg.survey.probe_spacing) + 1
             targets = start + np.sign(end - start) * cfg.survey.probe_spacing * np.arange(n_targets)
-            snapped = {float(lane_x[np.abs(lane_x - t).argmin()]) for t in targets}
-            stop_x = sorted(snapped, reverse=end < start) if len(lane_x) else []
+            snapped = {float(lane_x[np.abs(lane_x - t).argmin()]) for t in targets if len(lane_x)}
+            stop_x = sorted(snapped, reverse=end < start)
             route += [(start, y, False), *((x, y, True) for x in stop_x), (end, y, False)]
 
         stop_idx = [i for i, r in enumerate(route) if r[2]]

@@ -21,3 +21,26 @@ jobs:
       - run: uv run pytest -q
       - name: Licence gate (no GPL/AGPL/LGPL)
         run: uv run pip-licenses --partial-match --fail-on "GPL;General Public License"
+
+  hardware:
+    # Rebuilds the rover drawings and anatomy figures from model.mjs, runs the geometry audits,
+    # and fails if the committed outputs are out of date.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Anatomy kit (MIT), pinned
+        run: |
+          git clone -q https://github.com/wheresryan22/anatomy.git .claude/skills/anatomy
+          git -C .claude/skills/anatomy checkout -q e6600ffc4e8e6620eeb45bf49bcdbd5e4b84163f
+      - run: node hardware/rover-v1/drawings.mjs
+      - run: node hardware/rover-v1/anatomy/build.mjs
+      - run: node hardware/rover-v1/anatomy/build.mjs --light --audit
+      - run: node hardware/rover-v1/anatomy/build.mjs --light --audit --rest-order --pose=167
+      - run: node hardware/rover-v1/anatomy/build.mjs --light --audit --rest-order --arm=0.5
+      - run: node hardware/rover-v1/anatomy/cleaning-build.mjs
+      - run: node hardware/rover-v1/anatomy/cleaning-build.mjs --light --audit
+      - name: Committed outputs match the model
+        run: git diff --exit-code hardware/

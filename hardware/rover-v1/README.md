@@ -23,7 +23,10 @@ The anatomy figure is built with the Anatomy skill kit (MIT, https://github.com/
 
 ```powershell
 git clone https://github.com/wheresryan22/anatomy.git .claude/skills/anatomy
+git -C .claude/skills/anatomy checkout e6600ffc4e8e6620eeb45bf49bcdbd5e4b84163f
 ```
+
+That commit is the one the figures were built and audited with; CI pins the same one.
 
 Then build both themes and audit the geometry:
 
@@ -36,7 +39,7 @@ node hardware/rover-v1/anatomy/cleaning-build.mjs
 node hardware/rover-v1/anatomy/cleaning-build.mjs --light --audit
 ```
 
-`--audit` must end with `audit passed`. Run the plain `--audit` build first: it saves the page's paint order, which the `--rest-order` pose audits then check.
+`--audit` must end with `audit passed`. Commit the rebuilt HTML and SVG files: CI rebuilds them and fails if they differ from the committed ones. Run the plain `--audit` build first: it saves the page's paint order, which the `--rest-order` pose audits then check.
 - `--pose=<mm>` audits the probe at that point of its 167 mm stroke.
 - `--arm=<0..1>` audits the left camera arm at that share of its extension.
 
