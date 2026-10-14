@@ -3,6 +3,7 @@
 // Writes rover-anatomy.html (dark) or rover-anatomy-light.html next to this file.
 // Dimensions come from ../model.mjs, so the figure, the drawings and DESIGN.md agree.
 import { readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import * as M from "../model.mjs";
@@ -18,6 +19,7 @@ const { kitScript } = await load("scripts/inline-kit.mjs");
 
 const THEME = process.argv.includes("--light") ? "light" : "dark";
 const POSE = Number((process.argv.find((a) => a.startsWith("--pose=")) ?? "--pose=-1").slice(7));
+const ARM = Number((process.argv.find((a) => a.startsWith("--arm=")) ?? "--arm=-1").slice(6));
 const D = M.DIM;
 
 const W = 640;
@@ -276,20 +278,42 @@ box("chassis.switch.plate", [12, T.y, 118], [48, T.y + 1.6, 150], { tone: "lo" }
 box("chassis.switch", [18, T.y + 1.6, 130], [26, T.y + 6, 140], { tone: "hi" }, { r: 0.8, steps: 2 });
 box("chassis.xt60", [32, T.y + 1.6, 126], [42, T.y + 7, 140], { tone: "mid" }, { r: 0.8, steps: 2, extra: Dots([at([37, T.y + 7, 130]), at([37, T.y + 7, 136])], { size: 0.5, tone: "lo" }) });
 put("chassis.led", [15.5, T.y + 2.4, 142], Dots([at([15.5, T.y + 2.4, 142])], { size: 0.9, tone: "hi" }), [record(A.ball([15.5, T.y + 2.4, 142], 0.8, { name: "chassis.led" }))], { bias: 0.3 });
-for (const sx of [1, -1]) {
+{
   const b = D.bumper;
-  const x0 = sx > 0 ? b.x0 : -b.x1;
-  const x1 = sx > 0 ? b.x1 : -b.x0;
-  box(`bumper.${sx > 0 ? "front" : "rear"}`, [x0, -b.y, b.z0], [x1, b.y, b.z1], { tone: "mid" }, { r: 3, steps: 3, bevel: 0.6, owner: `bumper${sx}` });
-  const fx0 = sx > 0 ? b.x1 : -b.x1 - 4;
-  box(`bumper.pad.${sx > 0 ? "front" : "rear"}`, [fx0, -b.y + 8, b.z0 + 5], [fx0 + 4, b.y - 8, b.z1 - 5], { tone: "lo" }, { r: 1.4, steps: 2, owner: `bumper${sx}` });
+  box("bumper.rear", [-b.x1, -b.y, b.z0], [-b.x0, b.y, b.z1], { tone: "mid" }, { r: 3, steps: 3, bevel: 0.6, owner: "bumper" });
+  box("bumper.pad.rear", [-b.x1 - 4, -b.y + 8, b.z0 + 5], [-b.x1, b.y - 8, b.z1 - 5], { tone: "lo" }, { r: 1.4, steps: 2, owner: "bumper" });
   for (const sy of [1, -1]) {
-    const sx0 = sx > 0 ? T.x : -b.x0;
-    const sx1 = sx > 0 ? b.x0 : -T.x;
-    box(`bumper.strut`, [sx0, sy * 70 - 5, 103], [sx1, sy * 70 + 5, 113], { tone: "mid" }, { r: 1, steps: 2, owner: `bumper${sx}` });
-    const swx = sx > 0 ? T.x : -T.x - 10;
-    box(`bumper.switch`, [swx, sy * 70 + (sy > 0 ? 7 : -19), 103], [swx + 10, sy * 70 + (sy > 0 ? 19 : -7), 117], { tone: "hi" }, { r: 0.8, steps: 2, owner: `bumper${sx}` });
+    box("bumper.strut", [-b.x0, sy * 70 - 5, 103], [-T.x, sy * 70 + 5, 113], { tone: "mid" }, { r: 1, steps: 2, owner: "bumper" });
+    box("bumper.switch", [-T.x - 10, sy * 70 + (sy > 0 ? 7 : -19), 103], [-T.x, sy * 70 + (sy > 0 ? 19 : -7), 117], { tone: "hi" }, { r: 0.8, steps: 2, owner: "bumper" });
   }
+}
+// Self-cleaning cartridge: only its bayonet flange shows below the belly (Fig 2 shows it in section).
+{
+  const CR = D.cartridge;
+  const F = frameZ(0, 0, 0);
+  const shape = record(A.ring(F, CR.z0, CR.flangeZ1, D.well.rIn, CR.flangeR, { name: "cartridge.flange", owner: "chassis.tub" }));
+  put("cartridge.flange", [0, 0, (CR.z0 + CR.flangeZ1) / 2], S(k.cylinder(0, 0, CR.flangeR, CR.z0, CR.flangeZ1 - CR.z0, P, 48, 0.4), { tone: "mid" }) +
+    Dots([0, 1, 2].map((i) => at([Math.cos(i * 2.1 + 0.5) * (CR.flangeR - 4), Math.sin(i * 2.1 + 0.5) * (CR.flangeR - 4), CR.flangeZ1])), { size: 0.45 }), [shape]);
+}
+// Front scan beam: twin telescopic under-leaf camera arms. The left arm is drawn extended and moved live.
+const SC = D.scan;
+const SXC = (SC.x0 + SC.x1) / 2;
+{
+  const mouth = (sy) => path3([[SC.x0 + SC.wall, sy * SC.y, SC.z0 + SC.wall], [SC.x1 - SC.wall, sy * SC.y, SC.z0 + SC.wall], [SC.x1 - SC.wall, sy * SC.y, SC.z1 - SC.wall], [SC.x0 + SC.wall, sy * SC.y, SC.z1 - SC.wall]], true);
+  const brush = path3([[SC.x0 + SC.wall, SC.y + 0.05, SC.z1 - SC.wall - 3], [SC.x1 - SC.wall, SC.y + 0.05, SC.z1 - SC.wall - 3]]);
+  const extra = `<path class="rv-void" d="${mouth(1)}"/>` + Ln(mouth(1), { tone: "lo" }) + Ln(brush, { tone: "lo" }) +
+    Dots([-150, -60, 60, 150].map((y) => at([SC.x1, y, SC.z1 - 8])), { size: 0.45 });
+  const plan = { x: SC.x0, y: -SC.y, w: SC.x1 - SC.x0, d: 2 * SC.y, r: 3 };
+  put("scan.beam", [SXC, 0, (SC.z0 + SC.z1) / 2], S(k.slabOf(plan, SC.z0, SC.z1 - SC.z0, P, 3, 0.6), { tone: "mid", inner: Ln(k.sideSeam(plan, SC.z1 - 10, P, 3), { tone: "faint" }) }) + extra,
+    [[SC.x0, SC.x1, SC.z0, SC.z0 + SC.wall], [SC.x0, SC.x1, SC.z1 - SC.wall, SC.z1], [SC.x0, SC.x0 + SC.wall, SC.z0 + SC.wall, SC.z1 - SC.wall], [SC.x1 - SC.wall, SC.x1, SC.z0 + SC.wall, SC.z1 - SC.wall]].map(([x0, x1, z0, z1]) =>
+      record(A.slab({ x: x0, y: -SC.y, w: x1 - x0, d: 2 * SC.y, r: 0.4 }, z0, z1 - z0, { name: "scan.beam" }, 2))));
+}
+box("scan.strip", [SC.x1, -SC.y + 15, SC.z0 + 8], [SC.x1 + SC.strip, SC.y - 15, SC.z1 - 8], { tone: "lo" }, { r: 1.2, steps: 2 });
+for (const sy of [1, -1]) {
+  box("scan.strut", [T.x, sy * 70 - 8, 84], [SC.x0, sy * 70 + 8, 100], { tone: "mid" }, { r: 1, steps: 2, bevel: 0.3 });
+  box("scan.motor", [SXC - 13, sy * 60 - 13, SC.z1], [SXC + 13, sy * 60 + 13, SC.z1 + 20], { tone: "mid" }, {
+    r: 2, steps: 3, bevel: 0.4, extra: Dots([[-9, -9], [9, -9], [-9, 9], [9, 9]].map(([u, v]) => at([SXC + u, sy * 60 + v, SC.z1 + 20])), { size: 0.4 }),
+  });
 }
 {
   const F = frameZ(0, 0, 0);
@@ -310,16 +334,6 @@ const DECK = { x: -K.x, y: -K.y, w: 2 * K.x, d: 2 * K.y, r: K.r };
     Ln(screws.map(([x, y]) => k.ring(x, y, 5, K.z1, P, 20)).join(""), { tone: "lo" }) + Dots(screws.map(([x, y]) => at([x, y, K.z1])), { size: 0.55 });
   put("deck", [0, 0, (K.z0 + K.z1) / 2], S(k.slabOf(DECK, K.z0, K.z1 - K.z0, P, 8, 0.8), { tone: "mid" }) + extra, holed("deck", -K.x, -K.y, K.x, K.y, K.z0, K.z1, K.hole), { bias: -1 });
 }
-// Phase 3 accessory rail (T-slot) with end caps, ready for the under-leaf camera arm.
-{
-  const y0 = 100;
-  const y1 = 118;
-  box("aux.rail", [D.enclosure.x0 + 4, y0, K.z1], [D.enclosure.x1 - 4, y1, K.z1 + 16], { tone: "mid" }, {
-    r: 0.8, steps: 2, bevel: 0.4, extra: Ln(k.planOutline({ x: D.enclosure.x0 + 8, y: y0 + 7, w: D.enclosure.x1 - D.enclosure.x0 - 16, d: 4, r: 2 }, K.z1 + 16, P, 3), { tone: "lo" }),
-  });
-  for (const x of [D.enclosure.x0, D.enclosure.x1 - 4]) box("aux.cap", [x, y0, K.z1], [x + 4, y1, K.z1 + 17], { tone: "lo" }, { r: 0.8, steps: 2 });
-}
-
 // ---------------------------------------------------------------- probe tower (static parts)
 const TW = D.tower;
 const BASE = { x: TW.base.x0, y: -TW.base.y, w: TW.base.x1 - TW.base.x0, d: 2 * TW.base.y, r: 4 };
@@ -368,10 +382,9 @@ box("enc.wall.back", [E.x0, -E.y + E.wall, EF], [E.x0 + E.wall, E.y - E.wall, ET
 const ELIP = EF + 16;
 box("enc.wall.front", [E.x1 - E.wall, -E.y + E.wall, EF], [E.x1, E.y - E.wall, ELIP], { tone: "mid" }, { r: 0.6, steps: 2 });
 box("enc.wall.near", [E.x0, E.y - E.wall, EF], [E.x1 - E.wall, E.y, ELIP], { tone: "mid" }, { r: 0.6, steps: 2 });
-box("enc.aux.port", [E.x0 + 20, E.y, EF + 2], [E.x0 + 44, E.y + 4, EF + 10], { tone: "hi" }, { r: 1.2, steps: 2, extra: Dots([at([E.x0 + 24, E.y + 4, EF + 6]), at([E.x0 + 40, E.y + 4, EF + 6])], { size: 0.45 }) });
-const GLANDS = { probe: [E.x0, 0, 232], stepper: [E.x0, -40, 240], gnss: [E.x0, 84, 202], lidar: [E.x1, 40, EF + 8] };
+const GLANDS = { probe: [E.x0, 0, 232], stepper: [E.x0, -40, 240], gnss: [E.x0, 84, 202], lidar: [E.x1, 40, EF + 8], scan: [E.x1, -40, EF + 8] };
 for (const [name, [x, y, z]] of Object.entries(GLANDS)) {
-  const out = name === "lidar" ? 1 : -1;
+  const out = name === "lidar" || name === "scan" ? 1 : -1;
   const F = G.frameOf([x, y, z], [out, 0, 0], [0, 1, 0], [0, 0, 1]);
   disc(`gland.${name}`, F, 0, 3, 7, { tone: "mid" }, { steps: 6, owner: `gland.${name}` });
   disc(`gland.${name}.nut`, F, 3, 7, 5, { tone: "hi" }, { owner: `gland.${name}` });
@@ -441,6 +454,12 @@ for (const [x, y] of [[-128, -4], [-96, -34]]) post("rx.whip", x, y, 1.1, K.z1 +
 const MOTOR_PLUG = [TW.screwX, -TW.motor.s / 2 - 6, TW.top.z1 + 7];
 const LANE_Y = GLANDS.stepper[1];
 cable("cable.stepper", [MOTOR_PLUG, [TW.screwX, LANE_Y, TW.top.z1 + 7], [40, LANE_Y, TW.top.z1 + 7], [40, LANE_Y, GLANDS.stepper[2]], [GLANDS.stepper[0] - 7, LANE_Y, GLANDS.stepper[2]]], 2.2, { bend: 8, ends: [true, false] });
+{
+  const F = frameZ(SXC, GLANDS.scan[1], SC.z1);
+  disc("scan.gland", F, 0, 3, 6, { tone: "mid" }, { steps: 6, owner: "scan.gland" });
+  disc("scan.gland.nut", F, 3, 7, 4.4, { tone: "hi" }, { owner: "scan.gland" });
+}
+cable("cable.scan", [[SXC, GLANDS.scan[1], SC.z1 + 7], [SXC, GLANDS.scan[1], GLANDS.scan[2]], [GLANDS.scan[0] + 7, GLANDS.scan[1], GLANDS.scan[2]]], 2.4, { bend: 8, ends: [false, false] });
 cable("cable.lidar", [[LX + 8, L.s / 2, L.h0 + 8], [LX + 8, 30, L.h0 + 8], [LX + 8, 30, GLANDS.lidar[2]], [LX + 8, GLANDS.lidar[1], GLANDS.lidar[2]], [GLANDS.lidar[0] + 7, GLANDS.lidar[1], GLANDS.lidar[2]]], 2, { bend: 6, ends: [true, false] });
 const GNSS_PLUG = [GN.x + 17, GN.y, GN.top];
 cable("cable.gnss", [GNSS_PLUG, [GN.x + 17, GN.y, K.z1 + 6], [GN.x + 40, 88, K.z1 + 6], [E.x0 - 26, 88, K.z1 + 6], [E.x0 - 14, 84, GLANDS.gnss[2]], [GLANDS.gnss[0] - 7, GLANDS.gnss[1], GLANDS.gnss[2]]], 2, { bend: 10, touch: ["deck"], ends: [true, false] });
@@ -468,12 +487,13 @@ function probeBody(travel, zMin, zMax, layer) {
   cylZ("ext", PR.extR, headTop, cz, { tone: "hi" }, { steps: 32, extra: Ln(k.sideArc(0, 0, PR.extR, headTop + 30, P, 32), { tone: "faint" }) });
   cylZ("head", PR.headR, root, headTop - 4, { tone: "hi", lit: true }, { extra: Ln(k.sideArc(0, 0, PR.headR, root + 14, P, 48) + k.sideArc(0, 0, PR.headR, root + 30, P, 48), { tone: "lo" }) });
   cylZ("flange", PR.flangeR, headTop - 4, headTop, { tone: "hi", lit: true }, { extra: headTop <= zMax ? Dots(G.dotsOf(frameZ(0, 0, 0), headTop, PR.flangeR - 3.4, 6, P, { all: true }), { size: 0.45 }) : "" });
-  const tof = [PR.headR - 1, -14, root];
-  if (root + 10 > zMin && root < zMax) {
+  const TF = PR.tof;
+  const tofPlan = { x: TF.x0, y: TF.y0, w: TF.x1 - TF.x0, d: TF.y1 - TF.y0, r: 1 };
+  if (root + TF.h > zMin && root < zMax) {
     const a = Math.max(root, zMin);
-    const b = Math.min(root + 10, zMax);
-    parts.push({ d: k.depthOf([PR.headR + 4, -10, (a + b) / 2], P), svg: S(k.slabOf({ x: tof[0], y: -16, w: 10, d: 12, r: 1 }, a, b - a, P, 2), { tone: "mid" }) });
-    shapes.push(A.slab({ x: tof[0], y: -16, w: 10, d: 12, r: 1 }, a, b - a, { name: `probe.${layer}.tof` }, 2));
+    const b = Math.min(root + TF.h, zMax);
+    parts.push({ d: k.depthOf([(TF.x0 + TF.x1) / 2, (TF.y0 + TF.y1) / 2, (a + b) / 2], P), svg: S(k.slabOf(tofPlan, a, b - a, P, 2), { tone: "mid" }) });
+    shapes.push(A.slab(tofPlan, a, b - a, { name: `probe.${layer}.tof` }, 2));
   }
   for (const x of PR.needleX) {
     const tip = root - PR.needleL;
@@ -534,11 +554,12 @@ function axisParts(travel) {
   out.push(screw("tower.screw.high", cz + 22, COUPLER_Z0));
   return out;
 }
-const LOW_TOP = 120; // inside the well, below where it could be seen through the opening
+const LOW_TOP = D.cartridge.z0; // the cartridge's bottom face: above it the probe is inside the chassis
 const UP_BOTTOM = TW.base.z1;
 const up = probeBody(travelUp, UP_BOTTOM, 1000, "up");
 const low = probeBody(travelLow, -200, LOW_TOP, "low");
-if (POSE >= 0) {
+const lowFallback = low.shapes.length === 0;
+if (POSE >= 0 && !lowFallback) {
   const root = M.NEEDLE_ROOT0 - POSE;
   const headTop = root + PR.headL;
   const cz = M.CARRIAGE_Z0 - POSE;
@@ -582,7 +603,9 @@ function lowerClip() {
 }
 const probeGroup = (part, svg, clipId, clipD) =>
   `<g data-part="${part}"><clipPath id="${clipId}"><path data-hold d="${clipD}"/></clipPath><g clip-path="url(#${clipId})">${svg}</g></g>`;
-put("probe.low", [0, 0, 30], probeGroup("probe-low", low.svg, "rv-clip-low", lowerClip()), low.shapes.map(record), { bias: 0 });
+if (lowFallback) probeBody(travelLow, LOW_TOP, UP_BOTTOM, "low").shapes.forEach((shape) => record(shape));
+const lowShapes = low.shapes;
+if (!lowFallback || POSE < 0) put("probe.low", [0, 0, 30], probeGroup("probe-low", low.svg, "rv-clip-low", lowerClip()), lowShapes.map(record), { bias: 0 });
 put("probe.up", [0, 0, up.root + PR.headL], probeGroup("probe-up", up.svg, "rv-clip-up", upperClip()), up.shapes.map(record), { bias: 0 });
 put("probe.carriage", [-8, 0, car.cz + 14], `<g data-part="probe-carriage">${car.svg}</g>`, car.shapes.map(record), { bias: 0 });
 for (const part of axisParts(travelUp)) put(part.name, part.ref, `<g data-part="${part.name}">${part.svg}</g>`, [record(part.shape)]);
@@ -603,16 +626,108 @@ const LOOP_PTS = loopRoute(car.cz);
   put("cable.probe", G.lerp3(route[0], route[route.length - 1], 0.5), `<g data-part="probe-cable">${pieces.map((p) => tubeSvg(p, { tone: "mid" })).join("")}</g>`, pieces.map((p) => A.tube(p.points, p.radii)), { bias: 0.05 });
 }
 // ToF beam, shown while lowering: a ray from the sensor to the soil.
-put("probe.tof.beam", [PR.headR + 4, -10, 20], `<g data-part="tof-beam"></g>`, [record(A.box([PR.headR + 3, -11, 0], [PR.headR + 5, -9, 1], { name: "probe.tof.beam", ground: true }))], { bias: 0.1 });
+const TOF_XY = [(PR.tof.x0 + PR.tof.x1) / 2, (PR.tof.y0 + PR.tof.y1) / 2];
 
-A.settle(R, P);
+// Left scan arm, drawn at extension `armShare` (1 on the page; live code slides it back).
+// Each stage shows only beyond the stage that holds it: the mid stage and head beyond the beam mouth,
+// the inner stage beyond the mid stage's end.
+const armShare = ARM >= 0 ? ARM : 1;
+const MID_OFF = SC.mid.travel * armShare;
+const IN_OFF = (SC.mid.travel + SC.inner.travel) * armShare;
+const hullClip = (x0, x1, z0, z1, y) => {
+  const pts = [];
+  for (const yy of [y, y + 2000]) for (const [x, z] of [[x0, z0], [x1, z0], [x1, z1], [x0, z1]]) pts.push(at([x, yy, z]));
+  const h = G.hullOf(pts);
+  return `M${h.map(([x, z]) => `${f2(x)} ${f2(z)}`).join("L")}Z`;
+};
+function armBox(name, x0, x1, y0, y1, z0, z1, yCut, tone, extra = "") {
+  const a = Math.max(y0, yCut);
+  if (y1 - a < 0.2) return { svg: "", shapes: [] };
+  const plan = { x: x0, y: y0, w: x1 - x0, d: y1 - y0, r: 1.2 };
+  return { svg: S(k.slabOf(plan, z0, z1 - z0, P, 2, 0.4), { tone }) + extra, shapes: [A.slab({ x: x0, y: a, w: x1 - x0, d: y1 - a, r: 0.4 }, z0, z1 - z0, { name }, 2)] };
+}
+{
+  const mouth = SC.y;
+  const mid = SC.mid;
+  const inn = SC.inner;
+  const hd = SC.head;
+  const mz0 = SC.z0 + SC.wall;
+  const iz0 = mz0 + mid.wall;
+  const midY = [MID_OFF, MID_OFF + mid.len];
+  const inY = [IN_OFF, IN_OFF + inn.len];
+  const headY = [inY[1], inY[1] + hd.l];
+  const midEnd = path3([[SXC - mid.w / 2 + mid.wall, midY[1] + 0.05, iz0], [SXC + mid.w / 2 - mid.wall, midY[1] + 0.05, iz0], [SXC + mid.w / 2 - mid.wall, midY[1] + 0.05, iz0 + inn.h], [SXC - mid.w / 2 + mid.wall, midY[1] + 0.05, iz0 + inn.h]], true);
+  const midSvg = S(k.slabOf({ x: SXC - mid.w / 2, y: midY[0], w: mid.w, d: mid.len, r: 1 }, mz0, mid.h, P, 2, 0.4), { tone: "mid" }) + `<path class="rv-void" d="${midEnd}"/>`;
+  const midShapes = midY[1] > mouth ? [[0, mid.w, 0, mid.wall], [0, mid.w, mid.h - mid.wall, mid.h], [0, mid.wall, mid.wall, mid.h - mid.wall], [mid.w - mid.wall, mid.w, mid.wall, mid.h - mid.wall]].map(([u0, u1, v0, v1]) =>
+    A.slab({ x: SXC - mid.w / 2 + u0, y: mouth, w: u1 - u0, d: midY[1] - mouth, r: 0.3 }, mz0 + v0, v1 - v0, { name: "arm.mid" }, 2)) : [];
+  const inCut = Math.max(midY[1], mouth);
+  const innerSvg = S(k.slabOf({ x: SXC - inn.w / 2, y: inY[0], w: inn.w, d: inn.len, r: 1 }, iz0, inn.h, P, 2, 0.4), { tone: "mid" });
+  const innerShapes = inY[1] - inCut > 0.2 ? [A.slab({ x: SXC - inn.w / 2, y: inCut, w: inn.w, d: inY[1] - inCut, r: 0.4 }, iz0, inn.h, { name: "arm.inner" }, 2)] : [];
+  // Head: body, window on top with an LED ring, sloped nose that slides under low leaves, side ToF.
+  const bodyY1 = headY[1] - 12;
+  const hplan = { x: SXC - hd.w / 2, y: headY[0], w: hd.w, d: bodyY1 - headY[0], r: 2 };
+  const top = hd.z0 + hd.h;
+  const wc = [SXC, (headY[0] + bodyY1) / 2];
+  const leds = Array.from({ length: 10 }, (_, j) => at([wc[0] + Math.cos((j / 10) * Math.PI * 2) * 13, wc[1] + Math.sin((j / 10) * Math.PI * 2) * 13, top]));
+  const NF = G.frameOf([SXC - hd.w / 2, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]);
+  const nose = [[bodyY1, hd.z0], [headY[1], hd.z0], [headY[1], hd.z0 + 7], [bodyY1, top]];
+  const headSvg = S(k.slabOf(hplan, hd.z0, hd.h, P, 3, 0.5), { tone: "hi", lit: true }) +
+    `<path class="rv-void" d="${k.ring(wc[0], wc[1], 8.5, top, P, 40)}"/>` + Ln(k.ring(wc[0], wc[1], 8.5, top, P, 40), { tone: "lo" }) + Dots(leds, { size: 0.55, tone: "hi" }) +
+    S(G.prismOf(NF, nose, 0, hd.w, P), { tone: "hi", lit: true }) +
+    S(k.slabOf({ x: SXC - 4, y: headY[1] - 1, w: 8, d: 1.6, r: 0.4 }, hd.z0 + 1.5, 4, P, 1), { tone: "lo" });
+  const headShapes = headY[1] > mouth
+    ? [A.slab({ x: hplan.x, y: Math.max(headY[0], mouth), w: hd.w, d: Math.max(0.2, bodyY1 - Math.max(headY[0], mouth)), r: 0.4 }, hd.z0, hd.h, { name: "arm.head" }, 2), A.prism(NF, nose, 0, hd.w, { name: "arm.head.nose" })]
+    : [];
+  const HOUSE = hullClip(SC.x0 - 2, SC.x1 + 2, SC.z0 - 2, SC.z1 + 2, mouth);
+  const MIDEND = hullClip(SXC - mid.w / 2 - 1, SXC + mid.w / 2 + 1, mz0 - 1, mz0 + mid.h + 1, midY[1]);
+  const group = (part, clipId, clipD, svg) => `<g data-part="${part}"><clipPath id="${clipId}"><path data-hold d="${clipD}"/></clipPath><g clip-path="url(#${clipId})">${svg}</g></g>`;
+  // Stages hidden inside the beam (or inside the mid stage) are real geometry too: record them in pose
+  // audits so the arm stays supported, and use them as an item's shape when nothing of it shows.
+  const midHidden = Math.min(midY[1], mouth) - midY[0];
+  const midHid = midHidden > 0.2 ? [[0, mid.w, 0, mid.wall], [0, mid.w, mid.h - mid.wall, mid.h], [0, mid.wall, mid.wall, mid.h - mid.wall], [mid.w - mid.wall, mid.w, mid.wall, mid.h - mid.wall]].map(([u0, u1, v0, v1]) =>
+    A.slab({ x: SXC - mid.w / 2 + u0, y: midY[0], w: u1 - u0, d: midHidden, r: 0.3 }, mz0 + v0, v1 - v0, { name: "arm.hidden.mid" }, 2)) : [];
+  const inHid = Math.min(inY[1], inCut) - inY[0] > 0.2 ? [A.slab({ x: SXC - inn.w / 2, y: inY[0], w: inn.w, d: Math.min(inY[1], inCut) - inY[0], r: 0.4 }, iz0, inn.h, { name: "arm.hidden.inner" }, 2)] : [];
+  const headHid = Math.min(headY[1], mouth) - headY[0] > 0.2 ? [A.slab({ x: hplan.x, y: headY[0], w: hd.w, d: Math.min(headY[1], mouth) - headY[0], r: 0.4 }, hd.z0, hd.h, { name: "arm.hidden.head" }, 2)] : [];
+  // Pose audits only: hidden parts are recorded for support, and a stage that shows nothing is not drawn.
+  if (ARM >= 0) [...midHid, ...inHid, ...headHid].forEach((shape) => record(shape));
+  const show = (shapes) => ARM < 0 || shapes.length > 0;
+  const midItem = midShapes;
+  const inItem = innerShapes;
+  const headItem = headShapes;
+  if (show(midItem)) put("arm.mid", [SXC, (midY[0] + midY[1]) / 2, mz0 + mid.h / 2], group("arm-mid", "rv-clip-mid", HOUSE, midSvg), midItem.map(record));
+  // The inner stage shows only beyond both the mid stage's end (which moves) and the beam mouth (fixed).
+  if (show(inItem)) put("arm.inner", [SXC, (inY[0] + inY[1]) / 2, iz0 + inn.h / 2],
+    `<g data-part="arm-inner"><clipPath id="rv-clip-inner"><path data-follow="mid" d="${MIDEND}"/></clipPath><clipPath id="rv-clip-inner2"><path data-follow="beam" d="${HOUSE}"/></clipPath>` +
+    `<g clip-path="url(#rv-clip-inner)"><g clip-path="url(#rv-clip-inner2)">${innerSvg}</g></g></g>`, inItem.map(record));
+  if (show(headItem)) put("arm.head", [SXC, (headY[0] + headY[1]) / 2, hd.z0 + hd.h / 2], group("arm-head", "rv-clip-head", HOUSE, headSvg), headItem.map(record));
+
+}
+put("probe.tof.beam", [TOF_XY[0], TOF_XY[1], 20], `<g data-part="tof-beam"></g>`, [record(A.box([TOF_XY[0] - 1, TOF_XY[1] - 1, 0], [TOF_XY[0] + 1, TOF_XY[1] + 1, 1], { name: "probe.tof.beam", ground: true }))], { bias: 0.1 });
+
+// The page draws in the order settled for the rest pose. Pose audits with --rest-order reuse those keys
+// (items are created in the same sequence in every build), so they check the order the page really uses.
+const KEYS_FILE = join(tmpdir(), "agrisim-rover-anatomy-keys.json");
+const nthNames = () => {
+  const seen = {};
+  return R.items.map((item) => `${item.name}#${(seen[item.name] = (seen[item.name] ?? 0) + 1)}`);
+};
+if (process.argv.includes("--rest-order")) {
+  const keys = JSON.parse(readFileSync(KEYS_FILE, "utf8"));
+  nthNames().forEach((id, i) => {
+    if (!(id in keys)) throw new Error(`no rest key for ${id}`);
+    R.items[i].key = keys[id];
+  });
+} else {
+  A.settle(R, P);
+  if (POSE < 0 && ARM < 0) writeFileSync(KEYS_FILE, JSON.stringify(Object.fromEntries(nthNames().map((id, i) => [id, R.items[i].key]))));
+}
 R.items.sort((a, b) => a.key - b.key);
 const MATERIAL = [[/^soil\./, "rv-soil"], [/^(tyre|bumper\.pad|drip\.tape|rx\.whip)/, "rv-rubber"]];
 const materialOf = (name) => (MATERIAL.find(([re]) => re.test(name)) ?? [null, ""])[1];
 const groups = R.items.map((item) => `<g class="it${materialOf(item.name) ? " " + materialOf(item.name) : ""}" data-name="${item.name}">${item.svg}</g>`).join("");
 
 const LABEL_TEXT =
-  "AgriRover v1 parked on a soil test tray with a cutaway notch. A four-wheel skid-steer chassis carries a module deck with a probe tower at its centre: a stepper turns a lead screw that drives a carriage down two guide rods, pushing a three-rod soil moisture probe through a well in the chassis 60 mm into the soil. An electronics box with its near wall cut away holds the computer, microcontroller, stepper driver, RS485 transceiver, power converter and fuses; a 2D lidar and camera sit on a mast at the front, a GNSS antenna and an emergency stop at the rear, and an accessory rail on the left waits for the under-leaf camera arm.";
+  "AgriRover v1 parked on a soil test tray with a cutaway notch. A four-wheel skid-steer chassis carries a module deck with a probe tower at its centre: a stepper turns a lead screw that drives a carriage down two guide rods, pushing a three-rod soil moisture probe through a self-cleaning cartridge in a well at the chassis centre, 60 mm into the soil. On the way back up a brush seal wipes the rods, an air-knife blows them dry, and the probe checks it reads clean air before the next sample. A front scan beam holds two telescopic under-leaf camera arms; the left arm slides out toward the row with its camera looking up and slides back past a window wiper. An electronics box with two walls cut away holds the computer, microcontroller, stepper driver, RS485 transceiver, power converter and fuses; a 2D lidar and camera sit on a mast at the front, a GNSS antenna and an emergency stop at the rear.";
 const svg = k.figureSvg({ width: W, height: H, label: LABEL_TEXT, body: [...back, `<g class="rv-rover">${groups}</g>`] });
 
 const C = M.cycle();
@@ -632,8 +747,13 @@ const DATA = {
   available: M.AVAILABLE_N,
   reading: 0.291,
   loop: { x1: D.carriage.x1, gland: GLANDS.probe, deckTop: K.z1, r: LOOP_R },
+  arm: { mid: SC.mid.travel, inner: SC.mid.travel + SC.inner.travel, speed: SC.speed, share: armShare, dwell: 2 },
+  headRest: SC.mid.len + SC.head.l / 2,
+  brush: D.cartridge.brushZ,
+  needleL: PR.needleL,
+  clean: M.CLEAN.airMax,
   axis: { rodY: TW.rodY, rodR: TW.rodR, baseZ1: TW.base.z1, topZ0: TW.top.z0, carH: D.carriage.h, screwX: TW.screwX, screwR: TW.screwR, screwZ0: SCREW_Z0, couplerZ0: COUPLER_Z0 },
-  tof: [PR.headR + 4, -10],
+  tof: TOF_XY,
   playback: 3,
 };
 const strip = (rel) => readFileSync(join(SKILL, rel), "utf8").replace(/^import .*$/gm, "").replace(/^export /gm, "");
@@ -657,21 +777,22 @@ const body =
   k.plateHtml({
     fig: "Fig 1",
     title: "AgriRover v1, probe rover",
-    hint: "Space: probe cycle · ↑ ↓ or hover to move the probe",
+    hint: "Space: probe cycle · A: leaf arm · ↑ ↓ or hover: probe",
     readout: "parked · probe up",
     keys: [
-      { mark: "lit", label: "Soil probe: three stainless rods that read volumetric water content" },
+      { mark: "lit", label: "Soil probe and under-leaf camera head: the two sensing ends" },
       { mark: "raised", label: "Probe tower: NEMA 17, T8 lead screw, carriage on two guide rods" },
-      { mark: "edge", label: "Probe cable: a service loop from the carriage to the electronics box" },
+      { mark: "edge", label: "Self-cleaning: brush seal and air-knife in the well; window wiper at the beam mouth" },
     ],
     caption:
-      `The module bolts to a 4WD skid-steer RC chassis (300 mm wheelbase, 330 mm track, 150 mm tyres) and probes through a well at the centre, where the rover's whole weight (${M.MASS_KG} kg, ${M.AVAILABLE_N.toFixed(0)} N) resists the push. A cycle lowers the probe at ${M.SPEED.approach} mm/s until the downward time-of-flight sensor sees the ground, inserts it ${PR.depth} mm at ${M.SPEED.insert} mm/s, reads for ${M.SPEED.read} s and retracts: ${C.t4.toFixed(1)} s in all, played here ${DATA.playback}× fast. The push follows a placeholder soil model (${M.SOIL.coneMPa} MPa tip resistance, ${M.SOIL.shaftKPa} kPa sleeve friction): about ${M.insertionForce(PR.depth).toFixed(0)} N at full depth. The reading shown is agrisim's first probe on seed 7 (0.291 m³/m³), a simulated value, not a field measurement. The near wall of the electronics box is cut away; the accessory rail on the left is reserved for the Phase 3 under-leaf camera arm.`,
-    body: `<div class="iso-stage rv-stage" tabindex="0" role="slider" aria-label="AgriRover probe. Space runs a probe cycle; up and down arrows move the probe 10 millimetres; Home retracts it; End drives it to full depth." aria-valuemin="0" aria-valuemax="${PR.depth}" aria-valuenow="0" aria-valuetext="Parked, probe up">${svg}</div>`,
+      `The module bolts to a 4WD skid-steer RC chassis (300 mm wheelbase, 330 mm track, 150 mm tyres) and probes through a well at the centre of the wheelbase, where most of the rover's weight resists the push (${M.MASS_KG} kg: ${M.AVAILABLE_N.toFixed(0)} N before the rear wheels unload). A cycle lowers the probe at ${M.SPEED.approach} mm/s until the downward time-of-flight sensor sees the ground, inserts it ${PR.depth} mm at ${M.SPEED.insert} mm/s and reads for ${M.SPEED.read} s. It then cleans itself before the next spot, because soil left on the rods would bias the next reading: the rods are wiped by a brush seal as they retract, blown dry by an air-knife for ${M.SPEED.blast} s, and must read clean air (within ${M.CLEAN.airMax} m³/m³ of their baseline) or the clean repeats. ${C.t6.toFixed(1)} s in all, played here ${DATA.playback}× fast. The push follows a placeholder soil model (${M.SOIL.coneMPa} MPa, ${M.SOIL.shaftKPa} kPa): about ${M.insertionForce(PR.depth).toFixed(0)} N at full depth. The front scan beam holds two telescopic arms whose low camera heads slide ${(M.SCAN_REACH / 1000).toFixed(2)} m out from the centre line, under the leaves of the row, and are wiped as they retract. The reading shown is agrisim's first probe on seed 7 (0.291 m³/m³), a simulated value, not a field measurement. The electronics box is drawn with its near and front walls cut away.`,
+    body: `<div class="iso-stage rv-stage" tabindex="0" role="slider" aria-label="AgriRover. Space runs a probe cycle with cleaning; A slides the left under-leaf camera arm out or in; up and down arrows move the probe 10 millimetres; Home retracts it; End drives it to full depth." aria-valuemin="0" aria-valuemax="${PR.depth}" aria-valuenow="0" aria-valuetext="Parked, probe up">${svg}</div>`,
   });
 const page = k.pageHtml({ title: "AgriRover v1 anatomy", theme: THEME, body, script: kitScript() + latheScript + tubeScript + LIVE, width: 700 });
-if (POSE < 0) {
+if (POSE < 0 && ARM < 0) {
   const name = THEME === "light" ? "rover-anatomy-light.html" : "rover-anatomy.html";
   writeFileSync(join(HERE, name), page);
   console.log("wrote", name, `${(page.length / 1024).toFixed(0)} KB`, `${R.items.length} items`, `${R.solids.length} shapes`, `scale ${KS.toFixed(3)}`, `${CABLES.length} lines`);
 }
-A.auditOrExit(R, P, {});
+// The scan cable leaves a gland on the beam it is mounted to; checked at 8x (see DESIGN.md, section 9).
+A.auditOrExit(R, P, { crowd: [["cable.scan", "scan.beam"]] });

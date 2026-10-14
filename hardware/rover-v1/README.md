@@ -6,7 +6,8 @@ The physical rover for the soil-moisture survey: a soil-probe module on a 4WD sk
 |---|---|
 | `model.mjs` | Parametric model: every dimension, the probe force and timing model, and the BOM |
 | `drawings.mjs` → `drawings/rover-v1-views.svg` | Front, side and plan views (third-angle, 1:5), with dimensions and a parts list |
-| `anatomy/build.mjs` + `anatomy/live.js` → `anatomy/rover-anatomy-light.html`, `anatomy/rover-anatomy.html` | Interactive isometric anatomy figure: hover or use the arrow keys to move the probe; Space runs a full probe cycle |
+| `anatomy/build.mjs` + `anatomy/live.js` → `anatomy/rover-anatomy-light.html`, `anatomy/rover-anatomy.html` | Fig 1, the whole rover: hover or use the arrow keys to move the probe; Space runs a probe cycle with cleaning; A slides the left under-leaf camera arm |
+| `anatomy/cleaning-build.mjs` + `anatomy/cleaning-live.js` → `anatomy/probe-cleaning-light.html`, `anatomy/probe-cleaning.html` | Fig 2, the self-cleaning probe cartridge in section: brushes, air-knife, air check |
 
 Open the HTML or SVG files in a browser to view them. Nothing needs installing to view.
 
@@ -28,9 +29,15 @@ Then build both themes and audit the geometry:
 
 ```powershell
 node hardware/rover-v1/anatomy/build.mjs
-node hardware/rover-v1/anatomy/build.mjs --light
 node hardware/rover-v1/anatomy/build.mjs --light --audit
-node hardware/rover-v1/anatomy/build.mjs --light --audit --pose=167
+node hardware/rover-v1/anatomy/build.mjs --light --audit --rest-order --pose=167
+node hardware/rover-v1/anatomy/build.mjs --light --audit --rest-order --arm=0.5
+node hardware/rover-v1/anatomy/cleaning-build.mjs
+node hardware/rover-v1/anatomy/cleaning-build.mjs --light --audit
 ```
 
-`--audit` must end with `audit passed`. `--pose=<mm>` audits the probe at that point of its 167 mm stroke. Set `ANATOMY_DIR` if the skill lives elsewhere. Once installed, the skill can also be used in Claude Code as `/anatomy`.
+`--audit` must end with `audit passed`. Run the plain `--audit` build first: it saves the page's paint order, which the `--rest-order` pose audits then check.
+- `--pose=<mm>` audits the probe at that point of its 167 mm stroke.
+- `--arm=<0..1>` audits the left camera arm at that share of its extension.
+
+Set `ANATOMY_DIR` if the skill lives elsewhere. Once installed, the skill can also be used in Claude Code as `/anatomy`.

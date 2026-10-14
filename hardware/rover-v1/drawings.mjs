@@ -3,7 +3,7 @@
 import { writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { BOM, DIM, OVERALL, STROKE, parts } from "./model.mjs";
+import { BOM, DIM, OVERALL, SCAN_REACH, STROKE, parts, scanHeads } from "./model.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SCALE = 1 / 5;
@@ -55,8 +55,7 @@ function shapeOf(part, view, style) {
   return `<rect x="${X(u0)}" y="${Y(v1)}" width="${f((u1 - u0) * SCALE)}" height="${f((v1 - v0) * SCALE)}" rx="${r}" ${style}/>`;
 }
 
-function drawView(view, travel, phantom = false) {
-  const list = parts(travel).filter((p) => !phantom || p.group === "probe");
+function drawView(view, travel, phantom = false, list = parts(travel).filter((p) => !phantom || p.group === "probe")) {
   const depthOf = (p) => Math.max(...corners(p).map(view.d));
   list.sort((a, b) => depthOf(a) - depthOf(b));
   const style = phantom ? 'class="phantom"' : 'class="solid"';
@@ -101,6 +100,7 @@ for (const [name, view] of Object.entries(VIEWS)) {
   }
   out.push(drawView(view, 0));
   if (name !== "plan") out.push(drawView(view, STROKE, true));
+  if (name === "front") out.push(drawView(view, 0, true, scanHeads(1)));
   out.push(`<text class="vtitle" x="${view.ox}" y="${name === "plan" ? 22 : 252}" text-anchor="middle">${view.title}</text>`);
   out.push("</g>");
 }
@@ -120,13 +120,14 @@ out.push(dim(front, [-OVERALL.width / 2, 0], [OVERALL.width / 2, 0], 26, `${OVER
 out.push(dim(front, [-W.track / 2, 0], [W.track / 2, 0], 14, `${W.track} track`));
 out.push(dim(front, [W.track / 2 + 55, 0], [W.track / 2 + 55, OVERALL.podClearance], -4, `${OVERALL.podClearance} pod`, true));
 out.push(dim(plan, [-DIM.deck.x, -DIM.wheel.track / 2 - DIM.wheel.w / 2], [DIM.deck.x, -DIM.wheel.track / 2 - DIM.wheel.w / 2], 6, `${2 * DIM.deck.x} deck`));
+out.push(dim(front, [0, DIM.scan.z1], [SCAN_REACH, DIM.scan.z1], -16, `${SCAN_REACH} arm reach`));
 
 // Balloons on the side elevation (refs into the BOM table).
 const B = [
   [[-180, 40], 1, -6, 14], [[-150, 75], 2, 8, 16], [[-60, 135], 4, 0, 26], [[-218, 110], 5, -8, 14],
   [[-100, 182], 8, 2, -30], [[0, 300], 10, 18, -4], [[34, 330], 11, 18, 6], [[34, 428], 12, -16, -6],
   [[0, 377], 13, 22, -8], [[0, 215], 15, 22, 2], [[-150, 230], 16, -14, -22], [[-200, 252], 17, -2, -24],
-  [[170, 300], 19, 6, -18], [[165, 236], 20, 18, -10],
+  [[170, 300], 19, 6, -18], [[165, 236], 20, 18, -10], [[-251, 92], 22, -8, 18], [[0, 96], 6, 16, 22],
 ];
 for (const [at, n, dx, dy] of B) out.push(balloon(side, at, n, dx, dy));
 
@@ -143,7 +144,7 @@ const title = [
   `<rect class="frame" x="300" y="256" width="112" height="32"/>`,
   `<text class="tt" x="303" y="263">AgriRover v1: soil-probe module on a 4WD skid-steer chassis</text>`,
   `<text x="303" y="269">General arrangement · third-angle projection · scale 1:5 · units mm</text>`,
-  `<text x="303" y="274">Probe retracted (solid) and at ${DIM.probe.depth} mm depth (phantom); stroke ${STROKE} mm</text>`,
+  `<text x="303" y="274">Phantom: probe at ${DIM.probe.depth} mm depth (stroke ${STROKE} mm), scan arms extended</text>`,
   `<text x="303" y="279">Design targets, not as-built: confirm chassis dims on purchase.</text>`,
   `<text x="303" y="284">Team: Auenchanters · 2026-10-14</text>`,
 ];
