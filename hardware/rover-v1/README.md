@@ -39,6 +39,12 @@ node hardware/rover-v1/anatomy/cleaning-build.mjs
 node hardware/rover-v1/anatomy/cleaning-build.mjs --light --audit
 ```
 
+Then copy the model to the 3D replay, which builds its rover from it (a test fails until the copies match):
+
+```powershell
+Copy-Item hardware/rover-v1/model.mjs src/agrisim/viewer3d/rover-model.mjs
+```
+
 `--audit` must end with `audit passed`. Commit the rebuilt HTML and SVG files: CI rebuilds them and fails if they differ from the committed ones. Run the plain `--audit` build first: it saves the page's paint order, which the `--rest-order` pose audits then check.
 - `--pose=<mm>` audits the probe at that point of its 167 mm stroke.
 - `--arm=<0..1>` audits the left camera arm at that share of its extension.

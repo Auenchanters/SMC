@@ -64,6 +64,9 @@ def run(
         Path | None, typer.Option(exists=True, dir_okay=False, help="model.zip for --policy ppo")
     ] = None,
     out: Annotated[Path, typer.Option(help="Root folder for run outputs")] = Path("runs"),
+    view: Annotated[
+        bool, typer.Option("--view", help="Replay the survey in 3D in your browser afterwards")
+    ] = False,
 ) -> None:
     """Run one survey and write runs/<UTC timestamp>_seed<seed>/."""
     from agrisim.io import new_dir, run_dir_name, save_run
@@ -96,6 +99,30 @@ def run(
     typer.echo(f"lane coverage  {r.lane_coverage:.3f}")
     typer.echo(f"plant contacts {r.plant_contacts}")
     typer.echo("Note: soil and probe parameters are placeholders until calibrated.")
+    if view:
+        from agrisim.view3d import serve, write_scene
+
+        write_scene(result, out_dir)
+        serve(out_dir)
+
+
+@app.command()
+def view(
+    run_dir: Annotated[
+        Path, typer.Argument(exists=True, file_okay=False, help="A run folder made with --view")
+    ],
+    port: Annotated[int, typer.Option(help="Port on 127.0.0.1 (0 = any free port)")] = 0,
+    browser: Annotated[bool, typer.Option(help="Open the page in your browser")] = True,
+) -> None:
+    """Replay a finished survey in 3D in your browser (needs the run's scene.json)."""
+    from agrisim.view3d import SCENE, serve
+
+    if not (run_dir / SCENE).is_file():
+        raise typer.BadParameter(
+            f"{run_dir} has no {SCENE}; make one with: agrisim run ... --view",
+            param_hint="RUN_DIR",
+        )
+    serve(run_dir, open_browser=browser, port=port)
 
 
 @app.command()

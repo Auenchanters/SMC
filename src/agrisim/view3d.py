@@ -1,0 +1,152 @@
+"""3D replay of one survey in the browser (three.js page in viewer3d/).
+
+`write_scene` turns a finished run into scene.json: the field, the plants, the rover's path, every
+probe reading, and the map after each reading. `serve` hosts the viewer page and that file on
+127.0.0.1 and opens the browser. The page only replays what the simulator produced.
+"""
+
+import json
+import webbrowser
+from functools import partial
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
+
+import numpy as np
+import numpy.typing as npt
+
+from agrisim.io import metrics_dict
+from agrisim.mapping import make_mapper
+from agrisim.metrics import map_metrics
+
+if TYPE_CHECKING:
+    from agrisim.sim import RunResult
+
+VIEWER = Path(__file__).resolve().parent / "viewer3d"
+SCENE = "scene.json"
+PATH_EVERY = 4  # keep every 4th drive step (0.2 s at dt = 0.05 s), plus every stop and start
+
+
+def _milli(values: npt.ArrayLike) -> list[Any]:
+    """Grid values as integer thousandths (VWC 0.213 -> 213); NaN -> None. Keeps the JSON small."""
+    v = np.asarray(values, dtype=np.float64).ravel()
+    return [None if not np.isfinite(x) else round(float(x) * 1000) for x in v]
+
+
+def _path_samples(times: npt.NDArray[np.float64], dt: float) -> npt.NDArray[np.intp]:
+    """Indices to keep: every PATH_EVERY-th step, both ends, and both sides of every pause."""
+    n = len(times)
+    keep = np.zeros(n, dtype=bool)
+    keep[::PATH_EVERY] = True
+    keep[[0, -1]] = True
+    gap = np.diff(times) > 1.5 * dt  # the rover stood still here (probing)
+    keep[:-1] |= gap
+    keep[1:] |= gap
+    return np.flatnonzero(keep)
+
+
+def scene_dict(result: "RunResult") -> dict[str, Any]:
+    """Everything the 3D page needs, from one finished run."""
+    cfg, lay = result.cfg, result.layout
+    idx = _path_samples(result.times, cfg.dt)
+    p = result.poses[idx]
+
+    # The map as it stood after each reading, rebuilt from the readings in order.
+    mapper = make_mapper(cfg.mapping)
+    est, sd, rmse = [], [], []
+    for k in range(len(result.readings) + 1):
+        if k:
+            mapper.update(result.readings[k - 1])
+        mean, var = mapper.estimate(result.grid)
+        est.append(_milli(mean))
+        sd.append(_milli(np.sqrt(var)))
+        r = map_metrics(result.truth_grid, mean, var, cfg.mapping.dry_threshold).rmse
+        rmse.append(round(r, 5) if np.isfinite(r) else None)
+
+    return {
+        "version": 1,
+        "seed": result.seed,
+        "policy": result.policy,
+        "field": cfg.field.model_dump(),
+        "rover": cfg.rover.model_dump(),
+        "probe_time_s": cfg.probe.insertion_time_s,
+        "dry_threshold": cfg.mapping.dry_threshold,
+        "vwc_range": list(cfg.soil.vwc_clip),
+        "std_vwc": cfg.soil.std_vwc,
+        "stems": np.round(lay.stems, 3).tolist(),
+        "canopy": np.round(lay.canopy_radius, 3).tolist(),
+        "rows_y": np.round(lay.row_y, 3).tolist(),
+        "lanes_y": np.round(lay.lane_y, 3).tolist(),
+        "path": {
+            "t": np.round(result.times[idx], 2).tolist(),
+            "x": np.round(p[:, 0], 3).tolist(),
+            "y": np.round(p[:, 1], 3).tolist(),
+            "th": np.round(p[:, 2], 4).tolist(),
+        },
+        "probes": [
+            {"t": round(r.t, 2), "x": round(r.x, 3), "y": round(r.y, 3), "v": r.value}
+            for r in result.readings
+        ],
+        "grid": {"nx": result.grid.nx, "ny": result.grid.ny, "res": result.grid.resolution},
+        "truth": _milli(result.truth_grid),
+        "estimate": est,  # estimate[k] = map after k readings
+        "sd": sd,  # kriging standard deviation after k readings (None where undefined)
+        "rmse": rmse,
+        "metrics": metrics_dict(result),
+        "contacts": [
+            {"t": round(float(result.times[c.step]), 2), "x": c.x, "y": c.y}
+            for c in result.contacts
+        ],
+    }
+
+
+def write_scene(result: "RunResult", out_dir: Path) -> Path:
+    path = out_dir / SCENE
+    path.write_text(json.dumps(scene_dict(result), separators=(",", ":")), encoding="utf-8")
+    return path
+
+
+class _Handler(SimpleHTTPRequestHandler):
+    """Serves the viewer files; /run/<file> comes from the run folder instead."""
+
+    def __init__(self, *args: Any, run_dir: Path, **kwargs: Any) -> None:
+        self.run_dir = run_dir
+        # Explicit types: some Windows registries map .js to text/plain, which browsers refuse
+        # to run as a module.
+        self.extensions_map = {
+            ".html": "text/html",
+            ".js": "text/javascript",
+            ".mjs": "text/javascript",
+            ".json": "application/json",
+            ".css": "text/css",
+            ".txt": "text/plain",
+        }
+        super().__init__(*args, directory=str(VIEWER), **kwargs)
+
+    def translate_path(self, path: str) -> str:
+        if path.split("?")[0] == "/run/" + SCENE:
+            return str(self.run_dir / SCENE)
+        return super().translate_path(path)
+
+    def log_message(self, format: str, *args: Any) -> None:
+        pass
+
+
+def make_server(run_dir: Path, port: int = 0) -> ThreadingHTTPServer:
+    """A server on 127.0.0.1 (port 0 = any free port); call serve_forever() to run it."""
+    return ThreadingHTTPServer(("127.0.0.1", port), partial(_Handler, run_dir=run_dir))
+
+
+def serve(run_dir: Path, open_browser: bool = True, port: int = 0) -> None:
+    """Host the 3D viewer for one run folder until Ctrl+C."""
+    server = make_server(run_dir, port)
+    url = f"http://127.0.0.1:{server.server_address[1]}/"
+    print(f"3D viewer: {url}  (press Ctrl+C to stop)", flush=True)
+    if open_browser:
+        webbrowser.open(url)
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        server.server_close()

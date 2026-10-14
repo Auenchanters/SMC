@@ -20,7 +20,7 @@ A pure-Python simulator of a planted tomato field. A small differential-drive ro
 
 <sub>Real simulator output, seed 7. Higher-quality video: [docs/media/survey.mp4](docs/media/survey.mp4). Soil parameters are placeholders until calibrated.</sub>
 
-**Demo video (2 min 46 s):** [docs/media/agrisim-demo.mp4](docs/media/agrisim-demo.mp4) shows the CLI, a run's outputs, the Rerun replay and the rover hardware figures.
+**Demo video (3 min 9 s):** [docs/media/agrisim-demo.mp4](docs/media/agrisim-demo.mp4) shows the CLI, a run's outputs, the Rerun viewer, the 3D replay and the rover hardware figures.
 
 </div>
 
@@ -100,6 +100,20 @@ The same config and seed always give a byte-identical `metrics.json`.
 
 Everything is driven by one YAML file ([configs/demo.yaml](configs/demo.yaml)). Every physical number in it is marked `# PLACEHOLDER: calibrate`.
 
+## 3D replay
+
+Add `--view` to any run to replay it in 3D in your browser: the rover (built from the hardware design's dimensions) drives between staked tomato rows, parks, and pushes its probe into the soil. Every reading leaves a coloured mark and the moisture map fills in on the ground. A panel says in plain words what is happening, and buttons switch the ground colour between the robot's map, the real moisture, the map error and the uncertainty. It works offline (three.js is bundled) and needs no install beyond `uv sync`.
+
+```powershell
+uv run agrisim run --config configs/demo.yaml --seed 7 --view
+```
+
+| | |
+|:---:|:---:|
+| ![3D replay, following the robot](docs/img/viewer3d.jpg) **Following the robot.** It has parked and is pushing the probe into the soil. | ![3D replay, whole field](docs/img/viewer3d-field.jpg) **The whole field.** Orange = too dry, blue = wet; each round mark is a reading. |
+
+Reopen a run later with `uv run agrisim view runs\<folder>`. Press `?` in the page for a guide.
+
 ## Screenshots
 
 | | |
@@ -108,7 +122,7 @@ Everything is driven by one YAML file ([configs/demo.yaml](configs/demo.yaml)). 
 
 ![Final frame of the survey](docs/img/hero.png)
 
-**Live view:** `--rerun` opens the [Rerun](https://rerun.io/) viewer. It shows the field, the moving rover, probes coloured by reading, the four maps updating after each probe, and RMSE over time. Scrub the `sim_time` timeline to replay a mission.
+**Live view:** `--rerun` opens the [Rerun](https://rerun.io/) viewer. It shows the field, the moving rover, probes coloured by reading, the four maps updating after each probe, and the average map error over time. A "How to read this" panel explains each view. Drag the time bar to replay a mission.
 
 ## Quickstart
 
@@ -124,7 +138,7 @@ git config core.hooksPath .githooks
 
 `uv sync` installs Python 3.13 and every pinned dependency into `.venv`. The last line turns on the repository's git hooks (see [CLAUDE.md](CLAUDE.md)).
 
-**1. One survey** (add `--rerun` to watch it live):
+**1. One survey** (add `--view` for the 3D replay, or `--rerun` for the Rerun viewer):
 
 ```powershell
 uv run agrisim run --config configs/demo.yaml --seed 7
@@ -176,6 +190,7 @@ Each run writes a new folder `runs/<UTC time>_seed<seed>/`, for example `runs/20
 | `path.csv` | The rover pose every 0.05 s |
 | `maps.png` | Truth, estimate, error and variance with fixed colour scales |
 | `recording.rrd` | Rerun recording (only with `--rerun`); reopen it with `uv run rerun <file>` |
+| `scene.json` | Data for the 3D replay (only with `--view`); reopen it with `uv run agrisim view <folder>` |
 
 `bench` and `eval` write `runs/bench_<time>/` or `runs/eval_<time>/` with `results.csv` (one row per strategy and seed) and `summary.md` (mean and 95% interval per strategy).
 
@@ -270,8 +285,10 @@ src/agrisim/
   env.py        Gymnasium env, MaskablePPO training, learned policy
   bench.py      multi-seed benchmark, 95% intervals, Markdown summary
   viz.py        Rerun logging
+  view3d.py     3D replay: scene.json and a local web server
+  viewer3d/     the 3D replay page (three.js 0.186.1 bundled, MIT)
   io.py         Windows-safe run folders and outputs
-  cli.py        agrisim run | bench | train | eval
+  cli.py        agrisim run | bench | train | eval | view
 configs/demo.yaml   all placeholder numbers, marked "PLACEHOLDER: calibrate"
 scripts/            demo.ps1 / demo.sh, check_licenses.ps1 / .sh, make_media.py, demo_video/
 tests/              pytest suite

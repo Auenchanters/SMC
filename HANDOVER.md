@@ -1,9 +1,9 @@
 # Handover: agrisim (Layer A)
 
-You are taking over a finished first version of the soil-moisture survey simulator and the first rover hardware design. This page tells you how to set it up, how to test it end to end, what results to expect, and what is still open. Read [README.md](README.md) first for what the project does, or watch the 3-minute demo: [docs/media/agrisim-demo.mp4](docs/media/agrisim-demo.mp4).
+You are taking over a finished first version of the soil-moisture survey simulator and the first rover hardware design. This page tells you how to set it up, how to test it end to end, what results to expect, and what is still open. Read [README.md](README.md) first for what the project does, or watch the 3-minute demo: [docs/media/agrisim-demo.mp4](docs/media/agrisim-demo.mp4). The quickest way to see what the project does is the 3D replay: `uv run agrisim run --config configs/demo.yaml --seed 7 --view`.
 
 State at handover (14 Oct 2026):
-- ExecPlan milestones M0 to M9 are done. 66 tests pass.
+- ExecPlan milestones M0 to M9 are done, plus a 3D replay viewer. 70 tests pass.
 - CI is green: tests on Windows and Ubuntu, plus a hardware job that rebuilds and audits the rover figures.
 - Every decision, surprise and result is in [EXECPLAN.md](EXECPLAN.md).
 - Nothing is half-finished in the code. Open items are in section 3.
@@ -23,7 +23,9 @@ Hard rules. Each one has broken something or is a team decision, so do not work 
 7. **Generated files: do not edit them by hand.**
    - `hardware/rover-v1/drawings/*.svg` and `hardware/rover-v1/anatomy/*.html` come from `model.mjs`. Rebuild them, then commit; CI fails if they are stale.
    - `docs/img/*` (except `architecture.svg`) and `docs/media/survey.mp4` come from `scripts/make_media.py`.
-   - `docs/media/agrisim-demo.mp4` comes from `scripts/demo_video/`.
+   - `docs/media/agrisim-demo.mp4` and `docs/img/viewer3d*.jpg` come from `scripts/demo_video/`.
+   - `src/agrisim/viewer3d/rover-model.mjs` is a byte-for-byte copy of `hardware/rover-v1/model.mjs` (the 3D rover is built from it). After changing the model, copy it; a test fails until you do.
+   - `src/agrisim/viewer3d/vendor/` is three.js 0.186.1 exactly as published (MIT). Do not edit it; to upgrade, replace the files and update its README.txt and the Decision Log.
 8. **Pull before you edit README.md or HANDOVER.md.** Two people edit them.
 
 Definition of done for any change. All of these must pass before you commit:
@@ -65,7 +67,7 @@ Work through these in order and tick each one. "Expected" values came from the t
 | A1 | `uv run ruff check .` | `All checks passed!` |
 | A2 | `uv run ruff format --check .` | all files already formatted |
 | A3 | `uv run mypy src` | `Success: no issues found in 18 source files` |
-| A4 | `uv run pytest -q` | `66 passed` (about 50 to 140 s) |
+| A4 | `uv run pytest -q` | `70 passed` (about 50 to 140 s) |
 | A5 | `.\scripts\check_licenses.ps1` | exit code 0, with no GPL, AGPL or LGPL package listed |
 
 ### B. One survey
@@ -75,7 +77,9 @@ Work through these in order and tick each one. "Expected" values came from the t
 | B1 | `uv run agrisim run --config configs/demo.yaml --seed 7` | RMSE `0.0299`, R2 `0.677`, `59 valid / 60 used`, path `465.7 m`, lane coverage `1.000`, plant contacts `0` |
 | B2 | Open the new `runs\<time>_seed7\` folder | `config.yaml`, `metrics.json`, `truth.npy`, `estimate.npy`, `variance.npy`, `probes.csv`, `path.csv`, `maps.png` |
 | B3 | Run B1 again, then `fc.exe runs\<first>\metrics.json runs\<second>\metrics.json` | `FC: no differences encountered` (determinism) |
-| B4 | `uv run agrisim run --config configs/demo.yaml --seed 7 --rerun` | The Rerun viewer opens. The field view (rover in red, canopies in green, probe sites) is on the left with north up, the four maps are on the right, and the RMSE plot is below the field. Press play or drag the time cursor: the survey replays at 30x and the maps update after each probe. The folder gains `recording.rrd`. |
+| B4 | `uv run agrisim run --config configs/demo.yaml --seed 7 --rerun` | The Rerun viewer opens. Left: "The field from above" (robot in red, plants in green, readings as dots) and "Average map error over time". Right: a "How to read this" panel and the four maps with plain names. Press play or drag the time bar: the survey replays at 30x and the maps update after each reading. The folder gains `recording.rrd`. |
+| B4b | `uv run agrisim run --config configs/demo.yaml --seed 7 --view` | Prints the same numbers as B1, then `3D viewer: http://127.0.0.1:<port>/` and opens it in your browser. The robot drives between tomato rows, stops, pushes the probe in; marks appear and the map fills in. The "Right now" panel ends at "Survey complete", `60 of 60 (1 failed)`, `466 m`, plants touched `0`, map off by `±3.0 % points`. Ctrl+C in the terminal stops it. The folder gains `scene.json` (about 1.2 MB). |
+| B4c | `uv run agrisim view runs\<the B4b folder>` | The same replay opens again without re-running. On a folder without `scene.json` it says to use `--view` (exit code 2). |
 | B5 | `uv run agrisim run --config configs/demo.yaml --seed 7 --policy greedy_variance --budget 30` | plant contacts `0`; the rover drives in reverse inside lanes rather than turning around |
 | B6 | `uv run agrisim run --config configs/demo.yaml --seed 7 --policy ppo --model models/ppo_v1/model.zip --budget 30` | RMSE `0.0348`, `29 valid / 30 used`, path `783.6 m`, plant contacts `0` |
 
@@ -122,9 +126,9 @@ Needs Node.js 22 or later. Install the Anatomy kit once at the pinned commit, as
 | F5 | Open `hardware/rover-v1/anatomy/rover-anatomy.html` in a browser. Hover over the figure, press Space, then press A. | Hovering moves the probe. Space runs a probe cycle with cleaning, then a leaf scan. A slides the camera arm out and back. |
 | F6 | Open `hardware/rover-v1/anatomy/probe-cleaning.html` and press Space | Soil crumbs stick to the rods in the ground, are scraped off by the brushes on the way up, and fall. Then the air jets show, then the air check. |
 
-### G. Demo video (optional, about 6 minutes)
+### G. Demo video (optional, about 12 minutes)
 
-Follow [scripts/demo_video/README.md](scripts/demo_video/README.md). Expected: `docs/media/agrisim-demo.mp4` of about 2 min 45 s. The terminal numbers match B1 and B6, and the bench numbers match a 10-seed run.
+Follow [scripts/demo_video/README.md](scripts/demo_video/README.md). Expected: `docs/media/agrisim-demo.mp4` of about 3 min 10 s. The terminal numbers match B1 and B6, and the bench numbers match a 10-seed run.
 
 Report problems as GitHub issues with the command, the seed and the config file attached. Because runs are deterministic, the seed alone reproduces the bug.
 
@@ -140,6 +144,8 @@ Report problems as GitHub issues with the command, the seed and the config file 
 | Teammate's name in CLAUDE.md | The contributor list says "teammate: TBD". Add your GitHub name there in your first commit |
 | Rover hardware design | First version in [hardware/rover-v1/](hardware/rover-v1/): a 4WD RC chassis, a centre probe with a self-cleaning cartridge (brushes, air jets, air check), and a front scan beam with two under-leaf camera arms. It is on paper only. Dimensions marked [A] are assumptions to check against the chassis actually bought. The nine open questions (chassis choice, soil strength, probe model, cleaning in wet clay, canopy height, fogging, leaf brush, positioning, waterproofing) are in [DESIGN.md §8](hardware/rover-v1/DESIGN.md) |
 | Hardware CI uses `actions/setup-node@v4` | Works today; bump it when GitHub deprecates v4 |
+| 3D replay: JavaScript is not linted or unit-tested | The Python side (scene data, server, model copy) is tested. The page itself was checked by eye and by the demo-video recorder. If it grows, add a small headless-browser smoke test |
+| 3D replay: water or soil effects | Considered [threejs-particle-fluids](https://github.com/dgreenheck/threejs-particle-fluids) (MIT) for drip-irrigation water or the probe's air blast. Not used: it needs WebGPU with no WebGL fallback, so the page would stop working on some laptops and in the headless recorder |
 | A config can leave no probe site (D8) | The run completes with `nan` map metrics. A validation warning could be added if this confuses users |
 | Phase 2 (Gazebo / ROS 2 in WSL2) | Separate plan, not started |
 
@@ -158,5 +164,6 @@ Report problems as GitHub issues with the command, the seed and the config file 
 - **Fixed:** a reversed or invalid `--seeds` crashed `bench` and `eval` with a traceback, and `bench` left an empty folder behind (D7). `eval` now also rejects `--budget 0`.
 - **Fixed:** the Rerun viewer did not show the field view (rover, plants, probes) at all, only the maps (B4).
 - **Added:** the CI hardware job, the demo video and its scripts, and section 0 of this file.
+- **Added:** the 3D replay (`--view` and `agrisim view`, B4b and B4c), built so a first-time user can follow it without help. The Rerun viewer got plain panel names and a "How to read this" panel (B4).
 
 Details are in the ExecPlan's Surprises & Discoveries section.

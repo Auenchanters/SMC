@@ -29,6 +29,34 @@ def map_ranges(cfg: SimConfig) -> dict[str, tuple[str, float, float]]:
     }
 
 
+MAP_NAMES = {
+    "truth": "Real moisture (the robot never sees this)",
+    "estimate": "Robot's moisture map",
+    "abs_error": "Map error: how wrong the map is",
+    "variance": "Uncertainty: how unsure the robot is",
+}
+# Markdown: a single line break inside a paragraph or list item is just a space.
+GUIDE = """
+A robot drives between rows of tomato plants and stops to push a probe into the soil.
+From those few readings it draws a moisture map of the whole field.
+
+**Press play** (bottom left) or **drag the time bar** to replay the survey (30x speed).
+
+- **The field from above:** the red box is the robot, green dots are plants, grey lines are
+  the paths it may drive. Round dots are its readings: purple = dry, yellow = wet,
+  red = the probe failed.
+- **Real moisture:** the truth, which exists only in the simulation. Dark = dry, yellow = wet.
+- **Robot's moisture map:** its guess for every spot, from its readings so far. Same colours.
+- **Map error:** dark = about right, bright = wrong.
+- **Uncertainty:** dark = sure (near a reading), yellow = unsure (far from any reading).
+- **Average map error over time:** falls as readings come in. 0.03 means the map is off by
+  about 3 percentage points of water on average.
+
+Scroll to zoom any view; double-click to reset it. The soil numbers are placeholders until
+calibrated. For a 3D replay, run `agrisim run ... --view`.
+"""
+
+
 def colorize(values: npt.ArrayLike, cmap: str, vmin: float, vmax: float) -> U8Array:
     """RGB uint8 colours; NaN maps to mid grey."""
     v = np.asarray(values, dtype=np.float64)
@@ -58,23 +86,32 @@ class RerunLogger:
         self._log_static(layout)
 
     def _blueprint(self) -> rrb.Blueprint:
-        """Field view (rover, plants, probes) beside the four maps, RMSE below; plays at 30x."""
+        """A guide panel, the field, the four maps and the error over time, in plain words."""
         whole_run = rr.encodings.TimeRange(
             start=rrb.TimeRangeBoundary.infinite(), end=rrb.TimeRangeBoundary.infinite()
         )
-        maps = (rrb.Spatial2DView(origin=f"maps/{n}", name=n) for n in map_ranges(self.cfg))
+        maps = (
+            rrb.Spatial2DView(origin=f"maps/{key}", name=MAP_NAMES[key])
+            for key in map_ranges(self.cfg)
+        )
         return rrb.Blueprint(
             rrb.Horizontal(
                 rrb.Vertical(
-                    rrb.Spatial2DView(origin="/", contents="/field/**", name="field (north up)"),
+                    rrb.Spatial2DView(
+                        origin="/", contents="/field/**", name="The field from above (north up)"
+                    ),
                     rrb.TimeSeriesView(
                         origin="metrics",
-                        name="map RMSE vs truth",
+                        name="Average map error over time (lower is better)",
                         axis_x=rrb.TimeAxis(view_range=whole_run),
                     ),
                     row_shares=[3, 1],
                 ),
-                rrb.Grid(*maps),
+                rrb.Vertical(
+                    rrb.TextDocumentView(origin="guide", name="How to read this"),
+                    rrb.Grid(*maps),
+                    row_shares=[2, 3],
+                ),
                 column_shares=[3, 2],
             ),
             rrb.TimePanel(state="collapsed", timeline="sim_time", playback_speed=30.0),
@@ -83,6 +120,7 @@ class RerunLogger:
 
     def _log_static(self, layout: FieldLayout) -> None:
         f, log = self.cfg.field, self.rec.log
+        log("guide", rr.TextDocument(GUIDE, media_type="text/markdown"), static=True)
         # 2D views draw y downwards; flip the field so north (high y) is up, like the maps.
         log("field", rr.Transform3D(translation=[0, f.width_y, 0], scale=[1, -1, 1]), static=True)
         outline = [(0, 0), (f.length_x, 0), (f.length_x, f.width_y), (0, f.width_y), (0, 0)]
@@ -133,7 +171,7 @@ class RerunLogger:
                 self.rec.log(
                     f"maps/{name}", rr.Image(colorize(np.flipud(maps[name]), cmap, lo, hi))
                 )
-        self.rec.log("metrics/rmse", rr.Scalars(rmse))
+        self.rec.log(r"metrics/average\ map\ error", rr.Scalars(rmse))
 
     def close(self) -> None:
         self.rec.flush()

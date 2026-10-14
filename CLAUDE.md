@@ -16,7 +16,7 @@ Claude must never appear as an author, committer or contributor of this reposito
 ## What this repo is
 `agrisim`: a pure-Python simulator of a planted tomato field where a small rover drives inter-row lanes without touching plants, probes soil moisture, and reconstructs a moisture grid plus an uncertainty grid. It also exposes a Gymnasium environment for training adaptive probing. Layer A only; no ROS or Gazebo code in this package.
 
-`hardware/rover-v1/` is the physical rover design, in Node.js (not part of the Python package). `model.mjs` is its single source of truth. The SVG drawings and anatomy HTML figures are generated from it: never edit them by hand. Rebuild, audit and commit them as described in its README; CI fails if they are stale.
+`hardware/rover-v1/` is the physical rover design, in Node.js (not part of the Python package). `model.mjs` is its single source of truth. The SVG drawings and anatomy HTML figures are generated from it: never edit them by hand. Rebuild, audit and commit them as described in its README; CI fails if they are stale. The 3D replay (`src/agrisim/viewer3d/`) builds its rover from a copy of `model.mjs`: copy it after every model change (a test checks). Never edit the vendored three.js in `viewer3d/vendor/`.
 
 ## Platform (hard rule)
 - Primary platform: **Windows (x86-64)**, run from PowerShell. Everything must install and run natively on Windows with no WSL, Docker or compiler toolchain. Linux must also work (CI).

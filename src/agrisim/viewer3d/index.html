@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Soil survey replay</title>
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.js" } }</script>
+<style>
+:root {
+  --panel: rgba(16, 20, 24, 0.84); --line: rgba(255, 255, 255, 0.12); --text: #eef2f4; --dim: #a7b3bb;
+  --accent: #8fe3a8; --warn: #ffb36b; --bad: #ff7b72; --radius: 12px;
+  font: 15px/1.45 "Segoe UI", system-ui, -apple-system, sans-serif; color: var(--text);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: #9fb8c8; }
+#view, #view canvas { position: fixed; inset: 0; display: block; width: 100%; height: 100%; }
+.panel { position: fixed; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); backdrop-filter: blur(8px); padding: 14px 16px; }
+h1 { font-size: 18px; margin: 0 0 6px; } h2 { font-size: 13px; margin: 0 0 8px; color: var(--dim); font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+p { margin: 0 0 8px; } .dim { color: var(--dim); }
+button { font: inherit; color: var(--text); background: rgba(255, 255, 255, 0.08); border: 1px solid var(--line); border-radius: 8px; padding: 6px 11px; cursor: pointer; }
+button:hover { background: rgba(255, 255, 255, 0.16); }
+button[aria-pressed="true"] { background: var(--accent); color: #0d1a12; border-color: var(--accent); font-weight: 600; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+#intro { left: 16px; top: 16px; width: 380px; }
+#intro .row { display: flex; gap: 8px; margin-top: 10px; }
+#introSmall { left: 16px; top: 16px; display: none; }
+
+#now { right: 16px; top: 16px; width: 330px; }
+#status { font-size: 19px; font-weight: 650; line-height: 1.3; }
+#substatus { color: var(--dim); margin-top: 2px; min-height: 1.4em; }
+#reading { margin-top: 8px; font-size: 16px; font-weight: 600; min-height: 1.4em; }
+.stats { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
+.stats span:nth-child(even) { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+#layers { left: 16px; bottom: 92px; width: 380px; }
+#layerButtons { display: flex; flex-wrap: wrap; gap: 6px; }
+#layerText { margin: 10px 0 8px; min-height: 2.9em; }
+#legendBar { height: 12px; border-radius: 6px; border: 1px solid var(--line); }
+#legendTicks { position: relative; height: 34px; font-size: 12px; color: var(--dim); }
+#legendTicks span { position: absolute; top: 3px; transform: translateX(-50%); white-space: nowrap; text-align: center; }
+#legendTicks span.mark { color: var(--warn); }
+
+#play { left: 16px; right: 16px; bottom: 16px; display: flex; align-items: center; gap: 12px; padding: 10px 14px; }
+#playBtn { width: 92px; font-weight: 600; }
+#time { flex: 1; accent-color: var(--accent); min-width: 120px; }
+#clock { font-variant-numeric: tabular-nums; color: var(--dim); white-space: nowrap; }
+#speeds { display: flex; gap: 4px; }
+#speeds button { padding: 6px 8px; }
+.sep { width: 1px; align-self: stretch; background: var(--line); }
+#cams { display: flex; gap: 4px; }
+label.slow { display: flex; gap: 6px; align-items: center; color: var(--dim); white-space: nowrap; }
+
+.tag { position: fixed; transform: translate(-50%, -100%); padding: 3px 8px; border-radius: 6px; background: rgba(16, 20, 24, 0.8); border: 1px solid var(--line); font-size: 13px; pointer-events: none; white-space: nowrap; }
+.tag.next { border-color: var(--accent); color: var(--accent); }
+#tip { position: fixed; display: none; pointer-events: none; max-width: 260px; padding: 8px 10px; border-radius: 8px; background: rgba(16, 20, 24, 0.94); border: 1px solid var(--line); font-size: 13px; }
+
+#help { position: fixed; inset: 0; display: none; place-items: center; background: rgba(0, 0, 0, 0.45); }
+#help .panel { position: relative; width: min(720px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; }
+#help dl { display: grid; grid-template-columns: 150px 1fr; gap: 8px 14px; margin: 10px 0 14px; }
+#help dt { font-weight: 650; } #help dd { margin: 0; color: var(--dim); }
+kbd { font: 12px Consolas, monospace; border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; background: rgba(255, 255, 255, 0.06); }
+
+#loading { position: fixed; inset: 0; display: grid; place-items: center; background: #1b2329; color: var(--text); font-size: 18px; text-align: center; padding: 20px; }
+@media (max-width: 900px) {
+  #intro, #layers { width: calc(100vw - 32px); } #now { display: none; } #speeds, #cams .lbl { display: none; }
+}
+</style>
+</head>
+<body>
+<div id="view"></div>
+
+<section class="panel" id="intro" aria-label="What is this">
+  <h1>Soil-moisture survey: 3D replay</h1>
+  <p>A small robot drives between rows of tomato plants without touching them. At each <b>stop</b> it pushes a <b>probe</b> into the soil and measures how much water is there.</p>
+  <p>From a few dozen measurements it draws a <b>moisture map of the whole field</b>, so a farmer can see which parts are too dry.</p>
+  <p class="dim" id="runInfo"></p>
+  <div class="row"><button id="helpBtn">How to read this</button><button id="hideIntro">Hide</button></div>
+</section>
+<button class="panel" id="introSmall">What is this?</button>
+
+<section class="panel" id="now" aria-live="polite" aria-label="What is happening now">
+  <h2>Right now</h2>
+  <div id="status">Loading…</div>
+  <div id="substatus"></div>
+  <div id="reading"></div>
+  <div class="stats">
+    <span>Readings taken</span><span id="sReadings">0</span>
+    <span>Distance driven</span><span id="sDistance">0 m</span>
+    <span>Plants touched</span><span id="sContacts">0</span>
+    <span title="Average difference between the robot's map and the real moisture">Map is off by (average)</span><span id="sError">no map yet</span>
+  </div>
+</section>
+
+<section class="panel" id="layers" aria-label="Ground colour">
+  <h2>Colour the ground by</h2>
+  <div id="layerButtons" role="group"></div>
+  <p id="layerText"></p>
+  <div id="legendBar"></div>
+  <div id="legendTicks"></div>
+</section>
+
+<section class="panel" id="play" aria-label="Playback">
+  <button id="playBtn">❚❚ Pause</button>
+  <input id="time" type="range" min="0" max="1" step="0.1" value="0" aria-label="Mission time">
+  <span id="clock">0:00 / 0:00</span>
+  <div class="sep"></div>
+  <div id="speeds" role="group" aria-label="Speed"></div>
+  <label class="slow"><input id="slow" type="checkbox" checked> Slow down at stops</label>
+  <div class="sep"></div>
+  <div id="cams" role="group" aria-label="Camera"></div>
+</section>
+
+<div class="tag" id="tagRobot">Robot</div>
+<div class="tag next" id="tagNext">Next stop</div>
+<div id="tip"></div>
+
+<div id="help" role="dialog" aria-modal="true" aria-label="How to read this">
+  <section class="panel">
+    <h1>How to read this</h1>
+    <dl>
+      <dt>The robot</dt><dd>A 4-wheel rover about 50 cm long. It only drives along the paths between plant rows and turns around at the ends of the field, so it never touches a plant. The tall tower on top raises and lowers the soil probe.</dd>
+      <dt>A stop</dt><dd>The robot parks, lowers the probe, pushes its three metal rods 6 cm into the soil, measures for a moment, pulls it out through brushes that wipe it clean, blows it dry with air, and checks it is clean before driving on.</dd>
+      <dt>Round marks</dt><dd>Every place the robot measured gets a round mark on the ground, coloured by the moisture it measured. Point at a mark to see its value. A grey mark means the probe failed at that spot.</dd>
+      <dt>Moisture, in %</dt><dd>How much of the soil's volume is water. 25% means a quarter of the soil volume is water. Below <span id="helpDry"></span> counts as too dry here.</dd>
+      <dt>Robot's map</dt><dd>The robot's best guess for every spot in the field, filled in between its marks. It gets better with every reading.</dd>
+      <dt>Real moisture</dt><dd>The true moisture, which exists only because this is a simulation. The robot never sees it. Compare the two to judge the map.</dd>
+      <dt>Map error</dt><dd>How far the robot's map is from the truth at each spot. "Map is off by" is the average of that, in % points.</dd>
+      <dt>Uncertainty</dt><dd>How unsure the robot is about each spot: high far from any mark, low near one. Smart strategies drive to where it is high.</dd>
+      <dt>Plants touched</dt><dd>How many times the robot's body overlapped a plant's leaves. The goal is always 0.</dd>
+    </dl>
+    <h2>Controls</h2>
+    <p><b>Mouse:</b> drag to turn the view, right-drag to slide it, scroll to zoom. <b>Keys:</b> <kbd>Space</kbd> play or pause, <kbd>←</kbd> <kbd>→</kbd> previous or next stop, <kbd>1</kbd>–<kbd>5</kbd> ground colours, <kbd>F</kbd> follow the robot, <kbd>O</kbd> overhead view.</p>
+    <p class="dim">The soil and probe numbers are placeholders until they are calibrated with real field data, so treat the values as an example, not a measurement.</p>
+    <button id="closeHelp">Close</button>
+  </section>
+</div>
+
+<div id="loading">Loading the field…</div>
+<script type="module" src="./app.js"></script>
+</body>
+</html>

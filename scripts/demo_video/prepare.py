@@ -14,6 +14,7 @@ from pathlib import Path
 
 from agrisim.config import load
 from agrisim.sim import run_survey
+from agrisim.view3d import write_scene
 
 REPO = Path(__file__).resolve().parents[2]
 PAGES = Path(__file__).resolve().parent / "pages"
@@ -110,7 +111,10 @@ def main() -> None:
 
     rrd = WORK / "seed7.rrd"
     rrd.unlink(missing_ok=True)
-    run_survey(load(REPO / "configs" / "demo.yaml"), 7, rerun=True, rrd_path=rrd, spawn=False)
+    result = run_survey(
+        load(REPO / "configs" / "demo.yaml"), 7, rerun=True, rrd_path=rrd, spawn=False
+    )
+    write_scene(result, WORK)  # for the 3D replay segment
     print(f"wrote {WORK}")
 
 

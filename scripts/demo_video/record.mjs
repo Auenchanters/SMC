@@ -1,6 +1,7 @@
 // Demo video, step 2: drive each part of the app in headless Chrome and screencast it.
-// Needs Node 22+, Chrome or Edge, `prepare.py` already run, and the Rerun web viewer serving
-// runs/demo_video/seed7.rrd on port 9090 (see README.md). Run from the repository root:
+// Needs Node 22+, Chrome or Edge, `prepare.py` already run, the Rerun web viewer serving
+// runs/demo_video/seed7.rrd on port 9090 and `agrisim view` serving runs/demo_video on port
+// 8766 (see README.md). Run from the repository root:
 //   node scripts/demo_video/record.mjs            all segments
 //   node scripts/demo_video/record.mjs fig1 fig2  only these
 import { spawn } from "node:child_process";
@@ -26,6 +27,29 @@ const capJs = (n, title, sub, css) => `(() => {
 const slide = (page, secs) => async (a) => { await a.go(url(join(WORK, page))); await a.start(); await sleep(secs * 1000); await a.stop(); };
 const RERUN_TOP = "left:300px;top:6px";
 const SIDE = "left:14px;top:240px;max-width:284px";
+const TOP = "left:50%;top:16px;transform:translateX(-50%)";
+const FRAME_MS = 1000 / 30;
+// Replaces the page's clock: time moves only when the recorder calls __vt.step(ms).
+// With timers, setTimeout runs on the same clock (for pages that wait before acting).
+const virtualClock = (timers) => `(() => {
+  let now = 0;
+  const queue = [];
+  const due = [];
+  let next = 0;
+  window.__vt = { step(ms) {
+    now += ms;
+    due.sort((a, b) => a.at - b.at);
+    while (due.length && due[0].at <= now) { const t = due.shift(); t.fn(...t.args); }
+    for (const cb of queue.splice(0)) cb(now);
+  } };
+  performance.now = () => now;
+  window.requestAnimationFrame = (cb) => queue.push(cb);
+  window.cancelAnimationFrame = () => {};
+  if (${timers}) {
+    window.setTimeout = (fn, ms = 0, ...args) => { due.push({ id: ++next, at: now + ms, fn, args }); return next; };
+    window.clearTimeout = (id) => { const i = due.findIndex((t) => t.id === id); if (i >= 0) due.splice(i, 1); };
+  }
+})();`;
 const FIG = { width: 1280, height: 720, scale: 1.25 };
 const figure = (name) => url(join(REPO, "hardware", "rover-v1", "anatomy", `${name}.html`));
 const scrollToCard = "(() => { const c = document.querySelector('.iso-plate') ?? document.querySelector('svg'); window.scrollTo(0, c.getBoundingClientRect().top + scrollY - 12); const r = document.querySelector('.iso-stage svg').getBoundingClientRect(); return [r.x, r.y, r.width, r.height]; })()";
@@ -37,62 +61,109 @@ const SEGMENTS = {
   },
   outputs: { run: slide("outputs.html", 8) },
   rerun: {
+    virtual: true, // renders slowly in headless Chrome: step a virtual clock instead
     async run(a) {
       await a.go("http://127.0.0.1:9090/?url=rerun%2Bhttp%3A%2F%2Flocalhost%3A9876%2Fproxy");
-      await sleep(10000); // let the viewer load the whole recording
-      await a.eval(capJs("8", "The same survey replayed in the Rerun viewer", "rover (red), canopies (green), probe sites coloured by reading · maps update after every probe", RERUN_TOP));
+      await a.wait(8000); // let the viewer load the whole recording
+      await a.eval(capJs("8", "The same survey in the Rerun viewer (agrisim run --rerun)", "a guide panel explains every view · the maps update after every reading", RERUN_TOP));
       await a.start();
-      await sleep(1200);
+      await a.wait(1200);
       await a.click(290, 886); // time cursor to the start; the viewer keeps playing at 30x
-      await sleep(9000);
-      await a.eval(capJs("8", "Map error falls as readings come in", "kriging RMSE vs ground truth, bottom left · playback at 30x simulated time", RERUN_TOP));
-      await sleep(12000);
-      await a.eval(capJs("8", "Scrub the timeline to any moment of the survey", "drag the time cursor; every frame, map and metric is kept in recording.rrd", RERUN_TOP));
-      await a.drag(700, 886, 1385, 886, 2500);
-      await sleep(1500);
-      await a.drag(1385, 886, 900, 886, 1500);
-      await sleep(4000);
+      await a.wait(9000);
+      await a.eval(capJs("8", "Map error falls as readings come in", "average map error over time, bottom left · playback at 30x simulated time", RERUN_TOP));
+      await a.wait(12000);
+      await a.eval(capJs("8", "Click or drag the time bar to jump to any moment", "every frame, map and number is kept in recording.rrd", RERUN_TOP));
+      await a.click(1200, 886);
+      await a.wait(2500);
+      await a.click(760, 886);
+      await a.wait(4000);
       await a.stop();
+    },
+  },
+  view3d: {
+    virtual: true, // too heavy to render live in headless Chrome: step a virtual clock instead
+    async run(a) {
+      const V = "window.viewer";
+      await a.go("http://127.0.0.1:8766/?paused");
+      await a.until(`${V} && !document.getElementById("loading")`, 120000);
+      const first = await a.eval(`${V}.stops[2].start`);
+      await a.eval(`${V}.setSpeed(20); ${V}.setTime(${first} - 7)`);
+      await a.wait(1500);
+      await a.start();
+      await a.wait(3500); // the intro panel explains the page
+      await a.eval(`document.getElementById("hideIntro").click(); ${V}.setPlaying(true)`);
+      await a.eval(capJs("9", "The same survey as a 3D replay: agrisim run --view", "the robot drives between the rows, parks, and pushes its probe into the soil; the panel on the right says what it is doing", TOP));
+      await a.wait(9000);
+      await a.eval(capJs("9", "Each reading becomes a coloured mark, and the map fills in", "orange = too dry, blue = wet · the robot's map gets better with every reading", TOP));
+      await a.eval(`${V}.setCam("overhead"); ${V}.setTime(${V}.stops[30].start - 4); ${V}.setSpeed(60)`);
+      await a.wait(7000);
+      await a.eval(capJs("9", "Compare with the real moisture, which the robot never sees", "buttons on the left change what the ground colour shows", TOP));
+      await a.eval(`${V}.setLayer(1)`);
+      await a.wait(3500);
+      await a.eval(`${V}.setLayer(2)`);
+      await a.wait(3000);
+      await a.eval(`${V}.setLayer(0); ${V}.setTime(${V}.T_END - 2)`);
+      await a.eval(capJs("9", "Survey complete: 60 stops (1 probe failed), 0 plants touched", "the whole replay plays in the browser; drag to look around, Space to pause", TOP));
+      await a.wait(4500);
+      await a.stop();
+    },
+  },
+  // README screenshots of the 3D replay (no video): docs/img/viewer3d*.jpg
+  stills: {
+    virtual: true,
+    video: false,
+    async run(a) {
+      const V = "window.viewer";
+      await a.go("http://127.0.0.1:8766/?paused");
+      await a.until(`${V} && !document.getElementById("loading")`, 120000);
+      await a.eval(`document.getElementById("hideIntro").click(); ${V}.setTime(${V}.stops[4].start + 3.2)`);
+      await a.wait(1500);
+      await a.shot(join(REPO, "docs", "img", "viewer3d.jpg"));
+      await a.eval(`${V}.setCam("overhead"); ${V}.setTime(${V}.stops[32].start + 3.2)`);
+      await a.wait(2500);
+      await a.shot(join(REPO, "docs", "img", "viewer3d-field.jpg"));
     },
   },
   fig1: {
     ...FIG,
+    virtual: "timers", // smooth however slow the SVG renders
     async run(a) {
       await a.go(figure("rover-anatomy"));
       const [x, y, w, h] = await a.eval(scrollToCard);
       await a.move(x + w * 0.5, y + h * 0.3, 10);
-      await a.eval(capJs("9", "AgriRover v1: the rover in detail", "4WD RC chassis with the probe module on top. Hover over the figure to move the probe by hand.", SIDE));
-      await sleep(400);
+      await a.eval(capJs("10", "AgriRover v1: the rover in detail", "4WD RC chassis with the probe module on top. Hover over the figure to move the probe by hand.", SIDE));
+      await a.wait(400);
       await a.start();
-      await sleep(800);
+      await a.wait(800);
       await a.move(x + w * 0.52, y + h * 0.74, 3200);
-      await sleep(700);
+      await a.wait(700);
       await a.move(x + w * 0.5, y + h * 0.28, 2200);
-      await sleep(500);
+      await a.wait(500);
       await a.move(150, 650, 500);
-      await a.eval(capJs("10", "Space: one full probe cycle, then a leaf scan (3x speed)", "lower until the ground sensor sees soil · insert 60 mm · read · pull up through the brush seal · air blast · air check · camera arm slides under the leaves", SIDE));
+      await a.eval(capJs("11", "Space: one full probe cycle, then a leaf scan (3x speed)", "lower until the ground sensor sees soil · insert 60 mm · read · pull up through the brush seal · air blast · air check · camera arm slides under the leaves", SIDE));
       await a.jsKey(".iso-stage", " ");
-      await sleep(14500);
-      await a.eval(capJs("11", "A: slide the under-leaf camera arm out by hand", "351 mm reach from the centre line; a brush at the beam mouth wipes the camera window on every retraction", SIDE));
+      await a.wait(14500);
+      await a.eval(capJs("12", "A: slide the under-leaf camera arm out by hand", "351 mm reach from the centre line; a brush at the beam mouth wipes the camera window on every retraction", SIDE));
       await a.jsKey(".iso-stage", "a");
-      await sleep(3000);
+      await a.wait(3000);
       await a.jsKey(".iso-stage", "a");
-      await sleep(2600);
+      await a.wait(2600);
       await a.stop();
     },
   },
   fig2: {
     ...FIG,
+    virtual: "timers", // smooth however slow the SVG renders
     async run(a) {
       await a.go(figure("probe-cleaning"));
       await a.eval(scrollToCard);
       await a.move(150, 650, 10);
-      await a.eval(capJs("12", "Fig 2: the self-cleaning probe cartridge, cut in half", "Soil stuck to the rods would bias the next reading, so every cycle ends with cleaning (1.5x speed)", SIDE));
+      await a.eval(capJs("13", "Fig 2: the self-cleaning probe cartridge, cut in half", "Soil stuck to the rods would bias the next reading, so every cycle ends with cleaning (1.5x speed)", SIDE));
       await a.jsKey(".iso-stage", " ");
       await a.start();
-      await sleep(9500);
-      await a.eval(capJs("12", "Brushes scrape the rods on the way up", "the scraped soil falls back where it came from; then six nozzles blow the rods dry and the probe must read clean air within 0.02 m³/m³", SIDE));
-      await sleep(10500);
+      await a.wait(9500);
+      await a.eval(capJs("13", "Brushes scrape the rods on the way up", "the scraped soil falls back where it came from; then six nozzles blow the rods dry and the probe must read clean air within 0.02 m³/m³", SIDE));
+      await a.wait(10500);
       await a.stop();
     },
   },
@@ -145,20 +216,46 @@ async function record(name, segment) {
   await send("Page.enable");
   await send("Runtime.enable");
   await send("Emulation.setDeviceMetricsOverride", { width: W, height: H, deviceScaleFactor: segment.scale ?? 1, mobile: false });
+  if (segment.virtual) await send("Page.addScriptToEvaluateOnNewDocument", { source: virtualClock(segment.virtual === "timers") });
+  let vclock = 0; // seconds of virtual time (virtual segments only)
 
   let mouse = [W / 2, H / 2];
   let t1 = 0;
   const a = {
     async go(target) { await send("Page.navigate", { url: target }); await sleep(300); await a.until("document.readyState === 'complete'"); },
     async eval(js) { const r = await send("Runtime.evaluate", { expression: js, awaitPromise: true, returnByValue: true }); return r.result?.value; },
-    async until(js, timeout = 60000) { const t0 = Date.now(); while (!(await a.eval(js))) { if (Date.now() - t0 > timeout) throw new Error(`timeout: ${js}`); await sleep(100); } },
-    async move(x, y, ms = 600) { // eased glide that takes ms of wall time
+    async until(js, timeout = 60000) {
+      const t0 = Date.now();
+      while (!(await a.eval(js))) {
+        if (Date.now() - t0 > timeout) throw new Error(`timeout: ${js}`);
+        if (segment.virtual) await a.eval(`window.__vt && window.__vt.step(${FRAME_MS})`);
+        await sleep(100);
+      }
+    },
+    // Let ms of page time pass. Live segments just wait; virtual ones step the clock one frame
+    // at a time and screenshot each frame, so the video is smooth however slow the rendering.
+    async wait(ms) {
+      if (!segment.virtual) return sleep(ms);
+      for (let n = Math.round(ms / FRAME_MS); n > 0; n--) {
+        await a.eval(`window.__vt.step(${FRAME_MS})`);
+        vclock += FRAME_MS / 1000;
+        if (!recording) continue;
+        const shot = await send("Page.captureScreenshot", { format: "jpeg", quality: 92 });
+        const file = join(outDir, `f${String(frames.length).padStart(5, "0")}.jpg`);
+        writeFileSync(file, Buffer.from(shot.data, "base64"));
+        frames.push({ file, t: vclock });
+      }
+    },
+    async move(x, y, ms = 600) { // eased glide that takes ms (of page time on a virtual clock)
       const [x0, y0] = mouse, t0 = Date.now();
-      for (;;) {
-        const k = Math.min(1, (Date.now() - t0) / ms), e = k < 0.5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2;
+      const steps = Math.max(1, Math.round(ms / FRAME_MS));
+      for (let i = 1; ; i++) {
+        const k = segment.virtual ? Math.min(1, i / steps) : Math.min(1, (Date.now() - t0) / ms);
+        const e = k < 0.5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2;
         await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: x0 + (x - x0) * e, y: y0 + (y - y0) * e });
         if (k >= 1) break;
-        await sleep(16);
+        if (segment.virtual) await a.wait(FRAME_MS);
+        else await sleep(16);
       }
       mouse = [x, y];
     },
@@ -178,8 +275,20 @@ async function record(name, segment) {
     },
     // A key press sent to the element itself, so the figure does not show its keyboard focus ring.
     async jsKey(sel, key) { await a.eval(`document.querySelector(${JSON.stringify(sel)}).dispatchEvent(new KeyboardEvent("keydown", { key: ${JSON.stringify(key)}, bubbles: true, cancelable: true }))`); },
-    async start() { await send("Page.startScreencast", { format: "jpeg", quality: 92, everyNthFrame: 1 }); recording = true; },
-    async stop() { recording = false; t1 = Date.now() / 1000; await send("Page.stopScreencast"); },
+    async shot(file) {
+      const r = await send("Page.captureScreenshot", { format: "jpeg", quality: 85 });
+      writeFileSync(file, Buffer.from(r.data, "base64"));
+      console.log(`${name}: wrote ${file}`);
+    },
+    async start() {
+      if (!segment.virtual) await send("Page.startScreencast", { format: "jpeg", quality: 92, everyNthFrame: 1 });
+      recording = true;
+    },
+    async stop() {
+      recording = false;
+      t1 = segment.virtual ? vclock : Date.now() / 1000;
+      if (!segment.virtual) await send("Page.stopScreencast");
+    },
   };
   try {
     await segment.run(a);
@@ -187,8 +296,13 @@ async function record(name, segment) {
     ws.close();
     chrome.kill();
     await sleep(500);
-    rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+    try {
+      rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 });
+    } catch {
+      // Chrome's GPU process can hold the profile a little longer; the OS temp cleaner gets it.
+    }
   }
+  if (segment.video === false) return;
   if (!frames.length) throw new Error(`${name}: no frames captured`);
   // ffmpeg concat list: each frame lasts until the next one arrived.
   const lines = ["ffconcat version 1.0"];
@@ -201,7 +315,7 @@ async function record(name, segment) {
   console.log(`${name}: ${frames.length} frames over ${(t1 - frames[0].t).toFixed(1)} s`);
 }
 
-const names = process.argv.slice(2).length ? process.argv.slice(2) : Object.keys(SEGMENTS);
+const names = process.argv.slice(2).length ? process.argv.slice(2) : Object.keys(SEGMENTS).filter((n) => n !== "stills");
 for (const name of names) {
   if (!SEGMENTS[name]) throw new Error(`unknown segment ${name}; choose from ${Object.keys(SEGMENTS).join(", ")}`);
   await record(name, SEGMENTS[name]);

@@ -16,6 +16,7 @@ ORDER: list[tuple[str, float | None]] = [
     ("term", None),
     ("outputs", 8.0),
     ("rerun", None),
+    ("view3d", None),
     ("fig1", None),
     ("fig2", None),
     ("end", 7.5),
