@@ -1,4 +1,5 @@
 import json
+import re
 import threading
 import urllib.request
 from pathlib import Path
@@ -59,4 +60,5 @@ def test_viewer_rover_model_is_the_hardware_model() -> None:
 def test_view_needs_a_scene(tmp_path: Path) -> None:
     res = CliRunner().invoke(app, ["view", str(tmp_path)])
     assert res.exit_code == 2
-    assert "--view" in res.output
+    # On CI (GITHUB_ACTIONS) the error box is coloured; compare the plain text.
+    assert "--view" in re.sub(r"\x1b\[[0-9;]*m", "", res.output)
