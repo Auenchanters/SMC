@@ -1,0 +1,254 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 297" width="420mm" height="297mm" font-family="Helvetica, Arial, sans-serif">
+<title>AgriRover v1 general arrangement</title>
+<defs><marker id="arr" viewBox="0 0 6 6" refX="3" refY="3" markerWidth="4" markerHeight="4" orient="auto-start-reverse"><path d="M0 0L6 3L0 6Z" fill="#222"/></marker></defs>
+<style>
+  .solid { fill: #fff; stroke: #1b1b19; stroke-width: 0.22; }
+  .phantom { fill: none; stroke: #6b6b66; stroke-width: 0.18; stroke-dasharray: 3 1 0.6 1 0.6 1; }
+  .ground { stroke: #1b1b19; stroke-width: 0.35; }
+  .soil { fill: #eeece6; stroke: none; }
+  .centre { stroke: #8a8a84; stroke-width: 0.14; stroke-dasharray: 4 1 1 1; }
+  .dim line { stroke: #222; stroke-width: 0.15; } .dim text { font-size: 2.6px; fill: #222; }
+  .balloon line { stroke: #444; stroke-width: 0.15; } .balloon circle { fill: #fff; stroke: #444; stroke-width: 0.18; }
+  .balloon text { font-size: 2.6px; fill: #222; }
+  text { font-size: 2.4px; fill: #333; } .th { font-weight: bold; } .tt { font-size: 3px; font-weight: bold; }
+  .vtitle { font-size: 3px; font-weight: bold; letter-spacing: 0.2px; }
+  .frame { fill: none; stroke: #1b1b19; stroke-width: 0.35; }
+</style>
+<rect width="420" height="297" fill="#fff"/>
+<rect class="frame" x="5" y="5" width="410" height="287"/>
+<g data-view="side">
+<line class="ground" x1="175" y1="222" x2="295" y2="222"/>
+<rect class="soil" x="175" y="222" width="120" height="16"/>
+<circle cx="205" cy="207" r="15" class="solid"/>
+<circle cx="265" cy="207" r="15" class="solid"/>
+<rect x="205" y="199.6" width="17.6" height="8.4" rx="0.6" class="solid"/>
+<rect x="247.4" y="199.6" width="17.6" height="8.4" rx="0.6" class="solid"/>
+<circle cx="205" cy="207" r="3.8" class="solid"/>
+<circle cx="265" cy="207" r="3.8" class="solid"/>
+<rect x="203.8" y="186" width="2.4" height="3" rx="0" class="solid"/>
+<rect x="263.8" y="186" width="2.4" height="3" rx="0" class="solid"/>
+<rect x="264" y="178.8" width="8" height="6.4" rx="0.6" class="solid"/>
+<rect x="264" y="175.6" width="8" height="3.2" rx="0" class="solid"/>
+<rect x="192.6" y="199.2" width="4.4" height="2.4" rx="0.6" class="solid"/>
+<rect x="273" y="199.2" width="4.4" height="2.4" rx="0.6" class="solid"/>
+<rect x="234" y="142" width="2" height="41.2" rx="0" class="solid"/>
+<rect x="237.1" y="186.6" width="0.6" height="14" rx="0" class="solid"/>
+<rect x="234.7" y="186.6" width="0.6" height="14" rx="0" class="solid"/>
+<rect x="232.3" y="186.6" width="0.6" height="14" rx="0" class="solid"/>
+<rect x="241" y="142" width="1.6" height="41.2" rx="0" class="solid"/>
+<rect x="253" y="182" width="8" height="3.2" rx="0.6" class="solid"/>
+<rect x="233.4" y="148.8" width="3.2" height="27.8" rx="0" class="solid"/>
+<rect x="195" y="177.2" width="4" height="4.4" rx="0.6" class="solid"/>
+<rect x="199" y="176" width="0.8" height="9.2" rx="0.6" class="solid"/>
+<rect x="193.2" y="169" width="6.8" height="2.6" rx="0" class="solid"/>
+<rect x="231.4" y="176.6" width="7.2" height="10" rx="0" class="solid"/>
+<rect x="192.6" y="171.6" width="8" height="4.4" rx="0.6" class="solid"/>
+<rect x="237.6" y="132.4" width="8.4" height="8" rx="0.6" class="solid"/>
+<rect x="230.6" y="176.6" width="8.8" height="0.8" rx="0" class="solid"/>
+<rect x="234" y="142" width="2" height="41.2" rx="0" class="solid"/>
+<rect x="226.6" y="188.2" width="16.8" height="0.8" rx="0" class="solid"/>
+<rect x="231.4" y="143.2" width="13.2" height="5.6" rx="0.6" class="solid"/>
+<rect x="228.6" y="183.2" width="18" height="2" rx="0.6" class="solid"/>
+<rect x="228.6" y="140.4" width="18" height="1.6" rx="0.6" class="solid"/>
+<rect x="192.6" y="199.2" width="4.4" height="2.4" rx="0.6" class="solid"/>
+<rect x="273" y="199.2" width="4.4" height="2.4" rx="0.6" class="solid"/>
+<rect x="203.8" y="186" width="2.4" height="3" rx="0" class="solid"/>
+<rect x="263.8" y="186" width="2.4" height="3" rx="0" class="solid"/>
+<rect x="201.4" y="171.2" width="21.6" height="14" rx="0.6" class="solid"/>
+<rect x="267.8" y="162" width="2.4" height="23.2" rx="0" class="solid"/>
+<rect x="197" y="189" width="76" height="13" rx="0.6" class="solid"/>
+<rect x="202.2" y="182" width="20" height="3.2" rx="0.6" class="solid"/>
+<rect x="190.2" y="197.6" width="2.4" height="6" rx="0.6" class="solid"/>
+<rect x="277.4" y="197.6" width="2.4" height="6" rx="0.6" class="solid"/>
+<rect x="205" y="199.6" width="17.6" height="8.4" rx="0.6" class="solid"/>
+<rect x="247.4" y="199.6" width="17.6" height="8.4" rx="0.6" class="solid"/>
+<rect x="195" y="185.2" width="80" height="0.8" rx="0.6" class="solid"/>
+<rect x="263" y="158.4" width="12" height="3.6" rx="0" class="solid"/>
+<circle cx="205" cy="207" r="3.8" class="solid"/>
+<circle cx="265" cy="207" r="3.8" class="solid"/>
+<circle cx="205" cy="207" r="15" class="solid"/>
+<circle cx="265" cy="207" r="15" class="solid"/>
+<rect x="237.1" y="220" width="0.6" height="14" rx="0" class="phantom"/>
+<rect x="234.7" y="220" width="0.6" height="14" rx="0" class="phantom"/>
+<rect x="232.3" y="220" width="0.6" height="14" rx="0" class="phantom"/>
+<rect x="233.4" y="182.2" width="3.2" height="27.8" rx="0" class="phantom"/>
+<rect x="231.4" y="210" width="7.2" height="10" rx="0" class="phantom"/>
+<rect x="230.6" y="210" width="8.8" height="0.8" rx="0" class="phantom"/>
+<rect x="231.4" y="176.6" width="13.2" height="5.6" rx="0.6" class="phantom"/>
+<text class="vtitle" x="235" y="252" text-anchor="middle">LEFT SIDE ELEVATION (from +y)</text>
+</g>
+<g data-view="front">
+<line class="ground" x1="40" y1="222" x2="144" y2="222"/>
+<rect class="soil" x="40" y="222" width="104" height="16"/>
+<rect x="68" y="197.6" width="48" height="6" rx="0.6" class="solid"/>
+<rect x="104.8" y="199.2" width="2.4" height="2.4" rx="0.6" class="solid"/>
+<rect x="76.8" y="199.2" width="2.4" height="2.4" rx="0.6" class="solid"/>
+<rect x="109.8" y="162" width="2.4" height="23.2" rx="0" class="solid"/>
+<rect x="70" y="178.8" width="8" height="6.4" rx="0.6" class="solid"/>
+<rect x="70" y="175.6" width="8" height="3.2" rx="0" class="solid"/>
+<rect x="107.8" y="186" width="2.4" height="3" rx="0" class="solid"/>
+<rect x="73.8" y="186" width="2.4" height="3" rx="0" class="solid"/>
+<rect x="105" y="158.4" width="12" height="3.6" rx="0" class="solid"/>
+<rect x="110.4" y="203.2" width="8.1" height="7.6" rx="0" class="solid"/>
+<rect x="65.5" y="203.2" width="8.1" height="7.6" rx="0" class="solid"/>
+<rect x="85" y="182" width="8" height="3.2" rx="0.6" class="solid"/>
+<rect x="118.5" y="192" width="13" height="30" rx="0" class="solid"/>
+<rect x="52.5" y="192" width="13" height="30" rx="0" class="solid"/>
+<rect x="114.6" y="199.6" width="2" height="8.4" rx="0.6" class="solid"/>
+<rect x="67.4" y="199.6" width="2" height="8.4" rx="0.6" class="solid"/>
+<rect x="91.2" y="142" width="1.6" height="41.2" rx="0" class="solid"/>
+<rect x="87.8" y="132.4" width="8.4" height="8" rx="0.6" class="solid"/>
+<rect x="91.7" y="186.6" width="0.6" height="14" rx="0" class="solid"/>
+<rect x="91.7" y="186.6" width="0.6" height="14" rx="0" class="solid"/>
+<rect x="97.8" y="142" width="2" height="41.2" rx="0" class="solid"/>
+<rect x="84.2" y="142" width="2" height="41.2" rx="0" class="solid"/>
+<rect x="90.4" y="148.8" width="3.2" height="27.8" rx="0" class="solid"/>
+<rect x="91.7" y="186.6" width="0.6" height="14" rx="0" class="solid"/>
+<rect x="82.8" y="143.2" width="18.4" height="5.6" rx="0.6" class="solid"/>
+<rect x="88.4" y="176.6" width="7.2" height="10" rx="0" class="solid"/>
+<rect x="87.6" y="176.6" width="8.8" height="0.8" rx="0" class="solid"/>
+<rect x="82.4" y="183.2" width="19.2" height="2" rx="0.6" class="solid"/>
+<rect x="82.4" y="140.4" width="19.2" height="1.6" rx="0.6" class="solid"/>
+<rect x="83.6" y="188.2" width="16.8" height="0.8" rx="0" class="solid"/>
+<rect x="114.6" y="199.6" width="2" height="8.4" rx="0.6" class="solid"/>
+<rect x="67.4" y="199.6" width="2" height="8.4" rx="0.6" class="solid"/>
+<rect x="107.8" y="186" width="2.4" height="3" rx="0" class="solid"/>
+<rect x="73.8" y="186" width="2.4" height="3" rx="0" class="solid"/>
+<rect x="112" y="182" width="3.6" height="3.2" rx="0.6" class="solid"/>
+<rect x="73" y="171.2" width="38" height="14" rx="0.6" class="solid"/>
+<rect x="110.4" y="203.2" width="8.1" height="7.6" rx="0" class="solid"/>
+<rect x="65.5" y="203.2" width="8.1" height="7.6" rx="0" class="solid"/>
+<rect x="89.2" y="176" width="5.6" height="9.2" rx="0.6" class="solid"/>
+<rect x="69.6" y="189" width="44.8" height="13" rx="0.6" class="solid"/>
+<rect x="67" y="185.2" width="50" height="0.8" rx="0.6" class="solid"/>
+<rect x="89.6" y="177.2" width="4.8" height="4.4" rx="0.6" class="solid"/>
+<rect x="88.6" y="169" width="6.8" height="2.6" rx="0" class="solid"/>
+<rect x="104.8" y="199.2" width="2.4" height="2.4" rx="0.6" class="solid"/>
+<rect x="76.8" y="199.2" width="2.4" height="2.4" rx="0.6" class="solid"/>
+<rect x="88" y="171.6" width="8" height="4.4" rx="0.6" class="solid"/>
+<rect x="68" y="197.6" width="48" height="6" rx="0.6" class="solid"/>
+<rect x="118.5" y="192" width="13" height="30" rx="0" class="solid"/>
+<rect x="52.5" y="192" width="13" height="30" rx="0" class="solid"/>
+<rect x="91.7" y="220" width="0.6" height="14" rx="0" class="phantom"/>
+<rect x="91.7" y="220" width="0.6" height="14" rx="0" class="phantom"/>
+<rect x="90.4" y="182.2" width="3.2" height="27.8" rx="0" class="phantom"/>
+<rect x="91.7" y="220" width="0.6" height="14" rx="0" class="phantom"/>
+<rect x="82.8" y="176.6" width="18.4" height="5.6" rx="0.6" class="phantom"/>
+<rect x="88.4" y="210" width="7.2" height="10" rx="0" class="phantom"/>
+<rect x="87.6" y="210" width="8.8" height="0.8" rx="0" class="phantom"/>
+<text class="vtitle" x="92" y="252" text-anchor="middle">FRONT ELEVATION (from +x)</text>
+</g>
+<g data-view="plan">
+<rect x="201.2" y="90.4" width="7.6" height="8.1" rx="0" class="solid"/>
+<rect x="201.2" y="45.5" width="7.6" height="8.1" rx="0" class="solid"/>
+<rect x="261.2" y="90.4" width="7.6" height="8.1" rx="0" class="solid"/>
+<rect x="261.2" y="45.5" width="7.6" height="8.1" rx="0" class="solid"/>
+<rect x="205" y="94.6" width="17.6" height="2" rx="0.6" class="solid"/>
+<rect x="205" y="47.4" width="17.6" height="2" rx="0.6" class="solid"/>
+<rect x="247.4" y="94.6" width="17.6" height="2" rx="0.6" class="solid"/>
+<rect x="247.4" y="47.4" width="17.6" height="2" rx="0.6" class="solid"/>
+<rect x="192.6" y="84.8" width="4.4" height="2.4" rx="0.6" class="solid"/>
+<rect x="192.6" y="56.8" width="4.4" height="2.4" rx="0.6" class="solid"/>
+<rect x="273" y="84.8" width="4.4" height="2.4" rx="0.6" class="solid"/>
+<rect x="273" y="56.8" width="4.4" height="2.4" rx="0.6" class="solid"/>
+<rect x="190.2" y="48" width="2.4" height="48" rx="0.6" class="solid"/>
+<rect x="277.4" y="48" width="2.4" height="48" rx="0.6" class="solid"/>
+<rect x="190" y="98.5" width="30" height="13" rx="0" class="solid"/>
+<rect x="190" y="32.5" width="30" height="13" rx="0" class="solid"/>
+<rect x="250" y="98.5" width="30" height="13" rx="0" class="solid"/>
+<rect x="250" y="32.5" width="30" height="13" rx="0" class="solid"/>
+<rect x="197" y="49.6" width="76" height="44.8" rx="0.6" class="solid"/>
+<circle cx="235" cy="72" r="8.4" class="solid"/>
+<circle cx="237.4" cy="72" r="0.3" class="solid"/>
+<circle cx="235" cy="72" r="0.3" class="solid"/>
+<circle cx="232.6" cy="72" r="0.3" class="solid"/>
+<circle cx="205" cy="89" r="1.2" class="solid"/>
+<circle cx="205" cy="55" r="1.2" class="solid"/>
+<circle cx="265" cy="89" r="1.2" class="solid"/>
+<circle cx="265" cy="55" r="1.2" class="solid"/>
+<rect x="195" y="47" width="80" height="50" rx="0.6" class="solid"/>
+<rect x="228.6" y="62.4" width="18" height="19.2" rx="0.6" class="solid"/>
+<rect x="253" y="65" width="8" height="8" rx="0.6" class="solid"/>
+<rect x="202.2" y="92" width="20" height="3.6" rx="0.6" class="solid"/>
+<rect x="264" y="50" width="8" height="8" rx="0.6" class="solid"/>
+<rect x="195" y="69.6" width="4" height="4.8" rx="0.6" class="solid"/>
+<circle cx="235" cy="72" r="3.6" class="solid"/>
+<circle cx="235" cy="72" r="4.4" class="solid"/>
+<rect x="199" y="69.2" width="0.8" height="5.6" rx="0.6" class="solid"/>
+<circle cx="268" cy="54" r="4" class="solid"/>
+<rect x="192.6" y="68" width="8" height="8" rx="0.6" class="solid"/>
+<rect x="201.4" y="53" width="21.6" height="38" rx="0.6" class="solid"/>
+<circle cx="196.6" cy="72" r="3.4" class="solid"/>
+<circle cx="269" cy="91" r="1.2" class="solid"/>
+<circle cx="269" cy="91" r="6" class="solid"/>
+<circle cx="235" cy="72" r="1.6" class="solid"/>
+<rect x="231.4" y="62.8" width="13.2" height="18.4" rx="0.6" class="solid"/>
+<circle cx="235" cy="78.8" r="1" class="solid"/>
+<circle cx="235" cy="65.2" r="1" class="solid"/>
+<circle cx="241.8" cy="72" r="0.8" class="solid"/>
+<rect x="228.6" y="62.4" width="18" height="19.2" rx="0.6" class="solid"/>
+<rect x="237.6" y="67.8" width="8.4" height="8.4" rx="0.6" class="solid"/>
+<text class="vtitle" x="235" y="22" text-anchor="middle">PLAN (from above)</text>
+</g>
+<line class="centre" x1="205" y1="202.2" x2="205" y2="224"/>
+<line class="centre" x1="265" y1="202.2" x2="265" y2="224"/>
+<line class="centre" x1="235" y1="128" x2="235" y2="238"/>
+<line class="centre" x1="92" y1="128" x2="92" y2="238"/>
+<line class="centre" x1="189" y1="72" x2="281" y2="72"/>
+<g class="dim"><line x1="190.2" y1="223" x2="190.2" y2="249.5"/><line x1="279.8" y1="223" x2="279.8" y2="249.5"/><line x1="190.2" y1="248" x2="279.8" y2="248" marker-start="url(#arr)" marker-end="url(#arr)"/><text x="235" y="247" text-anchor="middle">448 overall</text></g>
+<g class="dim"><line x1="205" y1="223" x2="205" y2="237.5"/><line x1="265" y1="223" x2="265" y2="237.5"/><line x1="205" y1="236" x2="265" y2="236" marker-start="url(#arr)" marker-end="url(#arr)"/><text x="235" y="235" text-anchor="middle">300 wheelbase</text></g>
+<g class="dim"><line x1="51.5" y1="222" x2="41" y2="222"/><line x1="51.5" y1="132.4" x2="41" y2="132.4"/><line x1="42.5" y1="222" x2="42.5" y2="132.4" marker-start="url(#arr)" marker-end="url(#arr)"/><text x="41.3" y="177.2" text-anchor="middle" transform="rotate(-90 41.3 177.2)">448 overall</text></g>
+<g class="dim"><line x1="243.6" y1="222" x2="243.1" y2="222"/><line x1="243.6" y1="202" x2="243.1" y2="202"/><line x1="244.6" y1="222" x2="244.6" y2="202" marker-start="url(#arr)" marker-end="url(#arr)"/><text x="243.4" y="212" text-anchor="middle" transform="rotate(-90 243.4 212)">100 belly</text></g>
+<g class="dim"><line x1="230" y1="222" x2="229.5" y2="222"/><line x1="230" y1="234" x2="229.5" y2="234"/><line x1="231" y1="222" x2="231" y2="234" marker-start="url(#arr)" marker-end="url(#arr)"/><text x="229.8" y="228" text-anchor="middle" transform="rotate(-90 229.8 228)">60 deep</text></g>
+<g class="dim"><line x1="52.5" y1="223" x2="52.5" y2="249.5"/><line x1="131.5" y1="223" x2="131.5" y2="249.5"/><line x1="52.5" y1="248" x2="131.5" y2="248" marker-start="url(#arr)" marker-end="url(#arr)"/><text x="92" y="247" text-anchor="middle">395 overall</text></g>
+<g class="dim"><line x1="59" y1="223" x2="59" y2="237.5"/><line x1="125" y1="223" x2="125" y2="237.5"/><line x1="59" y1="236" x2="125" y2="236" marker-start="url(#arr)" marker-end="url(#arr)"/><text x="92" y="235" text-anchor="middle">330 track</text></g>
+<g class="dim"><line x1="135" y1="222" x2="138.5" y2="222"/><line x1="135" y1="210.8" x2="138.5" y2="210.8"/><line x1="140" y1="222" x2="140" y2="210.8" marker-start="url(#arr)" marker-end="url(#arr)"/><text x="138.8" y="216.4" text-anchor="middle" transform="rotate(-90 138.8 216.4)">56 pod</text></g>
+<g class="dim"><line x1="195" y1="112.5" x2="195" y2="119"/><line x1="275" y1="112.5" x2="275" y2="119"/><line x1="195" y1="117.5" x2="275" y2="117.5" marker-start="url(#arr)" marker-end="url(#arr)"/><text x="235" y="116.5" text-anchor="middle">400 deck</text></g>
+<g class="balloon"><circle cx="199" cy="214" r="0.5"/><line x1="199" y1="214" x2="193" y2="228"/><circle cx="193" cy="228" r="3"/><text x="193" y="229.2" text-anchor="middle">1</text></g>
+<g class="balloon"><circle cx="205" cy="207" r="0.5"/><line x1="205" y1="207" x2="213" y2="223"/><circle cx="213" cy="223" r="3"/><text x="213" y="224.2" text-anchor="middle">2</text></g>
+<g class="balloon"><circle cx="223" cy="195" r="0.5"/><line x1="223" y1="195" x2="223" y2="221"/><circle cx="223" cy="221" r="3"/><text x="223" y="222.2" text-anchor="middle">4</text></g>
+<g class="balloon"><circle cx="191.4" cy="200" r="0.5"/><line x1="191.4" y1="200" x2="183.4" y2="214"/><circle cx="183.4" cy="214" r="3"/><text x="183.4" y="215.2" text-anchor="middle">5</text></g>
+<g class="balloon"><circle cx="215" cy="185.6" r="0.5"/><line x1="215" y1="185.6" x2="217" y2="155.6"/><circle cx="217" cy="155.6" r="3"/><text x="217" y="156.8" text-anchor="middle">8</text></g>
+<g class="balloon"><circle cx="235" cy="162" r="0.5"/><line x1="235" y1="162" x2="253" y2="158"/><circle cx="253" cy="158" r="3"/><text x="253" y="159.2" text-anchor="middle">10</text></g>
+<g class="balloon"><circle cx="241.8" cy="156" r="0.5"/><line x1="241.8" y1="156" x2="259.8" y2="162"/><circle cx="259.8" cy="162" r="3"/><text x="259.8" y="163.2" text-anchor="middle">11</text></g>
+<g class="balloon"><circle cx="241.8" cy="136.4" r="0.5"/><line x1="241.8" y1="136.4" x2="225.8" y2="130.4"/><circle cx="225.8" cy="130.4" r="3"/><text x="225.8" y="131.6" text-anchor="middle">12</text></g>
+<g class="balloon"><circle cx="235" cy="146.6" r="0.5"/><line x1="235" y1="146.6" x2="257" y2="138.6"/><circle cx="257" cy="138.6" r="3"/><text x="257" y="139.8" text-anchor="middle">13</text></g>
+<g class="balloon"><circle cx="235" cy="179" r="0.5"/><line x1="235" y1="179" x2="257" y2="181"/><circle cx="257" cy="181" r="3"/><text x="257" y="182.2" text-anchor="middle">15</text></g>
+<g class="balloon"><circle cx="205" cy="176" r="0.5"/><line x1="205" y1="176" x2="191" y2="154"/><circle cx="191" cy="154" r="3"/><text x="191" y="155.2" text-anchor="middle">16</text></g>
+<g class="balloon"><circle cx="195" cy="171.6" r="0.5"/><line x1="195" y1="171.6" x2="193" y2="147.6"/><circle cx="193" cy="147.6" r="3"/><text x="193" y="148.8" text-anchor="middle">17</text></g>
+<g class="balloon"><circle cx="269" cy="162" r="0.5"/><line x1="269" y1="162" x2="275" y2="144"/><circle cx="275" cy="144" r="3"/><text x="275" y="145.2" text-anchor="middle">19</text></g>
+<g class="balloon"><circle cx="268" cy="174.8" r="0.5"/><line x1="268" y1="174.8" x2="286" y2="164.8"/><circle cx="286" cy="164.8" r="3"/><text x="286" y="166" text-anchor="middle">20</text></g>
+<text class="th" x="302" y="120">REF</text><text class="th" x="312" y="120">ITEM</text>
+<text x="304" y="124.4">1</text><text x="312" y="124.4">Wheels, 150 mm pneumatic or foam-filled tyres, 4</text>
+<text x="304" y="128.8">2</text><text x="312" y="128.8">Corner gear-motors 12 V with hall encoders, 4</text>
+<text x="304" y="133.20000000000002">3</text><text x="312" y="133.20000000000002">Independent trailing-arm suspension, 4</text>
+<text x="304" y="137.60000000000002">4</text><text x="312" y="137.60000000000002">4WD skid-steer chassis tub with centre probe well,…</text>
+<text x="304" y="142.00000000000003">5</text><text x="312" y="142.00000000000003">Front and rear spring bumpers with microswitches</text>
+<text x="304" y="146.40000000000003">6</text><text x="312" y="146.40000000000003">Probe well liner with needle wiper ring at the belly</text>
+<text x="304" y="150.80000000000004">7</text><text x="312" y="150.80000000000004">Standoffs M5, 15 mm, 4 (universal mounting pattern…</text>
+<text x="304" y="155.20000000000005">8</text><text x="312" y="155.20000000000005">Module deck, 3 mm aluminium, 400 x 250</text>
+<text x="304" y="159.60000000000005">9</text><text x="312" y="159.60000000000005">Probe tower base and top plate</text>
+<text x="304" y="164.00000000000006">10</text><text x="312" y="164.00000000000006">Guide rods 10 mm with LM10UU bushings, 2</text>
+<text x="304" y="168.40000000000006">11</text><text x="312" y="168.40000000000006">Lead screw T8 x 8 mm lead with brass nut</text>
+<text x="304" y="172.80000000000007">12</text><text x="312" y="172.80000000000007">NEMA 17 stepper, driven by a TMC2209 (StallGuard d…</text>
+<text x="304" y="177.20000000000007">13</text><text x="312" y="177.20000000000007">Carriage plate with cable gland</text>
+<text x="304" y="181.60000000000008">14</text><text x="312" y="181.60000000000008">Probe extension tube 16 mm</text>
+<text x="304" y="186.00000000000009">15</text><text x="312" y="186.00000000000009">Soil probe: 3-rod stainless FDR, RS485 Modbus, VWC…</text>
+<text x="304" y="190.4000000000001">16</text><text x="312" y="190.4000000000001">IP54 electronics enclosure: Raspberry Pi 5, Pico 2…</text>
+<text x="304" y="194.8000000000001">17</text><text x="312" y="194.8000000000001">2D LiDAR (360 deg, DTOF) on a front mast, for row …</text>
+<text x="304" y="199.2000000000001">18</text><text x="312" y="199.2000000000001">Front camera (Pi Camera Module 3 Wide), logging an…</text>
+<text x="304" y="203.6000000000001">19</text><text x="312" y="203.6000000000001">GNSS antenna on a mast (standard GNSS; RTK upgrade…</text>
+<text x="304" y="208.0000000000001">20</text><text x="312" y="208.0000000000001">E-stop mushroom button, cuts motor power</text>
+<text x="304" y="212.40000000000012">21</text><text x="312" y="212.40000000000012">RC receiver for manual drive and kill switch</text>
+<text x="304" y="216.80000000000013">22</text><text x="312" y="216.80000000000013">Accessory rail and capped AUX port for the Phase 3…</text>
+<rect class="frame" x="300" y="256" width="112" height="32"/>
+<text class="tt" x="303" y="263">AgriRover v1: soil-probe module on a 4WD skid-steer chassis</text>
+<text x="303" y="269">General arrangement · third-angle projection · scale 1:5 · units mm</text>
+<text x="303" y="274">Probe retracted (solid) and at 60 mm depth (phantom); stroke 167 mm</text>
+<text x="303" y="279">Design targets, not as-built: confirm chassis dims on purchase.</text>
+<text x="303" y="284">Team: Auenchanters · 2026-10-14</text>
+<text class="vtitle" x="20" y="40">AgriRover v1</text>
+<text x="20" y="47">Isometric anatomy: hardware/rover-v1/anatomy/rover-anatomy.html</text>
+<text x="20" y="52">Design notes, BOM and calculations: hardware/rover-v1/DESIGN.md</text>
+<text x="20" y="57">Generated from model.mjs: change a dimension there and rebuild.</text>
+</svg>
