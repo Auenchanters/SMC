@@ -94,6 +94,7 @@ class GreedyVariancePerCost:
     def choose(self, ctx: Context) -> int:
         travel = ctx.graph.distances(ctx.position, ctx.sites) / self.cfg.rover.max_speed
         cost = travel + self.cfg.probe.insertion_time_s
+        cost = np.maximum(cost, self.cfg.dt)  # zero probe time at the rover's own spot: no 0/0
         return _best(uncertainty(self.cfg, ctx) / cost, ctx.visited)
 
 

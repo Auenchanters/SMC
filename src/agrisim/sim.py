@@ -16,7 +16,7 @@ from agrisim.metrics import MapMetrics, RunMetrics, map_metrics, run_metrics, tr
 from agrisim.planning import LaneGraph, LanePlanner, Waypoint
 from agrisim.policies import FIXED, FIXED_PLUS, Context, Policy, Recheck, make_policy
 from agrisim.rover import RoverState
-from agrisim.safety import PlantContact, contacts
+from agrisim.safety import PlantContact, path_contacts
 from agrisim.sensor import MoistureProbe, ProbeReading
 from agrisim.soil import Anomaly, SoilTruth
 from agrisim.weather import SoilDynamics, current_view
@@ -202,7 +202,7 @@ def run_survey(
                 viz.log_maps(t, maps, map_metrics(tg, m, v, cfg.mapping.dry_threshold).rmse)
 
     p = poses(states)
-    hits = tuple(contacts(p, cfg.rover, layout))
+    hits = tuple(path_contacts(p, cfg.rover, layout))
     mean, var = map_now(cfg, grid, readings, t)
     truth_grid = truth_on_grid(truth(t), grid)
     if viz:

@@ -194,6 +194,10 @@ def results_figure(csv_path: Path) -> Figure:
 
     def ci(name: str, key: str) -> tuple[float, float]:
         v = np.array([float(r[key]) for r in by[name] if r[key] not in ("", "nan")])
+        if len(v) == 0:  # undefined on every seed (e.g. no dry cell anywhere)
+            return 0.0, 0.0
+        if len(v) == 1:
+            return float(v[0]), 0.0
         half = stats.t.ppf(0.975, len(v) - 1) * v.std(ddof=1) / math.sqrt(len(v))
         return float(v.mean()), float(half)
 
@@ -215,11 +219,17 @@ def results_figure(csv_path: Path) -> Figure:
             ax.text(mv + hv, yi, "  " + fmt.format(mv), va="center", fontsize=8, color=INK)
         ax.set_yticks(y, order, fontsize=9, color=INK)
         ax.grid(axis="x", color=GRID, lw=0.6, zorder=0)
-        ax.set_xlim(0, max(a + b for a, b in m) * 1.25)
+        ax.set_xlim(0, max(a + b for a, b in m) * 1.25 or 1.0)
         _style(ax, title)
+    hits = sum(int(r["plant_contacts"]) for r in rows)
+    touched = (
+        "Zero plant contacts in every run."
+        if hits == 0
+        else f"{hits} plant contacts in {sum(int(r['plant_contacts']) > 0 for r in rows)} runs."
+    )
     fig.suptitle(
         f"Held-out fields (seeds {seeds[0]}-{seeds[-1]}, n = {len(seeds)}), {budget} probes each; "
-        "bars = mean, whiskers = 95% CI. Zero plant contacts in every run.",
+        f"bars = mean, whiskers = 95% CI. {touched}",
         fontsize=10,
         color=INK,
     )

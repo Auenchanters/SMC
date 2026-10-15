@@ -33,6 +33,15 @@ opens a Rerun viewer showing the field, plants, lanes, the moving rover, probe p
 
 ## Surprises & Discoveries
 
+- Robustness review (2026-10-15, report `SMC-found-and-fixed.md` from an outside review at `ec499ad`; its patch file was not available, so every finding was reproduced on `c7e2d73` and fixed again here). All 22 reproduced. The serious ones:
+  - Validation accepted configs where the rover touched plants (34 contacts on seed 7 with a 0.8 m rover, `safety_margin: 0`, `row_spacing: 1.0`, `headland: 1.5`). The cause was a half-degree heading wobble while leaving a lane, with the rover's corner exactly at the canopy edge. Clearance checks now add a tracking allowance: 1.5 cm, plus the corner swing at 0.12 rad (4.3 cm for the demo rover). A fuzz of 300 random configs within 1% of the new limits, with two strategies each, gave 0 contacts.
+  - `dt` of 0.7 s made a turn in place oscillate forever.
+  - A 300 x 200 m field needed a 76 GB distance matrix. A KD-tree now finds the 49,634 sites in 0.15 s.
+  - `agrisim train` crashed whenever `stem_keepout` removed sites.
+  - YAML `.nan` was accepted as a probe bias.
+  - On Windows a second `agrisim view` could share a busy port. The server now claims it exclusively, which the test confirms on Windows.
+- The densified path check must stay separate from the pointwise one: `contacts()` is also used on unrelated poses (the shapely cross-check test). So `safety.path_contacts` fills in the path and `contacts` stays pointwise.
+
 - M11: the first "odd reading" rule (more than 2x probe noise away from the neighbours) treated ordinary soil variation between sparse readings as misreads and wasted probes; RMSE got worse than without rechecks. Comparing against the field's own typical disagreement (median-based, 3x) fixed that. Evidence: budget-30 recheck RMSE 0.0355 with the old rule vs 0.0344 with the new one (seeds 0-29).
 - M11: correcting old readings with the rain gauge removes most of the error rain causes, so going back for rain alone rarely beats measuring somewhere new. Rechecks pay off mostly for misreads and only once the field is already well covered (budget 60, not 30).
 
@@ -69,6 +78,18 @@ opens a Rerun viewer showing the field, plants, lanes, the moving rover, probe p
 - Review (2026-10-14): The Rerun viewer never showed the field (rover, plants, lanes, probes). Its automatic layout made views only for the four map images and the RMSE plot. `RerunLogger` now sends an explicit blueprint: field view (flipped so north is up, like the maps), RMSE over the whole run, the four maps, playback at 30x. Found while recording the demo video in the Rerun web viewer.
 
 ## Decision Log
+
+- Decision (robustness review, 2026-10-15): validation now also requires the following:
+  - a tracking allowance on top of `safety_margin`;
+  - `dt` at most 0.1 m and 0.25 rad per step;
+  - at least 2 grid cells across the field's short side;
+  - a soil FFT grid of at most 25 million cells;
+  - `vwc_clip` within [0, 1];
+  - finite numbers everywhere.
+
+  The demo config passes them unchanged: lane need 0.587 of 0.600 m, headland need 1.43 of 2.0 m. Every published number is unchanged. Checked again: seed 7 gives RMSE 0.0299, 465.7 m; PPO gives 0.0348, 783.6 m.
+
+  The PPO environment's actions are now every lane site, a list fixed by the config, with sites near a plant masked. On the demo config the action list is identical, so `models/ppo_v1` still loads. Date: 2026-10-15.
 
 - Decision (M11): weather is a small bucket water balance written here (about 60 lines), not AquaCrop-OSPy. Rationale: we need minutes-scale moisture change in the probe's top layer during one mission, not a season of crop growth; no new dependency. Revisit for season-long scenarios (roadmap step 4). Date: 2026-10-15.
 - Decision (M11): `weather` is optional in the config. Without it nothing changes over time and every existing number (README, HANDOVER, bench, PPO evaluation) is unchanged; the probe's bad-contact draws are also taken only when `bad_contact_prob > 0`, so older probe noise streams do not shift. The weather random stream is a fifth `SeedSequence` child, which leaves the first four identical. Date: 2026-10-15.
@@ -119,7 +140,7 @@ opens a Rerun viewer showing the field, plants, lanes, the moving rover, probe p
 - Decision (M1): Added a second geometry check: headland >= 2 * (turn-in-place radius + safety_margin + canopy_radius_max), because the plan turns in place on the headland centreline. Added `wet_patch_radius` and `wet_patch_height` to SoilConfig (the plan lists wet_patch_count only) so wet-patch numbers live in config, not code. Date: 2026-10-13.
 - Decision (M2): GRF by FFT circulant embedding on a grid padded by 3 correlation lengths; small negative eigenvalues from truncation are clipped to zero (an approximation), and each realisation is renormalised to zero mean, unit variance. Correlation length is sampled uniformly from `corr_length_range`. Drip stripes are cos^2 in distance to the nearest row (peak on the row, zero at lane centres), only over the planted x span. Dry and wet patches are compact raised-cosine bumps, so "inside the radius" is well defined. Date: 2026-10-13.
 - Decision (M3): Probe value = mean over footprint disc + bias + N(0, noise_std), rounded to resolution, clipped to [0, 1]. Failure returns valid=False, value=None. `ProbeReading` is a frozen dataclass with fields x, y, t, value, valid, sensor_id only (test enforces no truth field). Date: 2026-10-13.
-- Decision (M4): The full-coverage plan places a candidate stop every probe_spacing m per lane (16 lanes x 14 = 224 on the demo field), then thins them evenly along the route to the probe budget (60 in demo.yaml, or --budget in the bench). Rationale: the plan text asks for both a probe_spacing and a probe_budget; thinning along the boustrophedon gives a staggered, roughly uniform pattern with the same budget as the adaptive strategies. Date: 2026-10-13.
+- Decision (M4): The full-coverage plan places a candidate stop every probe_spacing m per lane (16 lanes x 15 = 240 on the demo field), then thins them evenly along the route to the probe budget (60 in demo.yaml, or --budget in the bench). Rationale: the plan text asks for both a probe_spacing and a probe_budget; thinning along the boustrophedon gives a staggered, roughly uniform pattern with the same budget as the adaptive strategies. Date: 2026-10-13.
 - Decision (M4): Path following = turn in place until heading error <= 0.15 rad, then pure pursuit (lookahead 0.3 m) along each straight segment; a segment ends within 1 cm of its end point. `contacts` is an analytic rectangle-vs-circle test on (S, 3) pose arrays with a KD-tree for candidates, cross-checked against Shapely on 300 random poses. `LaneGraph` is closed form (same lane: |dx|; else min over the west and east headlands), which is exact for straight parallel lanes, instead of a general graph search. Date: 2026-10-13.
 - Decision (M5): IDW variance is NaN everywhere (IDW has no uncertainty model; no invented proxy). GlobalMean variance is the sample variance (ddof=1). Dry precision/recall are NaN when undefined (no predicted / no true dry cells); F1 is NaN if either is NaN and 0 if both are 0. Calibration = fraction of cells with |truth - mean| <= 1.96 sqrt(var), NaN when there is no variance. Lane coverage = fraction of lane-centreline points (every 0.1 m) within 0.1 m of a driven pose. Truth is resampled to the output grid by bilinear sampling at output cell centres (exact 2x2 block mean for 0.25 m -> 0.5 m). Date: 2026-10-13.
 - Decision (M6): Each seed is split with `SeedSequence(seed).spawn(4)` into independent streams for layout, soil, probe noise and policy, so every policy sees the identical field and soil for a given seed. Maps are coloured with fixed ranges (VWC: vwc_clip; abs error: [0, 2 std_vwc]; variance: [0, (2 std_vwc)^2]) in both the PNG and Rerun. `truth.npy` is truth resampled to the output grid so it aligns with `estimate.npy` and `variance.npy`. The probe reads at the rover's actual stopping pose (within 1 cm of the stop), not the nominal site. NaN metrics are written as null in metrics.json. Date: 2026-10-13.

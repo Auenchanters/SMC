@@ -19,6 +19,7 @@ ConfigOpt = Annotated[
 
 def _load(config: Path) -> "SimConfig":
     """Load a config; report validation problems as one clean CLI error, not a traceback."""
+    import yaml
     from pydantic import ValidationError
 
     from agrisim.config import load
@@ -26,8 +27,45 @@ def _load(config: Path) -> "SimConfig":
     try:
         return load(config)
     except ValidationError as exc:
-        msgs = "; ".join(e["msg"].removeprefix("Value error, ") for e in exc.errors())
+        msgs = "; ".join(_issue(e["loc"], e["msg"]) for e in exc.errors())
         raise typer.BadParameter(f"{config}: {msgs}", param_hint="--config") from None
+    except yaml.YAMLError as exc:
+        msg = f"{config} is not valid YAML: {exc}"
+        raise typer.BadParameter(msg, param_hint="--config") from None
+    except UnicodeDecodeError:
+        raise typer.BadParameter(f"{config} is not UTF-8 text", param_hint="--config") from None
+    except (OSError, TypeError, AttributeError) as exc:  # missing extends: file, non-mapping YAML
+        raise typer.BadParameter(f"{config}: {exc}", param_hint="--config") from None
+
+
+def _issue(loc: tuple[int | str, ...], msg: str) -> str:
+    msg = msg.removeprefix("Value error, ")
+    return f"{'.'.join(map(str, loc))}: {msg}" if loc else msg
+
+
+def _out_root(out: Path) -> Path:
+    if out.exists() and not out.is_dir():
+        raise typer.BadParameter(f"{out} is a file, not a folder", param_hint="--out")
+    return out
+
+
+def _check_model(model: Path, cfg: "SimConfig") -> None:
+    from agrisim.env import LearnedPolicy
+
+    try:
+        LearnedPolicy.load(model, cfg)
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc), param_hint="--model") from None
+
+
+def _serve(run_dir: Path, browser: bool, port: int) -> None:
+    from agrisim.view3d import serve
+
+    try:
+        serve(run_dir, open_browser=browser, port=port)
+    except OSError as exc:  # port taken or not allowed
+        msg = f"cannot listen on port {port}: {exc}"
+        raise typer.BadParameter(msg, param_hint="--port") from None
 
 
 def _seeds(text: str) -> list[int]:
@@ -53,7 +91,7 @@ def version() -> None:
 @app.command()
 def run(
     config: ConfigOpt,
-    seed: Annotated[int, typer.Option(help="Run seed")] = 0,
+    seed: Annotated[int, typer.Option(min=0, help="Run seed")] = 0,
     rerun: Annotated[bool, typer.Option("--rerun", help="Open a Rerun viewer, save .rrd")] = False,
     budget: Annotated[int | None, typer.Option(help="Probe budget (default: config)")] = None,
     policy: Annotated[
@@ -78,10 +116,14 @@ def run(
         raise typer.BadParameter(f"unknown policy {policy!r}; choose from {valid}")
     if policy == LEARNED and model is None:
         raise typer.BadParameter("--policy ppo needs --model <model.zip>")
+    if policy != LEARNED and model is not None:
+        raise typer.BadParameter("--model is only used with --policy ppo")
     if budget is not None and budget < 1:
         raise typer.BadParameter("--budget must be at least 1")
     cfg = _load(config)
-    out_dir = new_dir(out, run_dir_name(seed))
+    if model is not None:
+        _check_model(model, cfg)
+    out_dir = new_dir(_out_root(out), run_dir_name(seed))
     rrd = out_dir / "recording.rrd"
     result = run_survey(cfg, seed, policy, rerun=rerun, budget=budget, rrd_path=rrd, model=model)
     save_run(result, out_dir)
@@ -100,10 +142,10 @@ def run(
     typer.echo(f"plant contacts {r.plant_contacts}")
     typer.echo("Note: soil and probe parameters are placeholders until calibrated.")
     if view:
-        from agrisim.view3d import serve, write_scene
+        from agrisim.view3d import write_scene
 
         write_scene(result, out_dir)
-        serve(out_dir)
+        _serve(out_dir, True, 0)
 
 
 @app.command()
@@ -111,18 +153,20 @@ def view(
     run_dir: Annotated[
         Path, typer.Argument(exists=True, file_okay=False, help="A run folder made with --view")
     ],
-    port: Annotated[int, typer.Option(help="Port on 127.0.0.1 (0 = any free port)")] = 0,
+    port: Annotated[
+        int, typer.Option(min=0, max=65535, help="Port on 127.0.0.1 (0 = any free port)")
+    ] = 0,
     browser: Annotated[bool, typer.Option(help="Open the page in your browser")] = True,
 ) -> None:
     """Replay a finished survey in 3D in your browser (needs the run's scene.json)."""
-    from agrisim.view3d import SCENE, serve
+    from agrisim.view3d import SCENE
 
     if not (run_dir / SCENE).is_file():
         raise typer.BadParameter(
             f"{run_dir} has no {SCENE}; make one with: agrisim run ... --view",
             param_hint="RUN_DIR",
         )
-    serve(run_dir, open_browser=browser, port=port)
+    _serve(run_dir, browser, port)
 
 
 @app.command()
@@ -131,7 +175,7 @@ def bench(
     seeds: Annotated[str, typer.Option(help="Seeds, e.g. 0-49 or 1,5,9")] = "0-49",
     budget: Annotated[int, typer.Option(help="Probe budget, same for every strategy")] = 30,
     strategies: Annotated[str, typer.Option(help="Comma-separated; default all")] = "",
-    workers: Annotated[int, typer.Option(help="Worker processes (1 = serial)")] = 1,
+    workers: Annotated[int, typer.Option(min=1, help="Worker processes (1 = serial)")] = 1,
     out: Annotated[Path, typer.Option(help="Root folder for outputs")] = Path("runs"),
 ) -> None:
     """Run every strategy on every seed; write runs/bench_<timestamp>/results.csv and summary.md."""
@@ -142,14 +186,14 @@ def bench(
     from agrisim.policies import STRATEGIES
 
     names = [s.strip() for s in strategies.split(",") if s.strip()] or list(STRATEGIES)
-    unknown = set(names) - set(STRATEGIES)
+    unknown = set(names) - {*STRATEGIES, "full_coverage"}
     if unknown:
         raise typer.BadParameter(f"unknown strategies {sorted(unknown)}; choose from {STRATEGIES}")
     if budget < 1:
         raise typer.BadParameter("--budget must be at least 1")
     seed_list = _seeds(seeds)
     cfg = _load(config)
-    out_dir = new_dir(out, f"bench_{datetime.now(UTC):%Y%m%dT%H%M%SZ}")
+    out_dir = new_dir(_out_root(out), f"bench_{datetime.now(UTC):%Y%m%dT%H%M%SZ}")
     rows = run_benchmark(cfg, seed_list, budget, names, workers)
     write_results(rows, out_dir)
     text = summary_markdown(rows, f"agrisim bench: {config.name}, budget {budget}")
@@ -161,16 +205,24 @@ def bench(
 @app.command()
 def train(
     config: ConfigOpt,
-    timesteps: Annotated[int, typer.Option(help="Total environment steps")] = 200_000,
-    seed: Annotated[int, typer.Option(help="Training seed")] = 0,
-    budget: Annotated[int, typer.Option(help="Probe budget per episode")] = 30,
-    n_envs: Annotated[int, typer.Option(help="Parallel envs (>1 uses spawn subprocesses)")] = 1,
+    timesteps: Annotated[int, typer.Option(min=1, help="Total environment steps")] = 200_000,
+    seed: Annotated[int, typer.Option(min=0, help="Training seed")] = 0,
+    budget: Annotated[int, typer.Option(min=1, help="Probe budget per episode")] = 30,
+    n_envs: Annotated[
+        int, typer.Option(min=1, help="Parallel envs (>1 uses spawn subprocesses)")
+    ] = 1,
     out: Annotated[Path, typer.Option(help="Output folder")] = Path("runs/ppo_v1"),
 ) -> None:
     """Train a MaskablePPO probing policy (episodes use seeds >= 1000)."""
     from agrisim.env import train as train_ppo
 
-    path = train_ppo(_load(config), timesteps, seed, out, budget, n_envs)
+    cfg = _load(config)
+    if out.exists() and not out.is_dir():
+        raise typer.BadParameter(f"{out} is a file, not a folder", param_hint="--out")
+    try:
+        path = train_ppo(cfg, timesteps, seed, out, budget, n_envs)
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc), param_hint="--config") from None
     typer.echo(f"saved {path}")
 
 
@@ -180,7 +232,7 @@ def evaluate(
     config: ConfigOpt,
     seeds: Annotated[str, typer.Option(help="Held-out seeds (< 1000)")] = "100-149",
     budget: Annotated[int, typer.Option(help="Probe budget, same for every strategy")] = 30,
-    workers: Annotated[int, typer.Option(help="Worker processes (1 = serial)")] = 1,
+    workers: Annotated[int, typer.Option(min=1, help="Worker processes (1 = serial)")] = 1,
     out: Annotated[Path, typer.Option(help="Root folder for outputs")] = Path("runs"),
 ) -> None:
     """Evaluate a trained model and every baseline on the same held-out seeds and budget."""
@@ -197,7 +249,8 @@ def evaluate(
     if max(seed_list) >= TRAIN_SEED_OFFSET:
         raise typer.BadParameter(f"evaluation seeds must be < {TRAIN_SEED_OFFSET} (held out)")
     cfg = _load(config)
-    out_dir = new_dir(out, f"eval_{datetime.now(UTC):%Y%m%dT%H%M%SZ}")
+    _check_model(model, cfg)
+    out_dir = new_dir(_out_root(out), f"eval_{datetime.now(UTC):%Y%m%dT%H%M%SZ}")
     names = [*STRATEGIES, LEARNED]
     rows = run_benchmark(cfg, seed_list, budget, names, workers, model=model.resolve())
     write_results(rows, out_dir)

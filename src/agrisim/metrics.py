@@ -6,6 +6,7 @@ import numpy as np
 import numpy.typing as npt
 from scipy.spatial import KDTree
 
+from agrisim.control import densify
 from agrisim.field import FieldLayout
 from agrisim.mapping import GridSpec
 from agrisim.soil import SoilTruth
@@ -77,7 +78,8 @@ def map_metrics(
 
 
 def lane_coverage(poses: npt.ArrayLike, layout: FieldLayout, tol: float = 0.1) -> float:
-    """Fraction of lane-centreline sample points (every 0.1 m) within `tol` of a driven pose."""
+    """Fraction of lane-centreline sample points (every 0.1 m) within `tol` of the driven path
+    (filled in between poses, so a fast rover's widely spaced samples still count)."""
     p = np.atleast_2d(np.asarray(poses, dtype=np.float64))
     pts = []
     for line in layout.lanes:
@@ -87,7 +89,7 @@ def lane_coverage(poses: npt.ArrayLike, layout: FieldLayout, tol: float = 0.1) -
     samples = np.concatenate(pts)
     if len(p) == 0:
         return 0.0
-    d, _ = KDTree(p[:, :2]).query(samples)
+    d, _ = KDTree(densify(p)[0][:, :2]).query(samples)
     return float((d <= tol).mean())
 
 

@@ -23,7 +23,7 @@ from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecEnv
 from torch import nn
 
 from agrisim.config import SimConfig
-from agrisim.field import FieldLayout, ProbeSite
+from agrisim.field import FieldLayout, lane_sites
 from agrisim.mapping import GridSpec, KrigingMapper
 from agrisim.metrics import truth_on_grid
 from agrisim.planning import LaneGraph
@@ -74,9 +74,10 @@ class ObsBuilder:
         t: float,
     ) -> Obs:
         c, s = self.cfg, self.cfg.soil
+        sd = s.std_vwc or 1.0  # a flat test field (std_vwc 0) must not give NaN observations
         obs = np.zeros((N_CHANNELS, self.grid.ny, self.grid.nx), dtype=np.float32)
-        obs[0] = (mean - s.mean_vwc) / s.std_vwc
-        obs[1] = var / s.std_vwc**2
+        obs[0] = (mean - s.mean_vwc) / sd
+        obs[1] = var / sd**2
         if len(probed_xy):
             obs[2][self.cell(probed_xy[:, 0], probed_xy[:, 1])] = 1.0
         obs[3][self.cell(position[0], position[1])] = 1.0
@@ -114,14 +115,12 @@ class AdaptiveProbingEnv(gym.Env[Obs, np.int64]):
         self.reward_scale = reward_scale
         self.grid = GridSpec.for_field(cfg.field, cfg.mapping.output_resolution)
         self.obs_builder = ObsBuilder(cfg, self.grid, self.budget)
-        n_sites = len(self._sites(FieldLayout.generate(cfg.field, np.random.default_rng(0))))
-        self.n_sites = n_sites
-        self.action_space = spaces.Discrete(n_sites)
+        # One action per lane site: a list fixed by the config. Sites too close to a plant in a
+        # given field are masked, so plant dropout cannot change the number of actions.
+        self.n_sites = n_actions(cfg)
+        self.action_space = spaces.Discrete(self.n_sites)
         self.observation_space = self.obs_builder.space
         self.probe = MoistureProbe(cfg.probe)
-
-    def _sites(self, layout: FieldLayout) -> tuple[ProbeSite, ...]:
-        return tuple(layout.candidate_probe_sites(self.cfg.survey.candidate_spacing))
 
     def _obs(self) -> Obs:
         xy = np.array([(r.x, r.y) for r in self._readings]).reshape(-1, 2)
@@ -141,11 +140,19 @@ class AdaptiveProbingEnv(gym.Env[Obs, np.int64]):
             ep_seed = int(options["episode_seed"])
         else:
             ep_seed = int(self.np_random.integers(TRAIN_SEED_OFFSET, 2**31 - 1))
-        rng_field, rng_soil, self._rng_probe, *_ = world_rngs(ep_seed)
-        layout = FieldLayout.generate(self.cfg.field, rng_field)
-        self._sites_now = self._sites(layout)
-        if len(self._sites_now) != self.n_sites:
-            raise RuntimeError("candidate-site count changed between episodes")
+        for _ in range(100):  # a field where every site is too close to a plant has no action
+            rng_field, rng_soil, self._rng_probe, *_ = world_rngs(ep_seed)
+            layout = FieldLayout.generate(self.cfg.field, rng_field)
+            self._sites_now = tuple(layout.lane_sites(self.cfg.survey.candidate_spacing))
+            self._ok = layout.site_ok(list(self._sites_now))
+            if self._ok.any():
+                break
+            ep_seed = int(self.np_random.integers(TRAIN_SEED_OFFSET, 2**31 - 1))
+        else:
+            raise ValueError(
+                "no probe site is at least field.stem_keepout from every plant in 100 fields; "
+                "lower stem_keepout or candidate_spacing"
+            )
         self._truth = SoilTruth.generate(self.cfg.soil, layout, rng_soil)
         self._truth_grid = truth_on_grid(self._truth, self.grid)
         self._graph = LaneGraph.from_layout(layout)
@@ -157,10 +164,15 @@ class AdaptiveProbingEnv(gym.Env[Obs, np.int64]):
         return self._obs(), {"episode_seed": ep_seed}
 
     def action_masks(self) -> npt.NDArray[np.bool_]:
-        return ~self._visited
+        return ~self._visited & self._ok
 
     def step(self, action: np.int64) -> tuple[Obs, float, bool, bool, dict[str, Any]]:
-        site = self._sites_now[int(action)]
+        a = int(action)
+        if not 0 <= a < self.n_sites:  # -1 would silently probe the last site
+            raise ValueError(f"action {a} out of range [0, {self.n_sites})")
+        if not self._ok[a]:
+            raise ValueError(f"action {a} is a site within stem_keepout of a plant (masked)")
+        site = self._sites_now[a]
         travel = float(self._graph.distances(self._here, [site])[0]) / self.cfg.rover.max_speed
         self._t += travel + self.cfg.probe.insertion_time_s
         reading = self.probe.read(self._truth, site.x, site.y, self._t, self._rng_probe)
@@ -171,7 +183,7 @@ class AdaptiveProbingEnv(gym.Env[Obs, np.int64]):
         self._mean, self._var = estimate(self.cfg, self.grid, self._readings)
         after = self._rmse()
         reward = self.reward_scale * (before - after) - self.time_penalty * travel
-        done = len(self._readings) >= self.budget or bool(self._visited.all())
+        done = len(self._readings) >= self.budget or not self.action_masks().any()
         info = {"rmse": after, "time_s": self._t, "travel_s": travel}
         return self._obs(), float(reward), done, False, info
 
@@ -204,6 +216,7 @@ def train(
     cfg: SimConfig, timesteps: int, seed: int, out: Path, budget: int, n_envs: int = 1
 ) -> Path:
     """Train MaskablePPO; write model.zip and train_meta.json into `out`. Returns the model path."""
+    AdaptiveProbingEnv(cfg, budget).reset(seed=seed)  # a config with no usable site fails here
     out.mkdir(parents=True, exist_ok=True)
 
     def make() -> gym.Env[Obs, np.int64]:
@@ -246,7 +259,22 @@ class LearnedPolicy:
 
     @classmethod
     def load(cls, path: Path, cfg: SimConfig) -> "LearnedPolicy":
-        return cls(MaskablePPO.load(path, device="cpu"), cfg)
+        """Load and check the model fits this config's field before any run starts."""
+        try:
+            model = MaskablePPO.load(path, device="cpu")
+        except Exception as exc:  # zip, pickle and torch errors all mean "not a model"
+            raise ValueError(f"{path} is not a MaskablePPO model.zip ({exc})") from None
+        grid = GridSpec.for_field(cfg.field, cfg.mapping.output_resolution)
+        want_obs = ObsBuilder(cfg, grid, 1).space.shape
+        want_n = n_actions(cfg)
+        got_obs = model.observation_space.shape
+        got_n = int(getattr(model.action_space, "n", -1))
+        if got_obs != want_obs or got_n != want_n:
+            raise ValueError(
+                f"model {path} was trained for a different field: it expects observations "
+                f"{got_obs} and {got_n} sites, this config gives {want_obs} and {want_n}"
+            )
+        return cls(model, cfg)
 
     def choose(self, ctx: Context) -> int:
         grid = GridSpec.for_field(self.cfg.field, self.cfg.mapping.output_resolution)
@@ -256,5 +284,18 @@ class LearnedPolicy:
         obs = ObsBuilder(self.cfg, grid, ctx.budget).build(
             mean, var, xy, (ctx.position.x, ctx.position.y), len(ctx.readings), t
         )
-        action, _ = self.model.predict(obs, deterministic=True, action_masks=~ctx.visited)
-        return int(action)
+        # The model's actions are every lane site; ctx.sites leaves out those near a plant.
+        g = ctx.graph
+        every = lane_sites(g.lane_y, g.x_west, g.x_east, self.cfg.survey.candidate_spacing)
+        index = {(s.lane, round(s.x, 6)): i for i, s in enumerate(every)}
+        mine = np.array([index[(s.lane, round(s.x, 6))] for s in ctx.sites], dtype=np.intp)
+        mask = np.zeros(len(every), dtype=bool)
+        mask[mine] = ~ctx.visited
+        action, _ = self.model.predict(obs, deterministic=True, action_masks=mask)
+        return int(np.flatnonzero(mine == int(action))[0])
+
+
+def n_actions(cfg: SimConfig) -> int:
+    """Number of lane sites (actions) for a config; the same for every field it generates."""
+    layout = FieldLayout.generate(cfg.field, np.random.default_rng(0))
+    return len(layout.lane_sites(cfg.survey.candidate_spacing))

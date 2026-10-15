@@ -9,6 +9,7 @@ import math
 from dataclasses import dataclass
 
 import numpy as np
+import numpy.typing as npt
 
 from agrisim.config import RoverConfig
 from agrisim.rover import RoverState, step, wrap_angle
@@ -26,9 +27,14 @@ class PurePursuit:
     reverse_margin: float = 0.3  # rad beyond 90 deg before choosing to reverse
 
     def command(
-        self, state: RoverState, start: tuple[float, float], end: tuple[float, float]
+        self,
+        state: RoverState,
+        start: tuple[float, float],
+        end: tuple[float, float],
+        dt: float = 0.0,
     ) -> tuple[float, float]:
-        """(v, w) for following the straight segment start -> end."""
+        """(v, w) for following the straight segment start -> end. With `dt`, a turn in place
+        never rotates past the target heading in one step (long steps would oscillate forever)."""
         sx, sy = start
         dx, dy = end[0] - sx, end[1] - sy
         seg = math.hypot(dx, dy)
@@ -40,7 +46,10 @@ class PurePursuit:
         eff = state.theta + math.pi if reverse else state.theta  # direction of travel
         err = wrap_angle(math.atan2(dy, dx) - eff)
         if abs(err) > self.turn_tol:
-            return 0.0, self.k_turn * err
+            w = self.k_turn * err
+            if dt > 0:
+                w = math.copysign(min(abs(w), abs(err) / dt), w)
+            return 0.0, w
         along = (state.x - sx) * ux + (state.y - sy) * uy
         remaining = seg - along
         s = min(along + self.lookahead, seg)
@@ -78,10 +87,32 @@ def drive_segment(
     for _ in range(max_steps):
         if follower.done(state, start, end):
             return out
-        v, w = follower.command(state, start, end)
+        v, w = follower.command(state, start, end, dt)
         state = step(state, v, w, dt, follower.rover)
         out.append(state)
     raise RuntimeError(f"segment {start} -> {end} not reached in {max_steps} steps")
+
+
+def densify(
+    p: npt.ArrayLike, ds: float = 0.05, dth: float = 0.05
+) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.intp]]:
+    """Poses filled in so consecutive ones are at most `ds` m and `dth` rad apart, and the index
+    of the original pose each one starts from. Checks on sampled poses (plant contacts, lane
+    coverage) would otherwise miss what happens between two far-apart samples."""
+    p = np.atleast_2d(np.asarray(p, dtype=np.float64))
+    if len(p) < 2:
+        return p, np.arange(len(p))
+    step = np.diff(p, axis=0)
+    step[:, 2] = (step[:, 2] + np.pi) % (2 * np.pi) - np.pi
+    n = np.maximum(
+        1,
+        np.ceil(np.maximum(np.hypot(step[:, 0], step[:, 1]) / ds, np.abs(step[:, 2]) / dth) - 1e-9),
+    ).astype(np.intp)
+    src = np.repeat(np.arange(len(step)), n)
+    frac = np.concatenate([np.arange(k) / k for k in n])
+    out = p[src] + step[src] * frac[:, None]
+    out[:, 2] = (out[:, 2] + np.pi) % (2 * np.pi) - np.pi
+    return np.vstack([out, p[-1:]]), np.append(src, len(p) - 1)
 
 
 def poses(states: list[RoverState]) -> np.ndarray:

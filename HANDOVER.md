@@ -3,7 +3,7 @@
 You are taking over a finished first version of the soil-moisture survey simulator and the first rover hardware design. This page tells you how to set it up, how to test it end to end, what results to expect, and what is still open. Read [README.md](README.md) first for what the project does, or watch the 3-minute demo: [docs/media/agrisim-demo.mp4](docs/media/agrisim-demo.mp4). The quickest way to see what the project does is the 3D replay: `uv run agrisim run --config configs/demo.yaml --seed 7 --view`.
 
 State at handover (14 Oct 2026):
-- ExecPlan milestones M0 to M9 are done, plus a 3D replay viewer and M11 (weather, probe misreads, rechecks). 75 tests pass.
+- ExecPlan milestones M0 to M9 are done, plus a 3D replay viewer and M11 (weather, probe misreads, rechecks). 92 tests pass.
 - CI is green: tests on Windows and Ubuntu, plus a hardware job that rebuilds and audits the rover figures.
 - Every decision, surprise and result is in [EXECPLAN.md](EXECPLAN.md).
 - Nothing is half-finished in the code. Open items are in section 3.
@@ -106,6 +106,13 @@ Work through these in order and tick each one. "Expected" values came from the t
 | D5 | `uv run agrisim bench --config configs/demo.yaml --seeds 0-1 --strategies foo` | `unknown strategies ['foo']` |
 | D6 | Set `probe: failure_prob: 0.5` in a copy and run B1 | Runs to the end with `42 valid / 60 used` and plant contacts `0`. Across many seeds the failure rate averages 0.5 (measured 0.508 over 20 seeds); seed 0 happens to lose only 18 |
 | D7 | `uv run agrisim bench --config configs/demo.yaml --seeds 5-3` (also try `--seeds abc`) | `Invalid value for --seeds: bad seed range '5-3'` (exit code 2); no `runs\bench_*` folder is created |
+| D9 | Add a top-level line `dt: 1.0` to a copy and run B1 | `dt 1.0 s is too long` (exit code 2), no run folder |
+| D10 | In a copy set `rover: length: 0.8`, `safety_margin: 0.0` and `field: row_spacing: 1.0`, `headland: 1.5` | An error naming the `tracking allowance` (this config used to touch plants 34 times) |
+| D11 | In copies set `soil: grid_resolution: 30.0`; or `soil: corr_length_range: [1000.0, 2000.0]`; or `probe: bias: .nan` | `too coarse`; `soil grid too large to generate`; `finite number` |
+| D12 | In a copy set `field: length_x: 10.0`, `width_y: 4.8`, then run B6 with it | `was trained for a different field` (exit code 2), no run folder |
+| D13 | `uv run agrisim run --config configs/demo.yaml --model models/ppo_v1/model.zip` (no `--policy ppo`) | `--model is only used with --policy ppo` |
+| D14 | `uv run agrisim bench --config configs/demo.yaml --seeds 0-2,1` | `seed(s) [1] listed more than once` |
+| D15 | Start `uv run agrisim view <a --view run folder> --port 8765 --no-browser` in two terminals | The second one is refused: `cannot listen on port 8765` |
 | D8 | Set `field: stem_keepout: 5.0` in a copy and run B1 | Runs to the end: `0 valid / 0 used`, path `465.7 m`, lane coverage `1.000`, plant contacts `0`, and the map metrics are `nan` (no readings). No point on any lane is 5 m from every stem. This used to crash. (With `0.7`, only 34 sites remain, in plant gaps and lane ends: `33 valid / 34 used`.) |
 
 ### E. Exploratory (try to break it)
@@ -171,6 +178,7 @@ Report problems as GitHub issues with the command, the seed and the config file 
 - **Added:** the CI hardware job, the demo video and its scripts, and section 0 of this file.
 - **Added:** the 3D replay (`--view` and `agrisim view`, B4b and B4c), built so a first-time user can follow it without help. The Rerun viewer got plain panel names and a "How to read this" panel (B4).
 
+- **Fixed (robustness review, 2026-10-15):** all 22 findings of the outside review `SMC-found-and-fixed.md`, re-checked on the current code. Highlights: validated configs could touch plants (now a tracking allowance), long `dt` hung, huge fields ran out of memory, `train` crashed with a large `stem_keepout`, NaN in configs, model/field mismatches, a busy port on Windows, and the demo script carrying on after a failure. 17 regression tests are in `tests/test_robustness.py`; D9 to D15 check them by hand.
 - **Added (M11):** weather (`weather:` in a config; `weather.py`), probe misreads (`probe.bad_contact_*`), the `recheck` and `fixed_plus_recheck` strategies, `extends:` scenario configs in `configs/scenarios/`, and rain in the 3D replay (B4d). Without a `weather:` section everything behaves exactly as before.
 
 Details are in the ExecPlan's Surprises & Discoveries section.

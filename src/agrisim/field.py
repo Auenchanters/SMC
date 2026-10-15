@@ -11,6 +11,7 @@ from functools import cached_property
 import numpy as np
 import numpy.typing as npt
 import shapely
+from scipy.spatial import KDTree
 from shapely.geometry import LineString, Polygon, box
 
 from agrisim.config import FieldConfig
@@ -77,15 +78,26 @@ class FieldLayout:
         canopies = shapely.buffer(shapely.points(self.stems), self.canopy_radius)
         return self.boundary.difference(shapely.union_all(canopies))
 
+    def lane_sites(self, spacing: float) -> list[ProbeSite]:
+        """Points every `spacing` m along each lane centreline (the same list for every field
+        with this config)."""
+        (x0, _), (x1, _) = self.lanes[0].coords
+        return lane_sites(self.lane_y, x0, x1, spacing)
+
+    def site_ok(self, sites: list[ProbeSite]) -> npt.NDArray[np.bool_]:
+        """True where a site is at least stem_keepout from every stem."""
+        if not sites or len(self.stems) == 0:
+            return np.ones(len(sites), dtype=bool)
+        d, _ = KDTree(self.stems).query(np.array([(s.x, s.y) for s in sites]))
+        return np.asarray(d >= self.cfg.stem_keepout)
+
     def candidate_probe_sites(self, spacing: float) -> list[ProbeSite]:
         """Points every `spacing` m along each lane centreline, at least stem_keepout from stems."""
-        sites = []
-        for lane, line in enumerate(self.lanes):
-            (x0, y), (x1, _) = line.coords
-            for x in np.arange(x0, x1 + _EPS, spacing):
-                sites.append(ProbeSite(float(x), float(y), lane))
-        if not sites or len(self.stems) == 0:
-            return sites
-        xy = np.array([(s.x, s.y) for s in sites])
-        d = np.linalg.norm(xy[:, None, :] - self.stems[None, :, :], axis=2).min(axis=1)
-        return [s for s, ok in zip(sites, d >= self.cfg.stem_keepout, strict=True) if ok]
+        sites = self.lane_sites(spacing)
+        return [s for s, ok in zip(sites, self.site_ok(sites), strict=True) if ok]
+
+
+def lane_sites(lane_y: FloatArray, x0: float, x1: float, spacing: float) -> list[ProbeSite]:
+    """Every `spacing` m from x0 to x1 on each lane centreline y."""
+    xs = np.arange(x0, x1 + _EPS, spacing)
+    return [ProbeSite(float(x), float(y), lane) for lane, y in enumerate(lane_y) for x in xs]

@@ -45,7 +45,10 @@ def gaussian_random_field(
     eig = np.clip(np.fft.fft2(cov).real, 0.0, None)
     noise = rng.standard_normal((my, mx))
     field = np.fft.ifft2(np.sqrt(eig) * np.fft.fft2(noise)).real[: shape[0], : shape[1]]
-    return np.asarray((field - field.mean()) / field.std(), dtype=np.float64)
+    sd = field.std()
+    if sd == 0:  # a tiny grid can have no spread at all; a flat field, not NaN
+        return np.zeros(shape, dtype=np.float64)
+    return np.asarray((field - field.mean()) / sd, dtype=np.float64)
 
 
 def _bump(d: FloatArray, radius: float) -> FloatArray:

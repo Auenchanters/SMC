@@ -6,6 +6,8 @@ probe reading, and the map after each reading. `serve` hosts the viewer page and
 """
 
 import json
+import os
+import socket
 import webbrowser
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -147,9 +149,20 @@ class _Handler(SimpleHTTPRequestHandler):
         pass
 
 
+class _Server(ThreadingHTTPServer):
+    # On Windows SO_REUSEADDR lets a second server bind a port that is already in use (and the
+    # two then share requests). Claim the port exclusively there instead.
+    allow_reuse_address = os.name != "nt"
+
+    def server_bind(self) -> None:
+        if os.name == "nt":
+            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+        super().server_bind()
+
+
 def make_server(run_dir: Path, port: int = 0) -> ThreadingHTTPServer:
     """A server on 127.0.0.1 (port 0 = any free port); call serve_forever() to run it."""
-    return ThreadingHTTPServer(("127.0.0.1", port), partial(_Handler, run_dir=run_dir))
+    return _Server(("127.0.0.1", port), partial(_Handler, run_dir=run_dir))
 
 
 def serve(run_dir: Path, open_browser: bool = True, port: int = 0) -> None:

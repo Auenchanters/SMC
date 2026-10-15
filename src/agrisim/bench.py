@@ -15,7 +15,7 @@ from scipy import stats
 from agrisim.config import SimConfig
 from agrisim.mapping import GlobalMeanMapper, IDWMapper, Mapper
 from agrisim.metrics import map_metrics
-from agrisim.policies import STRATEGIES
+from agrisim.policies import FIXED, STRATEGIES
 from agrisim.sim import RunResult, run_survey
 from agrisim.weather import current_view
 
@@ -94,6 +94,7 @@ def run_benchmark(
     model: Path | None = None,
 ) -> list[BenchRow]:
     """Rows in strategy-major order. `model` is needed only for the "ppo" strategy."""
+    strategies = [FIXED if s == "full_coverage" else s for s in strategies]
     jobs = [(cfg, s, name, budget, model) for name in strategies for s in seeds]
     if workers <= 1:
         return [bench_one(j) for j in jobs]
@@ -169,4 +170,7 @@ def parse_seeds(text: str) -> list[int]:
         if a < 0 or b < a:
             raise ValueError(f"bad seed range {part.strip()!r}; use e.g. 0-49 or 1,5,9")
         seeds += range(a, b + 1)
+    repeated = sorted({s for s in seeds if seeds.count(s) > 1})
+    if repeated:  # a seed run twice would be counted twice in the mean and interval
+        raise ValueError(f"seed(s) {repeated} listed more than once in {text!r}")
     return seeds

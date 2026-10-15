@@ -20,7 +20,9 @@ U8Array = npt.NDArray[np.uint8]
 def map_ranges(cfg: SimConfig) -> dict[str, tuple[str, float, float]]:
     """Fixed colour map and value range per map image, so frames and runs are comparable."""
     lo, hi = cfg.soil.vwc_clip
-    s = cfg.soil.std_vwc
+    if hi <= lo:  # equal clip bounds: still a usable colour range
+        lo, hi = lo - 0.01, hi + 0.01
+    s = cfg.soil.std_vwc or 0.01  # a flat field (std_vwc 0) still needs an error scale
     return {
         "truth": ("viridis", lo, hi),
         "estimate": ("viridis", lo, hi),
@@ -60,7 +62,8 @@ calibrated. For a 3D replay, run `agrisim run ... --view`.
 def colorize(values: npt.ArrayLike, cmap: str, vmin: float, vmax: float) -> U8Array:
     """RGB uint8 colours; NaN maps to mid grey."""
     v = np.asarray(values, dtype=np.float64)
-    rgb = colormaps[cmap](np.clip((v - vmin) / (vmax - vmin), 0, 1))[..., :3]
+    span = vmax - vmin if vmax > vmin else 1.0
+    rgb = colormaps[cmap](np.clip((v - vmin) / span, 0, 1))[..., :3]
     rgb[~np.isfinite(v)] = 0.5
     return np.asarray(np.round(rgb * 255), dtype=np.uint8)
 
@@ -146,7 +149,9 @@ class RerunLogger:
         )
 
     def log_drive(self, times: list[float], states: list[RoverState], every: int = 10) -> None:
-        for t, s in list(zip(times, states, strict=True))[::every]:
+        pairs = list(zip(times, states, strict=True))
+        # Every `every`-th step plus the last, so the rover is drawn where it actually stopped.
+        for t, s in pairs[::every] + (pairs[-1:] if (len(pairs) - 1) % every else []):
             self.rec.set_time("sim_time", duration=t)
             corners = list(footprint(s, self.cfg.rover).exterior.coords)
             self.rec.log("field/rover", rr.LineStrips2D([corners], colors=[230, 60, 60]))

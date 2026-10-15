@@ -7,7 +7,7 @@
 [![CI](https://github.com/Auenchanters/SMC/actions/workflows/ci.yml/badge.svg)](https://github.com/Auenchanters/SMC/actions/workflows/ci.yml)
 [![Python 3.13](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Windows native](https://img.shields.io/badge/Windows-native,_no_WSL-0078D4?logo=windows&logoColor=white)](#quickstart)
-[![tests](https://img.shields.io/badge/tests-75_passing-3FB950)](tests/)
+[![tests](https://img.shields.io/badge/tests-92_passing-3FB950)](tests/)
 [![Gymnasium](https://img.shields.io/badge/Gymnasium-1.3-0081A5)](https://gymnasium.farama.org/)
 [![Rerun](https://img.shields.io/badge/Rerun-0.39-6E40C9)](https://rerun.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -244,7 +244,7 @@ uv run pytest -q
 .\scripts\check_licenses.ps1
 ```
 
-There are 75 tests, about 50 to 140 s, with no network needed. They cover:
+There are 92 tests, about 50 to 140 s, with no network needed. They cover:
 
 - geometry validation;
 - field determinism;

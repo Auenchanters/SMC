@@ -8,6 +8,7 @@ import numpy.typing as npt
 from scipy.spatial import KDTree
 
 from agrisim.config import RoverConfig
+from agrisim.control import densify
 from agrisim.field import FieldLayout
 
 
@@ -54,4 +55,16 @@ def contacts(
             float(depth[i]),
         )
         for i in hit
+    ]
+
+
+def path_contacts(
+    poses: npt.ArrayLike, rover: RoverConfig, layout: FieldLayout
+) -> list[PlantContact]:
+    """Contacts along a driven path: filled in between poses first (control.densify), so a canopy
+    between two widely spaced samples is not missed. `step` indexes the input poses."""
+    dense, src = densify(poses)
+    return [
+        PlantContact(int(src[c.step]), c.plant, c.x, c.y, c.depth)
+        for c in contacts(dense, rover, layout)
     ]
