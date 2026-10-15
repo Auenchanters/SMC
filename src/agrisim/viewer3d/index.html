@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Soil survey replay</title>
-<script type="importmap">{ "imports": { "three": "./vendor/three.module.js" } }</script>
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.js", "three/addons/": "./vendor/jsm/" } }</script>
 <style>
 :root {
   --panel: rgba(16, 20, 24, 0.84); --line: rgba(255, 255, 255, 0.12); --text: #eef2f4; --dim: #a7b3bb;
@@ -50,6 +50,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .sep { width: 1px; align-self: stretch; background: var(--line); }
 #cams { display: flex; gap: 4px; }
 label.slow { display: flex; gap: 6px; align-items: center; color: var(--dim); white-space: nowrap; }
+select { font: inherit; color: var(--text); background: rgba(255, 255, 255, 0.08); border: 1px solid var(--line); border-radius: 8px; padding: 5px 6px; }
+select option { background: #1b2329; }
 
 .tag { position: fixed; transform: translate(-50%, -100%); padding: 3px 8px; border-radius: 6px; background: rgba(16, 20, 24, 0.8); border: 1px solid var(--line); font-size: 13px; pointer-events: none; white-space: nowrap; }
 .tag.next { border-color: var(--accent); color: var(--accent); }
@@ -109,6 +111,12 @@ kbd { font: 12px Consolas, monospace; border: 1px solid var(--line); border-radi
   <label class="slow"><input id="slow" type="checkbox" checked> Slow down at stops</label>
   <div class="sep"></div>
   <div id="cams" role="group" aria-label="Camera"></div>
+  <div class="sep"></div>
+  <label class="slow" title="Lower it if the replay stutters">Graphics
+    <select id="quality" aria-label="Graphics quality">
+      <option value="auto">Auto</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option>
+    </select>
+  </label>
 </section>
 
 <div class="tag" id="tagRobot">Robot</div>

@@ -25,7 +25,8 @@ Hard rules. Each one has broken something or is a team decision, so do not work 
    - `docs/img/*` (except `architecture.svg`) and `docs/media/survey.mp4` come from `scripts/make_media.py`.
    - `docs/media/agrisim-demo.mp4` and `docs/img/viewer3d*.jpg` come from `scripts/demo_video/`.
    - `src/agrisim/viewer3d/rover-model.mjs` is a byte-for-byte copy of `hardware/rover-v1/model.mjs` (the 3D rover is built from it). After changing the model, copy it; a test fails until you do.
-   - `src/agrisim/viewer3d/vendor/` is three.js 0.186.1 exactly as published (MIT). Do not edit it; to upgrade, replace the files and update its README.txt and the Decision Log.
+   - `src/agrisim/viewer3d/vendor/` is three.js 0.186.1 exactly as published (MIT); addons are in `vendor/jsm/` with three.js's own folder layout. Do not edit it; to upgrade, replace the files and update its README.txt and the Decision Log.
+   - `src/agrisim/viewer3d/assets/` holds CC0 assets (sky photo, and later textures and models). Each one is listed with its source and licence in `assets/LICENSES.md`; add new ones there.
 8. **Pull before you edit README.md or HANDOVER.md.** Two people edit them.
 
 Definition of done for any change. All of these must pass before you commit:

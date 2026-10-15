@@ -84,7 +84,7 @@ const SEGMENTS = {
     virtual: true, // too heavy to render live in headless Chrome: step a virtual clock instead
     async run(a) {
       const V = "window.viewer";
-      await a.go("http://127.0.0.1:8766/?paused");
+      await a.go("http://127.0.0.1:8766/?paused&quality=high");
       await a.until(`${V} && !document.getElementById("loading")`, 120000);
       const first = await a.eval(`${V}.stops[2].start`);
       await a.eval(`${V}.setSpeed(20); ${V}.setTime(${first} - 7)`);
@@ -114,7 +114,7 @@ const SEGMENTS = {
     video: false,
     async run(a) {
       const V = "window.viewer";
-      await a.go("http://127.0.0.1:8766/?paused");
+      await a.go("http://127.0.0.1:8766/?paused&quality=high");
       await a.until(`${V} && !document.getElementById("loading")`, 120000);
       await a.eval(`document.getElementById("hideIntro").click(); ${V}.setTime(${V}.stops[4].start + 3.2)`);
       await a.wait(1500);
@@ -122,6 +122,57 @@ const SEGMENTS = {
       await a.eval(`${V}.setCam("overhead"); ${V}.setTime(${V}.stops[32].start + 3.2)`);
       await a.wait(2500);
       await a.shot(join(REPO, "docs", "img", "viewer3d-field.jpg"));
+    },
+  },
+  // Fixed-camera screenshots of the 3D replay for before/after comparisons (no video):
+  // runs/lookdev/<LOOKDEV label>-<view>.jpg. Needs `agrisim view runs/dev3d --no-browser --port 8766`.
+  lookdev: {
+    virtual: true,
+    video: false,
+    async run(a) {
+      const V = "window.viewer";
+      const label = process.env.LOOKDEV ?? "now";
+      const dir = join(REPO, "runs", "lookdev");
+      mkdirSync(dir, { recursive: true });
+      await a.go(`http://127.0.0.1:8766/?paused&quality=high&${process.env.LOOKDEV_QUERY ?? ""}`);
+      await a.until(`${V} && !document.getElementById("loading")`, 120000);
+      await a.eval(`document.getElementById("hideIntro").click(); ${V}.setTime(${V}.stops[4].start + 3.2)`);
+      await a.wait(1500);
+      await a.shot(join(dir, `${label}-1-follow.jpg`));
+      // Eye level in the lane, looking along the rows at the parked robot.
+      await a.eval(`${V}.setCam("free"); ${V}.camera.position.set(${V}.camera.position.x - 1.2, 0.55, ${V}.camera.position.z)`);
+      await a.wait(800);
+      await a.shot(join(dir, `${label}-2-eye.jpg`));
+      await a.eval(`${V}.setLayer(4)`); // plain soil: judge the light without the data tint
+      await a.wait(200);
+      await a.shot(join(dir, `${label}-2b-eye-plain.jpg`));
+      await a.eval(`${V}.setLayer(0)`);
+      await a.eval(`${V}.setCam("overhead"); ${V}.setTime(${V}.stops[32].start + 3.2)`);
+      await a.wait(2500);
+      await a.shot(join(dir, `${label}-3-field.jpg`));
+    },
+  },
+  // Frame times of the 3D replay at each graphics level, on this machine's GPU (no video).
+  perf: {
+    gpu: true,
+    video: false,
+    async run(a) {
+      const V = "window.viewer";
+      for (const q of ["low", "medium", "high"]) {
+        await a.go(`http://127.0.0.1:8766/?quality=${q}`);
+        await a.until(`${V} && !document.getElementById("loading")`, 120000);
+        await a.eval(`${V}.setSpeed(20); ${V}.setTime(${V}.stops[4].start - 20); ${V}.setPlaying(true)`);
+        await sleep(3000); // shaders compile, caches fill
+        const r = await a.eval(`new Promise((done) => {
+          const gl = document.querySelector("canvas").getContext("webgl2");
+          const info = gl.getExtension("WEBGL_debug_renderer_info");
+          const gpu = info ? gl.getParameter(info.UNMASKED_RENDERER_WEBGL) : "unknown";
+          const times = []; let last = performance.now();
+          const tick = (now) => { times.push(now - last); last = now; if (times.length < 180) requestAnimationFrame(tick); else { times.sort((x, y) => x - y); done({ gpu, median: times[90].toFixed(1), p95: times[171].toFixed(1), size: innerWidth + "x" + innerHeight + "@" + devicePixelRatio }); } };
+          requestAnimationFrame(tick);
+        })`);
+        console.log(`perf ${q}: median ${r.median} ms, 95th percentile ${r.p95} ms (${r.size}) on ${r.gpu}`);
+      }
     },
   },
   fig1: {
@@ -188,7 +239,8 @@ async function record(name, segment) {
   if (!binary) throw new Error("no Chrome or Edge found; set CHROME to its path");
   const chrome = spawn(binary, ["--headless=new", "--remote-debugging-port=0", `--user-data-dir=${profile}`, "--no-first-run",
     "--no-default-browser-check", "--hide-scrollbars", "--allow-file-access-from-files", "--enable-unsafe-swiftshader",
-    "--ignore-gpu-blocklist", `--window-size=${W},${H}`, "about:blank"]);
+    "--ignore-gpu-blocklist", ...(segment.gpu ? ["--enable-gpu", "--use-angle=d3d11", "--enable-features=Vulkan", "--disable-frame-rate-limit"] : []),
+    `--window-size=${W},${H}`, "about:blank"]);
   const port = await new Promise((ok, fail) => {
     let text = "";
     chrome.stderr.on("data", (c) => { text += c; const m = text.match(/DevTools listening on ws:\/\/[^:]+:(\d+)\//); if (m) ok(Number(m[1])); });
@@ -315,7 +367,7 @@ async function record(name, segment) {
   console.log(`${name}: ${frames.length} frames over ${(t1 - frames[0].t).toFixed(1)} s`);
 }
 
-const names = process.argv.slice(2).length ? process.argv.slice(2) : Object.keys(SEGMENTS).filter((n) => n !== "stills");
+const names = process.argv.slice(2).length ? process.argv.slice(2) : Object.keys(SEGMENTS).filter((n) => !["stills", "lookdev", "perf"].includes(n));
 for (const name of names) {
   if (!SEGMENTS[name]) throw new Error(`unknown segment ${name}; choose from ${Object.keys(SEGMENTS).join(", ")}`);
   await record(name, SEGMENTS[name]);
