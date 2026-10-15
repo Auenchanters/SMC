@@ -128,6 +128,12 @@ export function createTerrain(D, { low = false } = {}) {
   return { height, ridge, geometry: geo, MARGIN };
 }
 
+/** How wet the soil looks, from the simulated moisture (thousandths of VWC per map cell). */
+export function setWetness(tex, values) {
+  values.forEach((v, i) => (tex.image.data[i] = Math.min(255, Math.round(((v ?? 250) / 1000 / 0.5) * 255))));
+  tex.needsUpdate = true;
+}
+
 /** The soil shader: photographed soils, wetness from the simulated moisture, data colours. */
 export function soilMaterial(D, renderer) {
   const load = new THREE.TextureLoader();
@@ -141,11 +147,9 @@ export function soilMaterial(D, renderer) {
   };
   const G = D.S.grid;
   // Simulated true moisture per map cell, for how wet the soil looks (VWC / 0.5 in one byte).
-  const moist = new Uint8Array(G.nx * G.ny);
-  D.S.truth.forEach((v, i) => (moist[i] = Math.min(255, Math.round(((v ?? 250) / 1000 / 0.5) * 255))));
-  const moistTex = new THREE.DataTexture(moist, G.nx, G.ny, THREE.RedFormat);
+  const moistTex = new THREE.DataTexture(new Uint8Array(G.nx * G.ny), G.nx, G.ny, THREE.RedFormat);
   moistTex.magFilter = moistTex.minFilter = THREE.LinearFilter;
-  moistTex.needsUpdate = true;
+  setWetness(moistTex, D.truthAt(0));
   // The data colours, painted by layers.js (RGB + strength in alpha).
   const tintData = new Uint8Array(G.nx * G.ny * 4);
   const tintTex = new THREE.DataTexture(tintData, G.nx, G.ny);

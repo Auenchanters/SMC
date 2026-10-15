@@ -8,6 +8,7 @@ import { createHud } from "./js/hud.js";
 import { createLayers, moistureColour } from "./js/layers.js";
 import { buildMarkers } from "./js/markers.js";
 import { createPlayback } from "./js/playback.js";
+import { createRain } from "./js/rain.js";
 import { buildPlants } from "./js/plants.js";
 import { QUALITY, createView } from "./js/render.js";
 import { buildRover } from "./js/rover.js";
@@ -43,6 +44,7 @@ buildTrees(view, D);
 const rover = buildRover(view);
 const marks = buildMarkers(view, D);
 const layers = createLayers(D, field);
+const rain = createRain(view, D, field);
 marks.colour(moistureColour);
 const cam = createCamera(view, D);
 const hud = createHud(D, view, marks);
@@ -98,6 +100,7 @@ addEventListener("keydown", (e) => {
 });
 
 let lastNow = performance.now();
+let frameWas = lastNow;
 let firstFrame = true;
 function frame(now) {
   tuneQuality(now - lastNow);
@@ -109,6 +112,8 @@ function frame(now) {
   const k = D.readingsBy(t);
 
   rover.pose(here, state ? state.travel : 0, D.ground);
+  rain.update(t, k, cam.controls.target, Math.min(0.1, (now - frameWas) / 1000));
+  frameWas = now;
   const camDist = cam.distance();
   field.soilUniforms.uTintAmount.value = THREE.MathUtils.clamp(camDist / 10, 0.35, 1); // real soil up close, clear map from afar
   scatter.update(now / 1000);

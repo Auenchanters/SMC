@@ -46,6 +46,7 @@ survey:
   probe_spacing: 2.0        # PLACEHOLDER: calibrate
   probe_budget: 60          # PLACEHOLDER: calibrate
   candidate_spacing: 1.0    # PLACEHOLDER: calibrate
+  recheck_probes: 10        # fixed_plus_recheck only: probes kept back to recheck doubtful spots
 
 mapping:
   method: ordinary_kriging

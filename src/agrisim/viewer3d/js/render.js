@@ -203,6 +203,7 @@ export async function createView(D, qualityName = "medium") {
     scene,
     camera,
     sunDir,
+    sun,
     setQuality,
     get quality() {
       return q;

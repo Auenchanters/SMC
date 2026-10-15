@@ -27,9 +27,9 @@ export function createLayers(D, field) {
   const LAYERS = [
     { label: "Robot's map", stops: MOIST, alpha: 0.62, value: (i, k) => milli(S.estimate[k][i]), ticks: moistTicks,
       text: "What the robot thinks the soil moisture is everywhere, worked out from its marks so far. Watch it sharpen with every reading." },
-    { label: "Real moisture", stops: MOIST, alpha: 0.62, value: (i) => milli(S.truth[i]), ticks: moistTicks,
-      text: "The true moisture in this simulated field. The robot never sees it; it is here so you can check the robot's map against it." },
-    { label: "Map error", stops: ERR, alpha: 0.8, value: (i, k) => (S.estimate[k][i] == null ? null : Math.abs(S.estimate[k][i] - S.truth[i]) / 1000),
+    { label: "Real moisture", stops: MOIST, alpha: 0.62, value: (i, k) => milli(D.truthAt(k)[i]), ticks: moistTicks,
+      text: "The true moisture in this simulated field (it changes when it rains). The robot never sees it; it is here so you can check the robot's map against it." },
+    { label: "Map error", stops: ERR, alpha: 0.8, value: (i, k) => (S.estimate[k][i] == null ? null : Math.abs(S.estimate[k][i] - D.truthAt(k)[i]) / 1000),
       ticks: () => [[0, "spot on"], [0.025, "2.5"], [0.05, "5"], [0.1, "10+ % points"]],
       text: "How far the robot's map is from the truth at each spot. Pale = about right, dark red = wrong by 10 % points or more." },
     { label: "Uncertainty", stops: UNC, alpha: 0.8, value: (i, k) => milli(S.sd[k][i]),

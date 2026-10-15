@@ -6,7 +6,7 @@ carry no defaults for them.
 
 import math
 from pathlib import Path
-from typing import Annotated, Literal, Self
+from typing import Annotated, Any, Literal, Self
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, PositiveFloat, PositiveInt, model_validator
@@ -97,12 +97,43 @@ class ProbeConfig(_Model):
     resolution: PositiveFloat
     failure_prob: Fraction
     insertion_time_s: NonNegative
+    # Poor soil contact (an air gap, a stone, a dry crust): the probe reads drier than the soil
+    # by up to bad_contact_drop and does not know it.
+    bad_contact_prob: Fraction = 0.0
+    bad_contact_drop: NonNegative = 0.0
 
 
 class SurveyConfig(_Model):
     probe_spacing: PositiveFloat
     probe_budget: PositiveInt
     candidate_spacing: PositiveFloat
+    recheck_probes: Annotated[int, Field(ge=0)] = 0  # fixed_plus_recheck: probes kept for rechecks
+
+    @model_validator(mode="after")
+    def _check(self) -> Self:
+        if self.recheck_probes >= self.probe_budget:
+            raise ValueError("recheck_probes must be less than probe_budget")
+        return self
+
+
+class RainEvent(_Model):
+    start_s: NonNegative  # mission time
+    duration_s: PositiveFloat
+    rate_mm_per_h: NonNegative
+
+
+class WeatherConfig(_Model):
+    """Water balance of the soil layer the probe measures (weather.py). Optional: without it the
+    soil does not change during a mission."""
+
+    layer_depth: PositiveFloat  # m of soil the probe reads; rain spreads through it
+    field_capacity: PositiveFloat  # VWC above which water drains away
+    drainage_per_h: NonNegative  # fraction of the water above field capacity drained per hour
+    evapotranspiration_mm_per_h: NonNegative  # sun, heat and the plants drying the soil
+    infiltration_cv: NonNegative  # spatial variation of how much rain soaks in (runoff, crust)
+    infiltration_corr_length: PositiveFloat  # m
+    step_s: PositiveFloat
+    rain: tuple[RainEvent, ...] = ()
 
 
 class MappingConfig(_Model):
@@ -120,6 +151,7 @@ class SimConfig(_Model):
     probe: ProbeConfig
     survey: SurveyConfig
     mapping: MappingConfig
+    weather: WeatherConfig | None = None
     dt: PositiveFloat = 0.05
 
     @model_validator(mode="after")
@@ -144,7 +176,20 @@ class SimConfig(_Model):
         return self
 
 
+def _merge(base: dict[str, Any], over: dict[str, Any]) -> dict[str, Any]:
+    out = dict(base)
+    for k, v in over.items():
+        out[k] = _merge(out[k], v) if isinstance(v, dict) and isinstance(out.get(k), dict) else v
+    return out
+
+
+def _read(path: Path) -> dict[str, Any]:
+    with path.open(encoding="utf-8") as fh:
+        data: dict[str, Any] = yaml.safe_load(fh) or {}
+    base = data.pop("extends", None)  # a scenario: another config file plus these changes
+    return _merge(_read(path.parent / base), data) if base else data
+
+
 def load(path: str | Path) -> SimConfig:
-    """Read and validate a YAML config file."""
-    with Path(path).open(encoding="utf-8") as fh:
-        return SimConfig.model_validate(yaml.safe_load(fh))
+    """Read and validate a YAML config file (following `extends:` to its base file)."""
+    return SimConfig.model_validate(_read(Path(path)))

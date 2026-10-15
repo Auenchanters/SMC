@@ -81,6 +81,9 @@ export async function loadSurvey(url) {
     stops,
     stopAt,
     readingsBy: (t) => stops.filter((s) => s.reveal <= t).length,
+    // With weather the real moisture changes: truthAt(k) is the field when reading k was taken.
+    truthAt: (k) => (S.truth_k ? S.truth_k[k] : S.truth),
+    rainAt: (t) => (S.rain ?? []).reduce((r, e) => r + (t >= e.start_s && t < e.start_s + e.duration_s ? e.rate_mm_per_h : 0), 0),
     rand: mulberry(S.seed * 7919 + 11),
   };
 }

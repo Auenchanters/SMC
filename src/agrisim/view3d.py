@@ -16,8 +16,9 @@ import numpy as np
 import numpy.typing as npt
 
 from agrisim.io import metrics_dict
-from agrisim.mapping import make_mapper
-from agrisim.metrics import map_metrics
+from agrisim.metrics import map_metrics, truth_on_grid
+from agrisim.sim import map_now
+from agrisim.weather import rain_mm
 
 if TYPE_CHECKING:
     from agrisim.sim import RunResult
@@ -51,20 +52,32 @@ def scene_dict(result: "RunResult") -> dict[str, Any]:
     idx = _path_samples(result.times, cfg.dt)
     p = result.poses[idx]
 
-    # The map as it stood after each reading, rebuilt from the readings in order.
-    mapper = make_mapper(cfg.mapping)
-    est, sd, rmse = [], [], []
-    for k in range(len(result.readings) + 1):
-        if k:
-            mapper.update(result.readings[k - 1])
-        mean, var = mapper.estimate(result.grid)
+    # The map as it stood after each reading, rebuilt from the readings in order. With weather,
+    # the truth changes too: truth_k[k] is the real moisture when reading k was taken.
+    readings = result.readings
+    est, sd, rmse, truth_k = [], [], [], []
+    for k in range(len(readings) + 1):
+        t = readings[k - 1].t if k else 0.0
+        mean, var = map_now(cfg, result.grid, readings[:k], t)
+        tg = truth_on_grid(result.truth_at(t), result.grid) if cfg.weather else result.truth_grid
         est.append(_milli(mean))
         sd.append(_milli(np.sqrt(var)))
-        r = map_metrics(result.truth_grid, mean, var, cfg.mapping.dry_threshold).rmse
-        rmse.append(round(r, 5) if np.isfinite(r) else None)
+        e = map_metrics(tg, mean, var, cfg.mapping.dry_threshold).rmse
+        rmse.append(round(e, 5) if np.isfinite(e) else None)
+        truth_k.append(_milli(tg))
+    # A reading taken beside an earlier one is a recheck; say why the rover went back.
+    again: list[str | None] = []
+    near = cfg.survey.candidate_spacing / 2
+    for k, r in enumerate(readings):
+        before = [q for q in readings[:k] if np.hypot(q.x - r.x, q.y - r.y) < near]
+        if not before:
+            again.append(None)
+            continue
+        wet = cfg.weather is not None and rain_mm(cfg.weather, before[-1].t, r.t) > 0.5
+        again.append("rain" if wet else "check")
 
     return {
-        "version": 1,
+        "version": 2,
         "seed": result.seed,
         "policy": result.policy,
         "field": cfg.field.model_dump(),
@@ -84,11 +97,13 @@ def scene_dict(result: "RunResult") -> dict[str, Any]:
             "th": np.round(p[:, 2], 4).tolist(),
         },
         "probes": [
-            {"t": round(r.t, 2), "x": round(r.x, 3), "y": round(r.y, 3), "v": r.value}
-            for r in result.readings
+            {"t": round(r.t, 2), "x": round(r.x, 3), "y": round(r.y, 3), "v": r.value, "again": a}
+            for r, a in zip(readings, again, strict=True)
         ],
         "grid": {"nx": result.grid.nx, "ny": result.grid.ny, "res": result.grid.resolution},
-        "truth": _milli(result.truth_grid),
+        "truth": _milli(result.truth_grid),  # at the end of the mission
+        "truth_k": truth_k if cfg.weather else None,
+        "rain": [e.model_dump() for e in cfg.weather.rain] if cfg.weather else [],
         "estimate": est,  # estimate[k] = map after k readings
         "sd": sd,  # kriging standard deviation after k readings (None where undefined)
         "rmse": rmse,

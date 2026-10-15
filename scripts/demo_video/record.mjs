@@ -152,6 +152,26 @@ const SEGMENTS = {
       await a.shot(join(dir, `${label}-3-field.jpg`));
     },
   },
+  // Before, during and after the shower in a weather run (no video):
+  // runs/lookdev/weather-*.jpg. Needs a rain run served on port 8766, e.g.
+  // `agrisim run --config configs/scenarios/rain_shower.yaml --seed 7 --view`, then `agrisim view`.
+  weather: {
+    virtual: true,
+    video: false,
+    async run(a) {
+      const V = "window.viewer";
+      const dir = join(REPO, "runs", "lookdev");
+      mkdirSync(dir, { recursive: true });
+      await a.go(`http://127.0.0.1:8766/?paused&quality=high`);
+      await a.until(`${V} && !document.getElementById("loading")`, 120000);
+      await a.eval(`document.getElementById("hideIntro").click()`);
+      for (const [name, t] of [["1-before", 500], ["2-raining", 1000], ["3-after", 1500]]) {
+        await a.eval(`${V}.setCam("follow"); ${V}.setTime(${t})`);
+        await a.wait(2500);
+        await a.shot(join(dir, `weather-${name}.jpg`));
+      }
+    },
+  },
   // Frame times of the 3D replay at each graphics level, on this machine's GPU (no video).
   perf: {
     gpu: true,
@@ -369,7 +389,7 @@ async function record(name, segment) {
   console.log(`${name}: ${frames.length} frames over ${(t1 - frames[0].t).toFixed(1)} s`);
 }
 
-const names = process.argv.slice(2).length ? process.argv.slice(2) : Object.keys(SEGMENTS).filter((n) => !["stills", "lookdev", "perf"].includes(n));
+const names = process.argv.slice(2).length ? process.argv.slice(2) : Object.keys(SEGMENTS).filter((n) => !["stills", "lookdev", "weather", "perf"].includes(n));
 for (const name of names) {
   if (!SEGMENTS[name]) throw new Error(`unknown segment ${name}; choose from ${Object.keys(SEGMENTS).join(", ")}`);
   await record(name, SEGMENTS[name]);

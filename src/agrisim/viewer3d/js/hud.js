@@ -80,6 +80,8 @@ export function createHud(D, view, marks) {
         const s = state.stop;
         status = PHASE[state.phase] ?? state.phase;
         sub = `Stop ${s.i + 1} of ${N}`;
+        if (s.again === "rain") sub += ": checking again, it has rained since the first reading here";
+        if (s.again === "check") sub += ": checking again, the first reading here did not fit its neighbours";
         if (t >= s.reveal) reading = `Reading: ${verdict(s.v)}`;
       } else if (k < N) {
         const next = stops[k];
@@ -95,12 +97,15 @@ export function createHud(D, view, marks) {
       }
       const contacts = S.contacts.filter((c) => c.t <= t).length;
       const err = S.rmse[k];
-      const text = [status, sub, reading, k, failed, here.dist.toFixed(0), contacts, err].join("|");
+      const rain = D.rainAt(t);
+      const weather = rain ? `Raining ${rain} mm an hour: the soil is getting wetter, so earlier readings go out of date.` : S.truth_k ? "Not raining. Sun and plants slowly dry the soil." : "";
+      const text = [status, sub, reading, weather, k, failed, here.dist.toFixed(0), contacts, err].join("|");
       if (text === lastText) return;
       lastText = text;
       $("status").textContent = status;
       $("substatus").textContent = sub;
       $("reading").textContent = reading;
+      $("weather").textContent = weather;
       const shown = state && t >= state.stop.reveal ? state.stop : !state && k > 0 ? stops[k - 1] : null;
       $("reading").style.color = shown && (shown.v == null || shown.v < DRY) ? "var(--warn)" : "var(--text)";
       $("sReadings").textContent = `${k} of ${N}${failed ? ` (${failed} failed)` : ""}`;

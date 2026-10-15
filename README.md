@@ -7,7 +7,7 @@
 [![CI](https://github.com/Auenchanters/SMC/actions/workflows/ci.yml/badge.svg)](https://github.com/Auenchanters/SMC/actions/workflows/ci.yml)
 [![Python 3.13](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Windows native](https://img.shields.io/badge/Windows-native,_no_WSL-0078D4?logo=windows&logoColor=white)](#quickstart)
-[![tests](https://img.shields.io/badge/tests-66_passing-3FB950)](tests/)
+[![tests](https://img.shields.io/badge/tests-75_passing-3FB950)](tests/)
 [![Gymnasium](https://img.shields.io/badge/Gymnasium-1.3-0081A5)](https://gymnasium.farama.org/)
 [![Rerun](https://img.shields.io/badge/Rerun-0.39-6E40C9)](https://rerun.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -80,13 +80,32 @@ All numbers below come from `agrisim eval` (held-out fields, seeds 100-149, budg
 - **Cheap but rougher.** Variance-per-cost finishes in less than half the time and is about 8% worse on map error.
 - **RL did not win yet.** The first learned policy behaves close to random. Likely causes are listed in the [ExecPlan](EXECPLAN.md#surprises--discoveries).
 
+### Weather and going back to check
+
+The soil can now change during a mission. Rain soaks in (more in some spots than others), and sun and plants dry it out. The probe also sometimes misreads, because of poor soil contact. Two strategies let the robot go back to a spot it doubts: `recheck` (it chooses freely between new spots and doubted ones) and `fixed_plus_recheck` (the full route, then a few rechecks). The robot knows how much it rained, from its rain gauge, and corrects its older readings for it. It does not know how much soaked in at each spot.
+
+Scenario `configs/scenarios/rain_shower.yaml` (a 10-minute downpour 10 minutes in, 1 misread in 20), 30 fields, budget 60:
+
+| Strategy | Map error (RMSE) | Distance | Mission time |
+|---|---|---|---|
+| recheck | 0.0276 ± 0.0020 | 1501 m | 65 min |
+| greedy_variance | 0.0280 ± 0.0016 | 1502 m | 66 min |
+| fixed_plus_recheck | 0.0300 ± 0.0014 | 728 m | 37 min |
+| fixed_spacing | 0.0308 ± 0.0012 | 466 m | 28 min |
+
+Going back helps a little, by 2 to 3% on the same fields, and it does so on 18 of 30. That is not conclusive. With only 30 probes it does not help: a new spot is worth more than a second look. Details are in the [ExecPlan](EXECPLAN.md#outcomes--retrospective).
+
+```powershell
+uv run agrisim run --config configs/scenarios/rain_shower.yaml --seed 7 --policy fixed_plus_recheck --view
+```
+
 ## How it works
 
 Per mission, from one config file and one integer seed:
 
 1. **Build a field.** Rows, plants with random canopy sizes and gaps, lanes, headlands ([field.py](src/agrisim/field.py)). Config validation refuses a rover that would not fit in a lane or could not turn in the headland, and the error message states the numbers.
-2. **Hide a believable moisture field.** A spatially correlated Gaussian random field made with FFT, with wetter drip-line stripes along the rows plus random dry patches (a clogged emitter) and wet patches (a leak) ([soil.py](src/agrisim/soil.py)). Only the probe, the metrics and the RL reward may read it.
-3. **Choose where to probe.** Fixed spacing, random, greedy max-variance, variance per travel cost, or a trained PPO policy ([policies.py](src/agrisim/policies.py)).
+2. **Hide a believable moisture field.** A spatially correlated Gaussian random field made with FFT, with wetter drip-line stripes along the rows plus random dry patches (a clogged emitter) and wet patches (a leak) ([soil.py](src/agrisim/soil.py)). Only the probe, the metrics and the RL reward may read it. With a `weather:` section it changes during the mission: rain soaks in unevenly, while sun and plants dry it ([weather.py](src/agrisim/weather.py)).
+3. **Choose where to probe.** Fixed spacing, random, greedy max-variance, variance per travel cost, recheck (also goes back to readings it doubts), or a trained PPO policy ([policies.py](src/agrisim/policies.py)).
 4. **Drive there safely.** Paths use only lane and headland centrelines ([planning.py](src/agrisim/planning.py)). The rover turns in place in headlands, follows lanes with pure pursuit, and **reverses** instead of making a U-turn inside a lane ([control.py](src/agrisim/control.py)). Every pose is checked against every nearby canopy ([safety.py](src/agrisim/safety.py)).
 5. **Probe.** The reading is the footprint average plus bias, Gaussian noise and quantisation, and probes sometimes fail ([sensor.py](src/agrisim/sensor.py)).
 6. **Map.** Ordinary kriging with a fitted variogram gives a mean map and a variance map. With too few readings it falls back to the field average; it never crashes ([mapping.py](src/agrisim/mapping.py)).
@@ -98,7 +117,7 @@ The same config and seed always give a byte-identical `metrics.json`.
 
 ![agrisim architecture](docs/img/architecture.svg)
 
-Everything is driven by one YAML file ([configs/demo.yaml](configs/demo.yaml)). Every physical number in it is marked `# PLACEHOLDER: calibrate`.
+Everything is driven by one YAML file ([configs/demo.yaml](configs/demo.yaml)). Every physical number in it is marked `# PLACEHOLDER: calibrate`. Scenarios in [configs/scenarios/](configs/scenarios/) start from it with `extends:` and change only what differs, for example adding a rain shower.
 
 ## 3D replay
 
@@ -225,7 +244,7 @@ uv run pytest -q
 .\scripts\check_licenses.ps1
 ```
 
-There are 66 tests, about 50 to 140 s, with no network needed. They cover:
+There are 75 tests, about 50 to 140 s, with no network needed. They cover:
 
 - geometry validation;
 - field determinism;
@@ -305,10 +324,11 @@ The planning documents are [context.md](context.md) (verified research, licence 
 - **Kriging smooths away small dry patches.** On 8 to 17 of every 50 fields, the map calls no cell dry at all.
 - **The first RL policy does not beat the baselines.** Likely fixes are a fully convolutional action head and longer training. These are untested.
 - **The RL environment abstracts driving** as lane-graph distance divided by speed. Evaluation, however, runs the policy through the full kinematic simulation, under the same conditions as every baseline.
-- **Moisture does not change over time** within a mission (no irrigation or evaporation dynamics yet).
+- **Weather is simple.** It is a single-layer water balance with rain, evapotranspiration and drainage. There is no irrigation yet, and the robot's own weather model is nearly perfect, which flatters it. Without a `weather:` section, the soil does not change during a mission.
 
 ## Roadmap
 
+- **A test bench for field robots.** The long-term aim is a "wind tunnel" for farm robots: many fields, crops and weather scenarios to test a robot against before it goes outside. The staged plan is in the [ExecPlan roadmap](EXECPLAN.md#roadmap-toward-a-test-bench-for-field-robots). It starts with calibrating against one real tomato field, because a test bench is only as good as its match to reality.
 - **Calibrate.** Agronomist input for tomato dry thresholds, real row and plant spacing, the chosen probe's accuracy and insertion time ([context.md §12](context.md)).
 - **Better learned policy.** A per-cell (fully convolutional) action head and longer training, compared on the same held-out seeds.
 - **Phase 2.** A Gazebo Jetty and ROS 2 Lyrical world (in WSL2) that calls this package for probe readings, so soil logic lives in one place.

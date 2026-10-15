@@ -29,6 +29,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 #now { right: 16px; top: 16px; width: 330px; }
 #status { font-size: 19px; font-weight: 650; line-height: 1.3; }
 #substatus { color: var(--dim); margin-top: 2px; min-height: 1.4em; }
+#weather { color: var(--dim); margin-top: 2px; }
+#weather:empty { display: none; }
 #reading { margin-top: 8px; font-size: 16px; font-weight: 600; min-height: 1.4em; }
 .stats { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
 .stats span:nth-child(even) { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
@@ -86,6 +88,7 @@ kbd { font: 12px Consolas, monospace; border: 1px solid var(--line); border-radi
   <div id="status">Loading…</div>
   <div id="substatus"></div>
   <div id="reading"></div>
+  <div id="weather"></div>
   <div class="stats">
     <span>Readings taken</span><span id="sReadings">0</span>
     <span>Distance driven</span><span id="sDistance">0 m</span>

@@ -17,6 +17,7 @@ from agrisim.mapping import GlobalMeanMapper, IDWMapper, Mapper
 from agrisim.metrics import map_metrics
 from agrisim.policies import STRATEGIES
 from agrisim.sim import RunResult, run_survey
+from agrisim.weather import current_view
 
 METRICS = (
     "rmse",
@@ -60,7 +61,9 @@ class BenchRow:
 
 
 def _baseline_rmse(result: RunResult, mapper: Mapper) -> float:
-    for r in result.readings:
+    cfg = result.cfg
+    end = result.run_metrics.mission_time_s
+    for r in current_view(result.readings, cfg.weather, end, cfg.soil.vwc_clip):
         mapper.update(r)
     mean, var = mapper.estimate(result.grid)
     return map_metrics(result.truth_grid, mean, var, result.cfg.mapping.dry_threshold).rmse

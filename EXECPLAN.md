@@ -27,9 +27,14 @@ opens a Rerun viewer showing the field, plants, lanes, the moving rover, probe p
 - [x] Outside the milestones: rover hardware design v1 in `hardware/rover-v1/` (2026-10-14), redesigned with a self-cleaning probe cartridge and under-leaf camera arms (be342be).
 - [x] 3D replay viewer and a plainer Rerun layout (2026-10-14), after the team lead found the viewer hard to understand. See Decision Log.
 - [ ] M10 Photoreal graphics for the 3D replay (started 2026-10-15). Phase 1 (modules), phase 2 (lighting) and phase 3 (field) done 2026-10-15; phase 4 (plants) next.
+- [x] M11 Weather, probe misreads and rechecks (2026-10-15). Rain and evapotranspiration change the soil during a mission; the rover corrects old readings with its rain gauge and can go back to spots it doubts (`recheck`, `fixed_plus_recheck`). Scenario configs in `configs/scenarios/`. See Outcomes for the honest result.
+- [ ] M12 onward: toward a test bench for field robots (roadmap below, not started).
 - [x] Pre-handover review (2026-10-14): two crash bugs fixed, Rerun layout fixed, hardware CI job added, demo video and its recording scripts added. See Surprises, Decision Log and Outcomes.
 
 ## Surprises & Discoveries
+
+- M11: the first "odd reading" rule (more than 2x probe noise away from the neighbours) treated ordinary soil variation between sparse readings as misreads and wasted probes; RMSE got worse than without rechecks. Comparing against the field's own typical disagreement (median-based, 3x) fixed that. Evidence: budget-30 recheck RMSE 0.0355 with the old rule vs 0.0344 with the new one (seeds 0-29).
+- M11: correcting old readings with the rain gauge removes most of the error rain causes, so going back for rain alone rarely beats measuring somewhere new. Rechecks pay off mostly for misreads and only once the field is already well covered (budget 60, not 30).
 
 (Record unexpected behaviour, library quirks, version issues and evidence here as you go.)
 
@@ -64,6 +69,12 @@ opens a Rerun viewer showing the field, plants, lanes, the moving rover, probe p
 - Review (2026-10-14): The Rerun viewer never showed the field (rover, plants, lanes, probes). Its automatic layout made views only for the four map images and the RMSE plot. `RerunLogger` now sends an explicit blueprint: field view (flipped so north is up, like the maps), RMSE over the whole run, the four maps, playback at 30x. Found while recording the demo video in the Rerun web viewer.
 
 ## Decision Log
+
+- Decision (M11): weather is a small bucket water balance written here (about 60 lines), not AquaCrop-OSPy. Rationale: we need minutes-scale moisture change in the probe's top layer during one mission, not a season of crop growth; no new dependency. Revisit for season-long scenarios (roadmap step 4). Date: 2026-10-15.
+- Decision (M11): `weather` is optional in the config. Without it nothing changes over time and every existing number (README, HANDOVER, bench, PPO evaluation) is unchanged; the probe's bad-contact draws are also taken only when `bad_contact_prob > 0`, so older probe noise streams do not shift. The weather random stream is a fifth `SeedSequence` child, which leaves the first four identical. Date: 2026-10-15.
+- Decision (M11): the rover's water-balance model is the truth's model except for the spatial soak-in. This is optimistic (a real rover's model will be off in field capacity, drainage and evapotranspiration too), so rechecks are probably worth more in a real field than here. Recorded as an open item rather than tuned. Date: 2026-10-15.
+- Decision (M11): a newer reading replaces an older one at the same spot rather than averaging them, because after rain the old one is out of date. Rechecks probe 0.15 m beside the old hole, as a real probe would. Date: 2026-10-15.
+- Decision (M11): the Gymnasium environment and the trained PPO model stay without weather and without rechecks (unchanged action mask), so the M8 evaluation remains reproducible. Date: 2026-10-15.
 
 - Decision: Layer A is pure Python with no ROS dependency. Rationale: fast iteration, headless training, runs on every team laptop; soil logic must live in one place that the later Gazebo layer calls. Date: 2026-10-13.
 - Decision: Our own FFT Gaussian-random-field generator instead of GSTools. Rationale: GSTools is LGPL-3.0; the team's rule forbids copyleft dependencies when a permissive option exists. Date: 2026-10-13.
@@ -126,6 +137,11 @@ opens a Rerun viewer showing the field, plants, lanes, the moving rover, probe p
 - Decision (review, 2026-10-14): The demo video (`docs/media/agrisim-demo.mp4`, 2 min 46 s, 6.4 MB) is committed. It is made by `scripts/demo_video/` (Node + headless Chrome screencast over the DevTools protocol + ffmpeg). The terminal part replays real captured output at real timing; waits over 1.6 s are sped up and labelled on screen. No new Python dependency.
 
 ## Outcomes & Retrospective
+
+- M11 (2026-10-15): 75 tests pass; ruff, mypy strict and the licence gate pass. The default `configs/demo.yaml` gives identical results for every existing strategy (checked: same RMSE and path to the last digit for seed 7 before and after). Benchmark on `configs/scenarios/rain_shower.yaml` (10-minute 20 mm/h shower from 10 min, 5% misreads), seeds 0-29, `agrisim bench --strategies fixed_spacing,greedy_variance,recheck,fixed_plus_recheck`:
+  - Budget 60: RMSE fixed 0.0308 +/- 0.0012, fixed_plus_recheck 0.0300 +/- 0.0014, greedy_variance 0.0280 +/- 0.0016, recheck 0.0276 +/- 0.0020. Per seed, fixed_plus_recheck beats fixed by 0.00075 on average (standard error 0.00049, better on 18/30 seeds) and recheck beats greedy by 0.00041 (s.e. 0.00038, 18/30). A small gain, not statistically conclusive. fixed_plus_recheck drives 728 m in 37 min vs 466 m in 28 min.
+  - Budget 30: no gain (fixed_plus_recheck vs fixed +0.00005, recheck vs greedy +0.00010). With few probes, a new spot is worth more than a second look.
+  - Zero plant contacts in every run.
 
 (Fill in at each milestone and at completion: what works, what does not, what was learned, what remains.)
 
@@ -229,6 +245,27 @@ Phases, each ending with before/after screenshots for the team lead:
 5. Rover: detailed parts modelled in Blender at real dimensions, placed by `model.mjs` (still the single source of truth); materials; a soil cut-away view showing the probe rods in the ground.
 6. Surroundings and polish: field edges, grass and weeds, hedgerow or tree line, haze, restyled panels.
 7. Verification and handover: frame-time checks per quality level, fixed-camera screenshot comparisons, demo video and README images re-recorded, HANDOVER, CLAUDE.md and this plan updated.
+
+### M11 Weather, probe misreads and rechecks
+Requested by the team lead (2026-10-15): add weather such as rain so the soil moisture changes, and let the robot go back to points it is unsure about instead of only following a predefined path.
+
+- `weather.py`: the soil layer the probe reads (`layer_depth`) is a bucket per grid cell, stepped every `step_s`: rain soaks in (scaled by a smooth random infiltration field with `infiltration_cv`, for runoff and crusting), evapotranspiration removes water, water above `field_capacity` drains at `drainage_per_h`. `SoilDynamics` is the hidden truth over time; `sim.Truth(t)` hands the probe the soil at the moment of each reading, and the map is scored against the soil at the end of the mission.
+- The rover's side (`weather.current_view`): it knows the rain gauge and the same bucket model, but not how much rain soaked in at each spot. Older readings are brought forward to "now" with the model; a newer valid reading within 0.3 m replaces an older one; failed readings are dropped.
+- Probe misreads (`probe.bad_contact_prob`, `bad_contact_drop`): poor soil contact reads drier than the soil and the probe does not know it.
+- `recheck` strategy: greedy max-variance over new sites and doubted readings alike. Doubt = (infiltration_cv x the rain's moisture change since the reading)^2 + how far a single reading is from its 6 nearest neighbours beyond 3x the field's typical (median-based) disagreement. A second reading at a spot clears the "odd" part, so a real local anomaly is not rechecked forever. A recheck probes 0.15 m along the lane from the old hole.
+- `fixed_plus_recheck`: the full-coverage route with `survey.recheck_probes` fewer stops, then that many `recheck` choices.
+- `extends:` in a config file: a scenario is a base config plus changes (`configs/scenarios/rain_shower.yaml`, `hot_afternoon.yaml`).
+- 3D replay: rain streaks and dimmer light while it rains, soil wetness and the "Real moisture" layer follow the simulated moisture, the status panel says when it rains and why the robot checks a spot again.
+
+### Roadmap: toward a test bench for field robots
+The team's long-term aim (2026-10-15): make agrisim for field robots what a wind tunnel is for aerodynamics, a place to test a robot and its decision-making against many fields, crops and weather before it goes outside. Order matters: a test bench is only worth trusting once it has been checked against real measurements.
+
+1. Calibrate and validate one crop first (tomato): real probe readings and weather-station data from one field over a few weeks; fit the soil, probe and weather numbers that are now placeholders; report how far the simulator is from the field. Without this step, results stay "inside the simulator only".
+2. Scenario library and a scorecard: named scenarios (dry spell, storm mid-survey, waterlogged corner, misreading probe, blocked lane) run by `agrisim bench` across many seeds, so a change to a robot or a strategy is scored on all of them at once.
+3. Crops as profiles: move crop numbers (row and plant spacing, canopy size and growth, root depth, dry threshold, water use per growth stage) into `configs/crops/<crop>.yaml`; the field generator and the 3D replay read the profile. Add a second crop only when someone needs it and has its numbers.
+4. Richer weather and soil: irrigation schedules (drip pulses wet the rows the lane probe does not see), a daily cycle of evapotranspiration, soil texture zones, several depths. Consider AquaCrop-OSPy (context.md) if crop water use needs to be realistic.
+5. Robots as plug-ins: the probe model, rover size and speed, and the strategy are already swappable; add a small interface so a team can test its own robot or sensor model without editing agrisim.
+6. Phase 2 (Gazebo / ROS 2) calls this package for soil truth, so the physics test bench and the decision test bench share one soil.
 
 ## Concrete Steps
 

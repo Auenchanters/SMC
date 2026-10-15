@@ -34,5 +34,8 @@ class MoistureProbe:
         if fail:
             return ProbeReading(x, y, t, None, False, self.sensor_id)
         raw = truth.mean_over_disc(x, y, c.footprint_radius) + c.bias + noise
+        if c.bad_contact_prob > 0:  # extra draws only when enabled, so older runs are unchanged
+            bad, drop = rng.random() < c.bad_contact_prob, rng.uniform(0.5, 1.0)
+            raw -= c.bad_contact_drop * drop if bad else 0.0
         value = float(np.clip(np.round(raw / c.resolution) * c.resolution, 0.0, 1.0))
         return ProbeReading(x, y, t, value, True, self.sensor_id)

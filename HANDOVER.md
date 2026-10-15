@@ -3,7 +3,7 @@
 You are taking over a finished first version of the soil-moisture survey simulator and the first rover hardware design. This page tells you how to set it up, how to test it end to end, what results to expect, and what is still open. Read [README.md](README.md) first for what the project does, or watch the 3-minute demo: [docs/media/agrisim-demo.mp4](docs/media/agrisim-demo.mp4). The quickest way to see what the project does is the 3D replay: `uv run agrisim run --config configs/demo.yaml --seed 7 --view`.
 
 State at handover (14 Oct 2026):
-- ExecPlan milestones M0 to M9 are done, plus a 3D replay viewer. 70 tests pass.
+- ExecPlan milestones M0 to M9 are done, plus a 3D replay viewer and M11 (weather, probe misreads, rechecks). 75 tests pass.
 - CI is green: tests on Windows and Ubuntu, plus a hardware job that rebuilds and audits the rover figures.
 - Every decision, surprise and result is in [EXECPLAN.md](EXECPLAN.md).
 - Nothing is half-finished in the code. Open items are in section 3.
@@ -81,6 +81,7 @@ Work through these in order and tick each one. "Expected" values came from the t
 | B4 | `uv run agrisim run --config configs/demo.yaml --seed 7 --rerun` | The Rerun viewer opens. Left: "The field from above" (robot in red, plants in green, readings as dots) and "Average map error over time". Right: a "How to read this" panel and the four maps with plain names. Press play or drag the time bar: the survey replays at 30x and the maps update after each reading. The folder gains `recording.rrd`. |
 | B4b | `uv run agrisim run --config configs/demo.yaml --seed 7 --view` | Prints the same numbers as B1, then `3D viewer: http://127.0.0.1:<port>/` and opens it in your browser. The robot drives between tomato rows, stops, pushes the probe in; marks appear and the map fills in. The "Right now" panel ends at "Survey complete", `60 of 60 (1 failed)`, `466 m`, plants touched `0`, map off by `±3.0 % points`. Ctrl+C in the terminal stops it. The folder gains `scene.json` (about 1.2 MB). |
 | B4c | `uv run agrisim view runs\<the B4b folder>` | The same replay opens again without re-running. On a folder without `scene.json` it says to use `--view` (exit code 2). |
+| B4d | `uv run agrisim run --config configs/scenarios/rain_shower.yaml --seed 7 --policy fixed_plus_recheck --view` | RMSE `0.0303`, `59 valid / 60 used`, path `641.0 m / 2054 s`, plant contacts `0`. In the replay, from 10:00 to 20:00 of mission time it rains: streaks fall, the light dims, the soil turns darker and wetter, and the panel says "Raining 20 mm an hour". After the route, the robot goes back to a few spots; the panel says "checking again" and why. |
 | B5 | `uv run agrisim run --config configs/demo.yaml --seed 7 --policy greedy_variance --budget 30` | plant contacts `0`; the rover drives in reverse inside lanes rather than turning around |
 | B6 | `uv run agrisim run --config configs/demo.yaml --seed 7 --policy ppo --model models/ppo_v1/model.zip --budget 30` | RMSE `0.0348`, `29 valid / 30 used`, path `783.6 m`, plant contacts `0` |
 
@@ -148,6 +149,9 @@ Report problems as GitHub issues with the command, the seed and the config file 
 | 3D replay: JavaScript is not linted or unit-tested | The Python side (scene data, server, model copy) is tested. The page itself was checked by eye and by the demo-video recorder. If it grows, add a small headless-browser smoke test |
 | 3D replay: water or soil effects | Considered [threejs-particle-fluids](https://github.com/dgreenheck/threejs-particle-fluids) (MIT) for drip-irrigation water or the probe's air blast. Not used: it needs WebGPU with no WebGL fallback, so the page would stop working on some laptops and in the headless recorder |
 | A config can leave no probe site (D8) | The run completes with `nan` map metrics. A validation warning could be added if this confuses users |
+| Weather (M11) is optimistic | The robot's water-balance model matches the truth's except for soak-in, so rechecks are likely worth more in a real field. There is no irrigation (drip wets the rows, but the probe stands in the lanes), and no daily cycle. See the ExecPlan M11 Decision Log |
+| PPO environment has no weather or rechecks | On purpose, so the M8 evaluation stays reproducible. Add both before retraining |
+| Test bench for field robots (long-term aim) | The staged roadmap is in EXECPLAN.md ("Roadmap: toward a test bench"). Step 1 is calibrating against one real field |
 | Phase 2 (Gazebo / ROS 2 in WSL2) | Separate plan, not started |
 
 ## 4. Where things live
@@ -166,5 +170,7 @@ Report problems as GitHub issues with the command, the seed and the config file 
 - **Fixed:** the Rerun viewer did not show the field view (rover, plants, probes) at all, only the maps (B4).
 - **Added:** the CI hardware job, the demo video and its scripts, and section 0 of this file.
 - **Added:** the 3D replay (`--view` and `agrisim view`, B4b and B4c), built so a first-time user can follow it without help. The Rerun viewer got plain panel names and a "How to read this" panel (B4).
+
+- **Added (M11):** weather (`weather:` in a config; `weather.py`), probe misreads (`probe.bad_contact_*`), the `recheck` and `fixed_plus_recheck` strategies, `extends:` scenario configs in `configs/scenarios/`, and rain in the 3D replay (B4d). Without a `weather:` section everything behaves exactly as before.
 
 Details are in the ExecPlan's Surprises & Discoveries section.

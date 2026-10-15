@@ -141,7 +141,7 @@ class AdaptiveProbingEnv(gym.Env[Obs, np.int64]):
             ep_seed = int(options["episode_seed"])
         else:
             ep_seed = int(self.np_random.integers(TRAIN_SEED_OFFSET, 2**31 - 1))
-        rng_field, rng_soil, self._rng_probe, _ = world_rngs(ep_seed)
+        rng_field, rng_soil, self._rng_probe, *_ = world_rngs(ep_seed)
         layout = FieldLayout.generate(self.cfg.field, rng_field)
         self._sites_now = self._sites(layout)
         if len(self._sites_now) != self.n_sites:

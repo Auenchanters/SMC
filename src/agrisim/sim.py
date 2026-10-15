@@ -1,7 +1,8 @@
 """Survey simulation: drive, probe, map, score."""
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
+from itertools import chain
 from pathlib import Path
 
 import numpy as np
@@ -9,15 +10,16 @@ import numpy.typing as npt
 
 from agrisim.config import SimConfig
 from agrisim.control import PurePursuit, drive_segment, poses
-from agrisim.field import FieldLayout
+from agrisim.field import FieldLayout, ProbeSite
 from agrisim.mapping import GridSpec, make_mapper
 from agrisim.metrics import MapMetrics, RunMetrics, map_metrics, run_metrics, truth_on_grid
 from agrisim.planning import LaneGraph, LanePlanner, Waypoint
-from agrisim.policies import FIXED, Context, make_policy
+from agrisim.policies import FIXED, FIXED_PLUS, Context, Policy, Recheck, make_policy
 from agrisim.rover import RoverState
 from agrisim.safety import PlantContact, contacts
 from agrisim.sensor import MoistureProbe, ProbeReading
 from agrisim.soil import Anomaly, SoilTruth
+from agrisim.weather import SoilDynamics, current_view
 
 FloatArray = npt.NDArray[np.float64]
 
@@ -29,7 +31,7 @@ class RunResult:
     policy: str
     layout: FieldLayout
     grid: GridSpec
-    truth_grid: FloatArray  # truth resampled to the output grid (for scoring and display only)
+    truth_grid: FloatArray  # truth at the end of the mission on the output grid (scoring, display)
     mean: FloatArray
     var: FloatArray
     readings: tuple[ProbeReading, ...]
@@ -40,6 +42,7 @@ class RunResult:
     run_metrics: RunMetrics
     corr_length: float
     anomalies: tuple[Anomaly, ...]
+    truth_at: "Truth"  # the truth at any mission time (scoring and display only)
 
     def maps(self) -> dict[str, FloatArray]:
         return {
@@ -50,40 +53,72 @@ class RunResult:
         }
 
 
+class Truth:
+    """Hidden soil truth at mission time t: fixed, or changing with the weather."""
+
+    def __init__(self, start: SoilTruth, dynamics: SoilDynamics | None) -> None:
+        self.start, self.dynamics = start, dynamics
+
+    def __call__(self, t: float) -> SoilTruth:
+        return self.dynamics.at(t) if self.dynamics else self.start
+
+
 def world_rngs(seed: int) -> tuple[np.random.Generator, ...]:
-    """Independent streams for layout, soil, probe noise and policy.
+    """Independent streams for layout, soil, probe noise, policy and weather.
 
     Separate streams mean every policy sees the same field and soil for a given seed.
     """
-    return tuple(np.random.default_rng(s) for s in np.random.SeedSequence(seed).spawn(4))
+    return tuple(np.random.default_rng(s) for s in np.random.SeedSequence(seed).spawn(5))
+
+
+def map_now(
+    cfg: SimConfig, grid: GridSpec, readings: Sequence[ProbeReading], t: float
+) -> tuple[FloatArray, FloatArray]:
+    """The rover's map at time t from the readings so far (see weather.current_view)."""
+    mapper = make_mapper(cfg.mapping)
+    for r in current_view(readings, cfg.weather, t, cfg.soil.vwc_clip):
+        mapper.update(r)
+    return mapper.estimate(grid)
 
 
 def _adaptive_legs(
-    policy_name: str,
+    policy: Policy,
     cfg: SimConfig,
     layout: FieldLayout,
     budget: int,
+    probes: int,
     readings: list[ProbeReading],
-    rng: np.random.Generator,
-    model: Path | None,
+    here: ProbeSite,
 ) -> Iterator[list[Waypoint]]:
     """One leg per probe: lane-graph path from the current site to the chosen one.
 
     `readings` is the live list the driver appends to, so each choice sees every earlier probe.
+    A site counts as visited once a reading was taken within half a site spacing of it. Going
+    back to a visited site, the rover probes 0.15 m further along the lane, beside the old hole.
     """
-    policy = make_policy(policy_name, cfg, rng, model)
     graph = LaneGraph.from_layout(layout)
-    sites = tuple(layout.candidate_probe_sites(cfg.survey.candidate_spacing))
+    spacing = cfg.survey.candidate_spacing
+    sites = tuple(layout.candidate_probe_sites(spacing))
     site_xy = np.array([(s.x, s.y) for s in sites])
-    visited = np.zeros(len(sites), dtype=bool)
-    here = graph.start_site()
-    for _ in range(min(budget, len(sites))):
-        ctx = Context(here, sites, site_xy, visited.copy(), tuple(readings), graph, budget)
-        k = policy.choose(ctx)
-        visited[k] = True
-        wps, _ = graph.shortest_path(here, sites[k])
+    mid_x = (graph.x_west + graph.x_east) / 2
+    for _ in range(probes):
+        times = np.zeros(len(sites), dtype=int)
+        for r in readings:
+            d = np.hypot(site_xy[:, 0] - r.x, site_xy[:, 1] - r.y)
+            if d.min() < spacing / 2:
+                times[d.argmin()] += 1
+        visited = times > 0
+        if visited.all() and not isinstance(policy, Recheck):
+            return
+        t = readings[-1].t if readings else 0.0
+        k = policy.choose(Context(here, sites, site_xy, visited, tuple(readings), graph, budget, t))
+        site = sites[k]
+        if times[k]:
+            step = 0.15 * int(times[k]) * (1 if site.x < mid_x else -1)
+            site = ProbeSite(site.x + step, site.y, site.lane)
+        wps, _ = graph.shortest_path(here, site)
         yield [*wps[:-1], Waypoint(wps[-1].x, wps[-1].y, probe=True)]
-        here = sites[k]
+        here = site
 
 
 def run_survey(
@@ -101,21 +136,35 @@ def run_survey(
     "ppo" with `model` = path to a trained MaskablePPO zip."""
     policy = FIXED if policy == "full_coverage" else policy
     budget = cfg.survey.probe_budget if budget is None else budget
-    rng_field, rng_soil, rng_probe, rng_policy = world_rngs(seed)
+    rng_field, rng_soil, rng_probe, rng_policy, rng_weather = world_rngs(seed)
     layout = FieldLayout.generate(cfg.field, rng_field)
-    truth = SoilTruth.generate(cfg.soil, layout, rng_soil)
+    start_soil = SoilTruth.generate(cfg.soil, layout, rng_soil)
+    dynamics = None
+    if cfg.weather is not None:
+        dynamics = SoilDynamics(start_soil, cfg.weather, cfg.soil.vwc_clip, rng_weather)
+    truth = Truth(start_soil, dynamics)
     grid = GridSpec.for_field(cfg.field, cfg.mapping.output_resolution)
-    truth_grid = truth_on_grid(truth, grid)
-    mapper = make_mapper(cfg.mapping)
     probe = MoistureProbe(cfg.probe)
     follower = PurePursuit(cfg.rover)
     readings: list[ProbeReading] = []
+    graph = LaneGraph.from_layout(layout)
 
     legs: Iterator[list[Waypoint]]
-    if policy == FIXED:
-        legs = iter([list(LanePlanner.plan_full_coverage(layout, cfg, budget).waypoints)])
+    if policy in (FIXED, FIXED_PLUS):
+        again = min(cfg.survey.recheck_probes, budget - 1) if policy == FIXED_PLUS else 0
+        route = list(LanePlanner.plan_full_coverage(layout, cfg, budget - again).waypoints)
+        legs = iter([route])
+        if again:
+            end = route[-1]
+            lane = int(np.abs(layout.lane_y - end.y).argmin())
+            chooser = make_policy(policy, cfg, rng_policy)
+            end_site = ProbeSite(end.x, end.y, lane)
+            legs = chain(
+                legs, _adaptive_legs(chooser, cfg, layout, budget, again, readings, end_site)
+            )
     else:
-        legs = _adaptive_legs(policy, cfg, layout, budget, readings, rng_policy, model)
+        chooser = make_policy(policy, cfg, rng_policy, model)
+        legs = _adaptive_legs(chooser, cfg, layout, budget, budget, readings, graph.start_site())
 
     viz = None
     if rerun:
@@ -123,7 +172,7 @@ def run_survey(
 
         viz = RerunLogger(cfg, layout, seed, rrd_path, spawn)
 
-    start = LaneGraph.from_layout(layout).start_site()
+    start = graph.start_site()
     prev = Waypoint(start.x, start.y)
     states, times = [RoverState(start.x, start.y, 0.0)], [0.0]
     t = 0.0
@@ -141,21 +190,21 @@ def run_survey(
                 continue
             t += cfg.probe.insertion_time_s
             here = states[-1]
-            reading = probe.read(truth, here.x, here.y, t, rng_probe)
+            reading = probe.read(truth(t), here.x, here.y, t, rng_probe)
             readings.append(reading)
-            mapper.update(reading)
             states.append(here)
             times.append(t)
             if viz:
                 viz.log_probe(reading)
-                m, v = mapper.estimate(grid)
-                maps = {"truth": truth_grid, "estimate": m, "abs_error": np.abs(m - truth_grid)}
-                maps["variance"] = v
-                viz.log_maps(t, maps, map_metrics(truth_grid, m, v, cfg.mapping.dry_threshold).rmse)
+                m, v = map_now(cfg, grid, readings, t)
+                tg = truth_on_grid(truth(t), grid)
+                maps = {"truth": tg, "estimate": m, "abs_error": np.abs(m - tg), "variance": v}
+                viz.log_maps(t, maps, map_metrics(tg, m, v, cfg.mapping.dry_threshold).rmse)
 
     p = poses(states)
     hits = tuple(contacts(p, cfg.rover, layout))
-    mean, var = mapper.estimate(grid)
+    mean, var = map_now(cfg, grid, readings, t)
+    truth_grid = truth_on_grid(truth(t), grid)
     if viz:
         viz.close()
     return RunResult(
@@ -180,6 +229,7 @@ def run_survey(
             layout=layout,
             plant_contacts=len(hits),
         ),
-        corr_length=truth.corr_length,
-        anomalies=truth.anomalies,
+        corr_length=start_soil.corr_length,
+        anomalies=start_soil.anomalies,
+        truth_at=truth,
     )
