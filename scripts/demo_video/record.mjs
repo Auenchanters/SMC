@@ -167,11 +167,13 @@ const SEGMENTS = {
           const gl = document.querySelector("canvas").getContext("webgl2");
           const info = gl.getExtension("WEBGL_debug_renderer_info");
           const gpu = info ? gl.getParameter(info.UNMASKED_RENDERER_WEBGL) : "unknown";
-          const times = []; let last = performance.now();
-          const tick = (now) => { times.push(now - last); last = now; if (times.length < 180) requestAnimationFrame(tick); else { times.sort((x, y) => x - y); done({ gpu, median: times[90].toFixed(1), p95: times[171].toFixed(1), size: innerWidth + "x" + innerHeight + "@" + devicePixelRatio }); } };
+          // Average over 240 frames (total time / frames): with the frame cap off, single frame
+          // times swing as the GPU works in bursts, but the average is the real throughput.
+          const times = []; const start = performance.now(); let last = start;
+          const tick = (now) => { times.push(now - last); last = now; if (times.length < 240) requestAnimationFrame(tick); else { gl.finish(); const mean = (performance.now() - start) / times.length; times.sort((x, y) => x - y); done({ gpu, median: mean.toFixed(1), p95: times[228].toFixed(1), size: innerWidth + "x" + innerHeight + "@" + devicePixelRatio }); } };
           requestAnimationFrame(tick);
         })`);
-        console.log(`perf ${q}: median ${r.median} ms, 95th percentile ${r.p95} ms (${r.size}) on ${r.gpu}`);
+        console.log(`perf ${q}: ${r.median} ms per frame on average (${(1000 / r.median).toFixed(0)} fps), 95th percentile ${r.p95} ms (${r.size}) on ${r.gpu}`);
       }
     },
   },

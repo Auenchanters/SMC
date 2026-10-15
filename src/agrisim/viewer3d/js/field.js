@@ -1,7 +1,8 @@
-// The ground, the moisture overlay surface, irrigation and the trees around the field.
+// The field: shaped ground (terrain.js), the grass beyond it, irrigation and the trees around.
 import * as THREE from "three";
 import { at } from "./data.js";
 import { lumpyBall } from "./plants.js";
+import { createTerrain, soilMaterial } from "./terrain.js";
 
 function speckleTexture(renderer, rand, size, base, colours, n, rMin, rMax, repeat) {
   const c = document.createElement("canvas");
@@ -31,57 +32,53 @@ function speckleTexture(renderer, rand, size, base, colours, n, rMin, rMax, repe
   return tex;
 }
 
-/** Ground and irrigation. Returns the overlay mesh and its RGBA data (one texel per map cell). */
-export function buildField(view, D) {
+/** Ground, grass and irrigation. Sets D.ground(x, y), the ground height every other module uses. */
+export function buildField(view, D, { low = false } = {}) {
   const { scene, renderer } = view;
-  const { S, F, LX, LY, CENTRE, rand } = D;
-  const MARGIN = 1.2;
-  const grassTex = speckleTexture(renderer, rand, 512, "#5b7a37", ["#4a6a2c", "#6d8c42", "#7f9a4a", "#3e5b25", "#8a9a55"], 9000, 1, 3.5, [200, 200]);
-  const grass = new THREE.Mesh(new THREE.PlaneGeometry(800, 800), new THREE.MeshStandardMaterial({ map: grassTex, roughness: 1 }));
-  grass.rotation.x = -Math.PI / 2;
-  grass.position.copy(CENTRE).setY(-0.03);
+  const { S, F, LX, LY, rand } = D;
+  const terrain = createTerrain(D, { low });
+  D.ground = terrain.height;
+  D.ridge = terrain.ridge;
+
+  const soil = soilMaterial(D, renderer);
+  const ground = new THREE.Mesh(terrain.geometry, soil.material);
+  ground.receiveShadow = true;
+  ground.castShadow = true; // ridges and clods shade each other when the sun is low
+  scene.add(ground);
+
+  const grassTex = speckleTexture(renderer, rand, 512, "#5b7a37", ["#4a6a2c", "#6d8c42", "#7f9a4a", "#3e5b25", "#8a9a55"], 9000, 1, 3.5, [0.25, 0.25]); // one repeat per 4 m
+  // Grass beyond the shaped ground: a big square with a hole where the terrain mesh is (it
+  // overlaps the terrain's outer 0.3 m, where both are at grass level).
+  const ring = new THREE.Shape([[-400, -400], [400, -400], [400, 400], [-400, 400]].map(([a, b]) => new THREE.Vector2(a, b)));
+  const m = terrain.MARGIN - 0.3;
+  ring.holes.push(new THREE.Path([[-m, -m], [-m, LY + m], [LX + m, LY + m], [LX + m, -m]].map(([a, b]) => new THREE.Vector2(a, b))));
+  const grass = new THREE.Mesh(new THREE.ShapeGeometry(ring), new THREE.MeshStandardMaterial({ map: grassTex, roughness: 1 }));
+  grass.rotation.x = -Math.PI / 2; // shape x, y -> world x, -z: field x, y
+  grass.position.y = 0.05;
   grass.receiveShadow = true;
   scene.add(grass);
 
-  const soilTex = speckleTexture(renderer, rand, 512, "#6c4e36", ["#57402c", "#7d5d42", "#4a3423", "#8b6b4d", "#9c8269", "#3f2c1e"], 3200, 1, 7, [(LX + 2 * MARGIN) / 1.6, (LY + 2 * MARGIN) / 1.6]);
-  const soil = new THREE.Mesh(
-    new THREE.PlaneGeometry(LX + 2 * MARGIN, LY + 2 * MARGIN),
-    new THREE.MeshStandardMaterial({ map: soilTex, bumpMap: soilTex, bumpScale: 2.5, roughness: 0.97 }),
-  );
-  soil.rotation.x = -Math.PI / 2;
-  soil.position.copy(CENTRE);
-  soil.receiveShadow = true;
-  scene.add(soil);
-
-  const G = S.grid;
-  const overlayData = new Uint8Array(G.nx * G.ny * 4);
-  const overlayTex = new THREE.DataTexture(overlayData, G.nx, G.ny);
-  overlayTex.magFilter = overlayTex.minFilter = THREE.LinearFilter;
-  overlayTex.colorSpace = THREE.SRGBColorSpace;
-  const overlay = new THREE.Mesh(
-    new THREE.PlaneGeometry(G.nx * G.res, G.ny * G.res),
-    new THREE.MeshStandardMaterial({ map: overlayTex, transparent: true, roughness: 1, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }),
-  );
-  overlay.rotation.x = -Math.PI / 2;
-  overlay.position.copy(at((G.nx * G.res) / 2, (G.ny * G.res) / 2, 0.004));
-  overlay.receiveShadow = true;
-  scene.add(overlay);
-
-  // Drip irrigation: a tape along every row and a main pipe along the west headland.
-  const tapeMat = new THREE.MeshStandardMaterial({ color: 0x151515, roughness: 0.6 });
-  const tape = new THREE.CylinderGeometry(0.008, 0.008, LX - 2 * F.headland + 0.6, 8).rotateZ(Math.PI / 2);
+  // Drip tape lying along the top of every ridge, and a main pipe along the west headland.
+  const tapeMat = new THREE.MeshStandardMaterial({ color: 0x141414, roughness: 0.55 });
+  const x0 = F.headland - 0.3;
+  const x1 = LX - F.headland + 0.3;
   for (const y of S.rows_y) {
-    const m = new THREE.Mesh(tape, tapeMat);
-    m.position.copy(at(LX / 2, y, 0.008));
-    m.receiveShadow = true;
-    scene.add(m);
+    const pts = [];
+    for (let x = x0; x <= x1 + 1e-6; x += 0.25) {
+      const yy = y + Math.sin(x * 1.7 + y) * 0.03; // tape never lies perfectly straight
+      pts.push(at(x, yy, D.ground(x, yy) + 0.008));
+    }
+    const tape = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), pts.length * 2, 0.008, 6), tapeMat);
+    tape.receiveShadow = true;
+    scene.add(tape);
   }
-  const main = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, LY, 12).rotateX(Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x1f4f8a, roughness: 0.5 }));
-  main.position.copy(at(F.headland - 0.35, LY / 2, 0.025));
+  const mainPts = [];
+  for (let y = -0.3; y <= LY + 0.3; y += 0.5) mainPts.push(at(F.headland - 0.55, y, D.ground(F.headland - 0.55, y) + 0.025));
+  const main = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(mainPts), mainPts.length * 2, 0.025, 10), new THREE.MeshStandardMaterial({ color: 0x1f4f8a, roughness: 0.5 }));
   main.castShadow = true;
   scene.add(main);
 
-  return { overlay, overlayData, overlayTex };
+  return { tintData: soil.tintData, tintTex: soil.tintTex, soilUniforms: soil.uniforms };
 }
 
 /** Trees around the field, for scale. */

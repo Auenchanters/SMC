@@ -1,7 +1,7 @@
 // Tomato plants: one per stem in the survey, never wider than the canopy radius the simulator
 // uses for plant contact.
 import * as THREE from "three";
-import { at } from "./data.js";
+import { at as atField } from "./data.js";
 
 function mergeGeometries(list) {
   const pos = [];
@@ -57,7 +57,16 @@ export function buildPlants(view, D, { low = false } = {}) {
   const leaves = new THREE.InstancedMesh(frondGeometry(), new THREE.MeshStandardMaterial({ side: THREE.DoubleSide, roughness: 0.75 }), stems.length * FRONDS);
   const blobs = new THREE.InstancedMesh(lumpyBall(rand), new THREE.MeshStandardMaterial({ roughness: 0.9 }), stems.length * BLOBS);
   const stemMesh = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.008, 0.013, 1, 6).translate(0, 0.5, 0), new THREE.MeshStandardMaterial({ color: 0x4d7a2a, roughness: 0.8 }), stems.length);
-  const stakes = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.011, 0.011, 1, 6).translate(0, 0.5, 0), new THREE.MeshStandardMaterial({ color: 0x8b6a43, roughness: 0.9 }), stems.length);
+  // Stakes: rough poles of wood or bamboo, not at every plant, uneven in height and leaning a little.
+  const stakeGeo = new THREE.CylinderGeometry(0.009, 0.013, 1, 7, 4).translate(0, 0.5, 0);
+  {
+    const p = stakeGeo.attributes.position; // a slight crook along the pole
+    for (let i = 0; i < p.count; i++) p.setX(i, p.getX(i) + Math.sin(p.getY(i) * 5.3) * 0.012);
+    stakeGeo.computeVertexNormals();
+  }
+  const stakes = new THREE.InstancedMesh(stakeGeo, new THREE.MeshStandardMaterial({ roughness: 0.92 }), stems.length);
+  const woods = [0x8a6a45, 0x7a5c3c, 0x9a8a62, 0xb59e6a, 0x6b5a48].map((c) => new THREE.Color(c));
+  const tops = new Map(); // row y -> [[x, top height], ...] for the string lines
   const fruitCounts = stems.map(() => 3 + Math.floor(rand() * 4));
   const fruits = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 14, 10), new THREE.MeshStandardMaterial({ roughness: 0.35 }), fruitCounts.reduce((a, b) => a + b, 0));
   const o = new THREE.Object3D();
@@ -67,19 +76,32 @@ export function buildPlants(view, D, { low = false } = {}) {
   let li = 0;
   let fi = 0;
   let bi = 0;
+  let nStakes = 0;
   stems.forEach(([x, y], k) => {
     const r = S.canopy[k];
     const h = 0.8 + rand() * 0.25;
+    const g0 = D.ground(x, y);
+    const at = (px, py, ph = 0) => atField(px, py, g0 + ph); // everything on this plant starts at its ground
     o.position.copy(at(x, y));
     o.rotation.set((rand() - 0.5) * 0.08, 0, (rand() - 0.5) * 0.08);
     o.scale.set(1, h, 1);
     o.updateMatrix();
     stemMesh.setMatrixAt(k, o.matrix);
-    o.position.copy(at(x + 0.035, y + 0.025));
-    o.rotation.set(0, 0, 0);
-    o.scale.set(1, 1.15, 1);
-    o.updateMatrix();
-    stakes.setMatrixAt(k, o.matrix);
+    if (rand() < 0.55) {
+      const sh = 1.05 + rand() * 0.6;
+      const sx = x + 0.04;
+      const sy = y + (rand() - 0.5) * 0.06;
+      o.position.copy(at(sx, sy, -0.05));
+      o.rotation.set((rand() - 0.5) * 0.14, rand() * 6.3, (rand() - 0.5) * 0.14);
+      const thick = 0.8 + rand() * 0.6;
+      o.scale.set(thick, sh, thick);
+      o.updateMatrix();
+      stakes.setMatrixAt(nStakes, o.matrix);
+      stakes.setColorAt(nStakes++, woods[Math.floor(rand() * woods.length)]);
+      const row = Math.round(y * 100);
+      if (!tops.has(row)) tops.set(row, []);
+      tops.get(row).push([sx, sy, g0]);
+    }
     for (let j = 0; j < FRONDS; j++) {
       const f = j / (FRONDS - 1);
       o.position.copy(at(x, y, 0.12 + (h - 0.1) * f));
@@ -111,6 +133,38 @@ export function buildPlants(view, D, { low = false } = {}) {
       fruits.setColorAt(fi++, ripeness[Math.floor(rand() * ripeness.length)]);
     }
   });
+  stakes.count = nStakes;
+
+  // String lines along each row, tied to the stakes at two heights, sagging between them.
+  const segs = [];
+  for (const list of tops.values()) {
+    list.sort((a, b) => a[0] - b[0]);
+    for (let i = 1; i < list.length; i++) {
+      const [ax, ay, ag] = list[i - 1];
+      const [bx, by, bg] = list[i];
+      for (const hgt of [0.45, 0.85]) {
+        const sag = 0.015 + 0.01 * (bx - ax);
+        const a = atField(ax, ay, ag + hgt);
+        const b = atField(bx, by, bg + hgt);
+        const m = a.clone().lerp(b, 0.5);
+        m.y -= sag;
+        segs.push([a, m], [m, b]);
+      }
+    }
+  }
+  const twine = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.0012, 0.0012, 1, 3).translate(0, 0.5, 0), new THREE.MeshStandardMaterial({ color: 0xcfc2a0, roughness: 0.9 }), segs.length);
+  const up = new THREE.Vector3(0, 1, 0);
+  segs.forEach(([a, b], i) => {
+    const d = b.clone().sub(a);
+    o.position.copy(a);
+    o.quaternion.setFromUnitVectors(up, d.clone().normalize());
+    o.scale.set(1, d.length(), 1);
+    o.updateMatrix();
+    twine.setMatrixAt(i, o.matrix);
+  });
+  o.quaternion.identity();
+  view.scene.add(twine);
+
   for (const m of [leaves, blobs, stemMesh, stakes, fruits]) {
     m.castShadow = true;
     m.receiveShadow = true;

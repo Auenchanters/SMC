@@ -41,7 +41,8 @@ export function createCamera(view, D) {
     set,
     /** Start behind the robot without a flight. */
     jumpTo(roverPosition) {
-      focus.copy(roverPosition).setY(0.25);
+      focus.copy(roverPosition);
+      focus.y += 0.25;
       camera.position.copy(focus).add(FOLLOW_OFFSET);
       controls.target.copy(focus);
       set("follow");
@@ -49,7 +50,8 @@ export function createCamera(view, D) {
     },
     distance: () => camera.position.distanceTo(controls.target),
     update(now, roverPosition) {
-      focus.copy(roverPosition).setY(0.25);
+      focus.copy(roverPosition);
+      focus.y += 0.25;
       if (flight) {
         const f = Math.min(1, (now - flight.start) / flight.ms);
         const e = f < 0.5 ? 2 * f * f : 1 - (-2 * f + 2) ** 2 / 2;

@@ -25,9 +25,9 @@ export function createLayers(D, field) {
   const milli = (v) => (v == null ? null : v / 1000);
   const moistTicks = () => [[0.05, "5% dry"], [DRY, `${pct(DRY)} too dry below`, true], [0.3, "30%"], [0.45, "45% wet"]];
   const LAYERS = [
-    { label: "Robot's map", stops: MOIST, alpha: 0.7, value: (i, k) => milli(S.estimate[k][i]), ticks: moistTicks,
+    { label: "Robot's map", stops: MOIST, alpha: 0.62, value: (i, k) => milli(S.estimate[k][i]), ticks: moistTicks,
       text: "What the robot thinks the soil moisture is everywhere, worked out from its marks so far. Watch it sharpen with every reading." },
-    { label: "Real moisture", stops: MOIST, alpha: 0.7, value: (i) => milli(S.truth[i]), ticks: moistTicks,
+    { label: "Real moisture", stops: MOIST, alpha: 0.62, value: (i) => milli(S.truth[i]), ticks: moistTicks,
       text: "The true moisture in this simulated field. The robot never sees it; it is here so you can check the robot's map against it." },
     { label: "Map error", stops: ERR, alpha: 0.8, value: (i, k) => (S.estimate[k][i] == null ? null : Math.abs(S.estimate[k][i] - S.truth[i]) / 1000),
       ticks: () => [[0, "spot on"], [0.025, "2.5"], [0.05, "5"], [0.1, "10+ % points"]],
@@ -47,9 +47,12 @@ export function createLayers(D, field) {
     if (key === shownKey) return;
     shownKey = key;
     const L = LAYERS[layer];
-    field.overlay.visible = !!L.stops;
-    if (!L.stops) return;
-    const data = field.overlayData;
+    const data = field.tintData;
+    if (!L.stops) {
+      for (let i = 3; i < data.length; i += 4) data[i] = 0; // plain soil: no colour
+      field.tintTex.needsUpdate = true;
+      return;
+    }
     for (let i = 0; i < cells; i++) {
       const v = L.value(i, k);
       const o = i * 4;
@@ -63,7 +66,7 @@ export function createLayers(D, field) {
       data[o + 2] = tmp.b * 255;
       data[o + 3] = L.alpha * 255;
     }
-    field.overlayTex.needsUpdate = true;
+    field.tintTex.needsUpdate = true;
   }
   function showInfo() {
     const L = LAYERS[layer];

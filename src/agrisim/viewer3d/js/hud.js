@@ -4,6 +4,8 @@ import * as THREE from "three";
 import { clock, pct } from "./data.js";
 
 const $ = (id) => document.getElementById(id);
+const LIFT_ROBOT = new THREE.Vector3(0, 0.62, 0); // label heights above the ground
+const LIFT_NEXT = new THREE.Vector3(0, 0.3, 0);
 const PHASE = {
   lowering: "Lowering the probe to the ground",
   inserting: "Pushing the probe into the soil",
@@ -38,7 +40,7 @@ export function createHud(D, view, marks) {
   view.renderer.domElement.addEventListener("pointermove", (e) => {
     pointer.set((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
     raycaster.setFromCamera(pointer, view.camera);
-    const hit = raycaster.intersectObjects(marks.pins.filter((p) => p.group.visible).map((p) => p.head))[0];
+    const hit = raycaster.intersectObjects(marks.pins.filter((p) => p.group.visible).flatMap((p) => (p.dot.visible ? [p.head, p.dot] : [p.head])))[0];
     const tip = $("tip");
     if (!hit) {
       tip.style.display = "none";
@@ -65,8 +67,8 @@ export function createHud(D, view, marks) {
   return {
     openHelp,
     tags(roverPosition) {
-      placeTag($("tagRobot"), roverPosition.clone().setY(0.62), true);
-      placeTag($("tagNext"), marks.nextRing.position.clone().setY(0.32), marks.nextRing.visible);
+      placeTag($("tagRobot"), roverPosition.clone().add(LIFT_ROBOT), true);
+      placeTag($("tagNext"), marks.nextRing.position.clone().add(LIFT_NEXT), marks.nextRing.visible);
     },
     status(t, state, here, k) {
       const valid = stops.filter((s) => s.reveal <= t && s.v != null).length;

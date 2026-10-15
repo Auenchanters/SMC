@@ -11,6 +11,7 @@ import { createPlayback } from "./js/playback.js";
 import { buildPlants } from "./js/plants.js";
 import { QUALITY, createView } from "./js/render.js";
 import { buildRover } from "./js/rover.js";
+import { buildScatter } from "./js/scatter.js";
 import * as THREE from "three";
 
 const query = new URLSearchParams(location.search);
@@ -35,8 +36,9 @@ try {
 }
 
 const view = await createView(D, startQuality);
-const field = buildField(view, D);
+const field = buildField(view, D, { low }); // also sets D.ground(x, y), used by everything below
 buildPlants(view, D, { low });
+const scatter = buildScatter(view, D, { low });
 buildTrees(view, D);
 const rover = buildRover(view);
 const marks = buildMarkers(view, D);
@@ -106,9 +108,10 @@ function frame(now) {
   const state = D.stopAt(t);
   const k = D.readingsBy(t);
 
-  rover.pose(here, state ? state.travel : 0);
+  rover.pose(here, state ? state.travel : 0, D.ground);
   const camDist = cam.distance();
-  field.overlay.material.opacity = THREE.MathUtils.clamp(camDist / 10, 0.4, 1); // real soil up close, clear map from afar
+  field.soilUniforms.uTintAmount.value = THREE.MathUtils.clamp(camDist / 10, 0.35, 1); // real soil up close, clear map from afar
+  scatter.update(now / 1000);
   marks.update({ t, now, state, k, here, markScale: THREE.MathUtils.clamp(camDist / 7, 1, 3.5) });
   layers.paint(k);
   hud.status(t, state, here, k);
@@ -124,7 +127,8 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
-cam.jumpTo(rover.root.position.copy(new THREE.Vector3(D.path.x[0], 0, -D.path.y[0])));
+rover.pose(D.pathAt(0), 0, D.ground);
+cam.jumpTo(rover.root.position);
 setLayer(0);
 // Hooks for scripted demos, look-dev captures and tests.
 window.viewer = {

@@ -11,6 +11,24 @@ import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { GTAOPass } from "three/addons/postprocessing/GTAOPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
+
+// A camera-like finish on the final image (display colours): a touch more contrast and
+// colour, and a soft vignette.
+const GradeShader = {
+  uniforms: { tDiffuse: { value: null }, uContrast: { value: 1.06 }, uSaturation: { value: 1.06 }, uVignette: { value: 0.28 } },
+  vertexShader: "varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
+  fragmentShader: `uniform sampler2D tDiffuse; uniform float uContrast, uSaturation, uVignette; varying vec2 vUv;
+    void main() {
+      vec4 c = texture2D(tDiffuse, vUv);
+      float l = dot(c.rgb, vec3(0.2126, 0.7152, 0.0722));
+      vec3 col = mix(vec3(l), c.rgb, uSaturation);
+      col = (col - 0.5) * uContrast + 0.5;
+      vec2 d = vUv - 0.5;
+      col *= 1.0 - uVignette * dot(d, d) * 1.6;
+      gl_FragColor = vec4(clamp(col, 0.0, 1.0), c.a);
+    }`,
+};
 
 const SKY = "assets/sky/kloofendal_48d_partly_cloudy_puresky_2k.hdr";
 const SKY_TURN = THREE.MathUtils.degToRad(-35); // turns the sky so the sun lights the rows from an angle
@@ -129,6 +147,7 @@ export async function createView(D, qualityName = "medium") {
   gtao.blendIntensity = 1.0;
   composer.addPass(gtao);
   composer.addPass(new OutputPass());
+  composer.addPass(new ShaderPass(GradeShader));
 
   let q = QUALITY[qualityName] ?? QUALITY.medium;
   const resize = () => {

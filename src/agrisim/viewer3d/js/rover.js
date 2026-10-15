@@ -6,6 +6,8 @@ import { at } from "./data.js";
 
 const MM = 0.001;
 const WHEEL_R = DIM.wheel.r * MM;
+const HALF_BASE = (DIM.wheel.base / 2) * MM;
+const HALF_TRACK = (DIM.wheel.track / 2) * MM;
 const mat = (color, metalness, roughness, extra = {}) => new THREE.MeshStandardMaterial({ color, metalness, roughness, ...extra });
 const M = {
   body: mat(0x2c3136, 0.25, 0.55), dark: mat(0x1e2124, 0.3, 0.5), alu: mat(0xc3c9cf, 0.85, 0.38), blue: mat(0x2f62a8, 0.6, 0.38),
@@ -117,10 +119,25 @@ export function buildRover(view) {
   view.scene.add(root);
   return {
     root,
-    /** Place the rover at a path sample; `travel` is the probe's travel in mm (0 = parked). */
-    pose(here, travel) {
-      root.position.copy(at(here.x, here.y));
-      root.rotation.y = here.th;
+    /** Place the rover at a path sample on the ground; `travel` is the probe's travel in mm.
+     *  Its height and tilt come from the ground under its four tyres. */
+    pose(here, travel, ground) {
+      const c = Math.cos(here.th);
+      const s = Math.sin(here.th);
+      const tyre = (u, v) => {
+        // highest of three points along the tyre's footprint: a tyre rests on lumps, not in pits
+        let h = -Infinity;
+        for (const du of [-0.04, 0, 0.04]) h = Math.max(h, ground(here.x + c * (u + du) - s * v, here.y + s * (u + du) + c * v));
+        return h;
+      };
+      const fl = tyre(HALF_BASE, HALF_TRACK);
+      const fr = tyre(HALF_BASE, -HALF_TRACK);
+      const rl = tyre(-HALF_BASE, HALF_TRACK);
+      const rr = tyre(-HALF_BASE, -HALF_TRACK);
+      const pitch = Math.atan2((fl + fr - rl - rr) / 2, 2 * HALF_BASE);
+      const roll = Math.atan2((fl + rl - fr - rr) / 2, 2 * HALF_TRACK);
+      root.position.copy(at(here.x, here.y, (fl + fr + rl + rr) / 4));
+      root.rotation.set(roll, here.th, pitch, "YZX");
       for (const w of wheels) w.rotation.z = -(w.userData.left ? here.rollL : here.rollR) / WHEEL_R;
       probe.position.y = -travel * MM;
     },
