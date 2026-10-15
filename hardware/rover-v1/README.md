@@ -1,5 +1,7 @@
 # AgriRover v1 hardware
 
+> **Superseded by [AgriRover v2](../rover-v2/DESIGN.md)** (2026-10-15): open probe bay, rocker-differential chassis with 150 mm clearance, LiFePO4 battery with a designed BMS, and probe cleaning that never needs a person. v1 is kept because the 3D replay still builds its rover from this `model.mjs`.
+
 The physical rover for the soil-moisture survey: a soil-probe module on a 4WD skid-steer RC chassis. Design, calculations and bill of materials: [DESIGN.md](DESIGN.md).
 
 | | |

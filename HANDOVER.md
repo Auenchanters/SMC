@@ -128,6 +128,8 @@ Needs Node.js 22 or later. Install the Anatomy kit once at the pinned commit, as
 
 | # | Command | Expected |
 |---|---|---|
+| F0 | `node hardware/rover-v2/calc.mjs` then `node hardware/rover-v2/drawings.mjs` | `wrote ...CALCULATIONS.md`, `wrote ...rover-v2-views.svg 20 KB 43 parts`, and `git status` shows no change. CALCULATIONS.md shows 22.1 kg, 173 N usable probe push, 44 deg side slope, about 7.1 surveys per charge |
+| F0b | `uv run agrisim run --config configs/scenarios/rover_v2.yaml --seed 7` | The v2 footprint passes validation: RMSE `0.0299`, path `465.7 m / 2825 s`, plant contacts `0` |
 | F1 | `node hardware/rover-v1/drawings.mjs` | `wrote ...rover-v1-views.svg 23 KB 49 parts`, and `git status` shows no change |
 | F2 | `node hardware/rover-v1/anatomy/build.mjs --light --audit` | ends with `audit passed` |
 | F3 | `node hardware/rover-v1/anatomy/build.mjs --light --audit --rest-order --pose=167` (run F2 first) | `audit passed` |
@@ -151,7 +153,7 @@ Report problems as GitHub issues with the command, the seed and the config file 
 | gymnasium pinned to 1.3.0 (1.4.0 exists) | Upgrade once stable-baselines3 confirms 1.4 support |
 | `pathspec` (MPL-2.0) comes in via mypy | Dev tool only, never shipped; it is weak copyleft, not GPL. The team should acknowledge it. |
 | Teammate's name in CLAUDE.md | The contributor list says "teammate: TBD". Add your GitHub name there in your first commit |
-| Rover hardware design | First version in [hardware/rover-v1/](hardware/rover-v1/): a 4WD RC chassis, a centre probe with a self-cleaning cartridge (brushes, air jets, air check), and a front scan beam with two under-leaf camera arms. It is on paper only. Dimensions marked [A] are assumptions to check against the chassis actually bought. The nine open questions (chassis choice, soil strength, probe model, cleaning in wet clay, canopy height, fogging, leaf brush, positioning, waterproofing) are in [DESIGN.md §8](hardware/rover-v1/DESIGN.md) |
+| Rover hardware design | v2 in [hardware/rover-v2/](hardware/rover-v2/DESIGN.md) replaces v1 (2026-10-15). It is on paper only. Its eight bench questions are in [DESIGN.md §9](hardware/rover-v2/DESIGN.md): soil strength, cleaning-level shares, the dock's reference block, the controller firmware licence, pivot stiffness, tyre pressure, positioning, and canopy height. Not yet done for v2: interactive anatomy figures, and the rover in the 3D replay (it still uses v1) |
 | Hardware CI uses `actions/setup-node@v4` | Works today; bump it when GitHub deprecates v4 |
 | 3D replay: JavaScript is not linted or unit-tested | The Python side (scene data, server, model copy) is tested. The page itself was checked by eye and by the demo-video recorder. If it grows, add a small headless-browser smoke test |
 | 3D replay: water or soil effects | Considered [threejs-particle-fluids](https://github.com/dgreenheck/threejs-particle-fluids) (MIT) for drip-irrigation water or the probe's air blast. Not used: it needs WebGPU with no WebGL fallback, so the page would stop working on some laptops and in the headless recorder |
@@ -178,6 +180,7 @@ Report problems as GitHub issues with the command, the seed and the config file 
 - **Added:** the CI hardware job, the demo video and its scripts, and section 0 of this file.
 - **Added:** the 3D replay (`--view` and `agrisim view`, B4b and B4c), built so a first-time user can follow it without help. The Rerun viewer got plain panel names and a "How to read this" panel (B4).
 
+- **Added (rover v2, 2026-10-15):** [hardware/rover-v2/](hardware/rover-v2/DESIGN.md), the physics-led redesign with an open probe bay, rocker-differential chassis, 150 mm clearance, LiFePO4 + BMS, and autonomous cleaning levels 0 to 5 with a dock. Calculations are generated from `model.mjs` (F0), and the simulator runs its footprint with `configs/scenarios/rover_v2.yaml` (F0b).
 - **Fixed (robustness review, 2026-10-15):** all 22 findings of the outside review `SMC-found-and-fixed.md`, re-checked on the current code. Highlights: validated configs could touch plants (now a tracking allowance), long `dt` hung, huge fields ran out of memory, `train` crashed with a large `stem_keepout`, NaN in configs, model/field mismatches, a busy port on Windows, and the demo script carrying on after a failure. 17 regression tests are in `tests/test_robustness.py`; D9 to D15 check them by hand.
 - **Added (M11):** weather (`weather:` in a config; `weather.py`), probe misreads (`probe.bad_contact_*`), the `recheck` and `fixed_plus_recheck` strategies, `extends:` scenario configs in `configs/scenarios/`, and rain in the 3D replay (B4d). Without a `weather:` section everything behaves exactly as before.
 

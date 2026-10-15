@@ -1,0 +1,10 @@
+# Scenario: the demo field surveyed by the AgriRover v2 design (hardware/rover-v2/).
+# Its footprint and probe cycle come from hardware/rover-v2/CALCULATIONS.md.
+extends: ../demo.yaml
+
+rover:
+  width: 0.40               # 395 mm over the tyres, rounded up
+  length: 0.58              # 572 mm, camera beam to rear tyre, rounded up
+
+probe:
+  insertion_time_s: 29.0    # v2 cycle: 28 s, plus wet cleans on 10% of cycles (PLACEHOLDER: time it on soil)

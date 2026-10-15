@@ -313,7 +313,7 @@ scripts/            demo.ps1 / demo.sh, check_licenses.ps1 / .sh, make_media.py,
 tests/              pytest suite
 docs/img, docs/media  README images and video
 models/ppo_v1/      trained MaskablePPO policy + its held-out evaluation
-hardware/rover-v1/  rover hardware design (drawings, interactive anatomy figure, BOM)
+hardware/rover-v2/  rover hardware design: model, calculations, drawings, BOM (v1, superseded, in rover-v1/)
 ```
 
 The planning documents are [context.md](context.md) (verified research, licence and platform rules; the source of truth), [EXECPLAN.md](EXECPLAN.md) (the milestone plan with every decision, surprise and result) and [CLAUDE.md](CLAUDE.md) (rules for the coding agent).
@@ -332,7 +332,7 @@ The planning documents are [context.md](context.md) (verified research, licence 
 - **Calibrate.** Agronomist input for tomato dry thresholds, real row and plant spacing, the chosen probe's accuracy and insertion time ([context.md §12](context.md)).
 - **Better learned policy.** A per-cell (fully convolutional) action head and longer training, compared on the same held-out seeds.
 - **Phase 2.** A Gazebo Jetty and ROS 2 Lyrical world (in WSL2) that calls this package for probe readings, so soil logic lives in one place.
-- **Phase 3 and later.** Cameras and disease detection evaluated on real, expert-labelled field images; then the physical rover. Its first design (a soil-probe module on a 4WD skid-steer chassis, with drawings, an interactive anatomy figure and the bill of materials) is in [hardware/rover-v1/](hardware/rover-v1/).
+- **Phase 3 and later.** Cameras and disease detection evaluated on real, expert-labelled field images; then the physical rover. Its current design, [hardware/rover-v2/](hardware/rover-v2/DESIGN.md), was laid out from the physics: an open probe bay between the axles (the only place the whole weight resists the push), a rocker-differential chassis with 150 mm clearance, a LiFePO4 battery with a designed BMS, and probe cleaning that escalates on its own and never needs a person. The first design is kept in [hardware/rover-v1/](hardware/rover-v1/).
 
 ## Handover
 

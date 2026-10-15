@@ -29,6 +29,7 @@ opens a Rerun viewer showing the field, plants, lanes, the moving rover, probe p
 - [ ] M10 Photoreal graphics for the 3D replay (started 2026-10-15). Phase 1 (modules), phase 2 (lighting) and phase 3 (field) done 2026-10-15; phase 4 (plants) next.
 - [x] M11 Weather, probe misreads and rechecks (2026-10-15). Rain and evapotranspiration change the soil during a mission; the rover corrects old readings with its rain gauge and can go back to spots it doubts (`recheck`, `fixed_plus_recheck`). Scenario configs in `configs/scenarios/`. See Outcomes for the honest result.
 - [ ] M12 onward: toward a test bench for field robots (roadmap below, not started).
+- [x] Outside the milestones: rover hardware v2 in `hardware/rover-v2/` (2026-10-15), a redesign from the physics after the team lead's review of v1. See Decision Log.
 - [x] Pre-handover review (2026-10-14): two crash bugs fixed, Rerun layout fixed, hardware CI job added, demo video and its recording scripts added. See Surprises, Decision Log and Outcomes.
 
 ## Surprises & Discoveries
@@ -78,6 +79,16 @@ opens a Rerun viewer showing the field, plants, lanes, the moving rover, probe p
 - Review (2026-10-14): The Rerun viewer never showed the field (rover, plants, lanes, probes). Its automatic layout made views only for the four map images and the RMSE plot. `RerunLogger` now sends an explicit blueprint: field view (flipped so north is up, like the maps), RMSE over the whole run, the four maps, playback at 30x. Found while recording the demo video in the Rerun web viewer.
 
 ## Decision Log
+
+- Decision (rover v2, 2026-10-15): redesign rather than patch v1. The team lead found v1 impractical: the probe was buried at the centre, it rode too low and felt unstable, and the electronics, battery and longevity were not designed. Cleaning also still needed a person when it failed. The v2 choices, each from a calculation in `hardware/rover-v2/CALCULATIONS.md`:
+  - The probe stays between the axles, because by Newton's third law only there does the whole weight resist the push. It sits in an open bay rather than a well, so it can be seen, reached and swapped from above.
+  - A rocker-differential with no springs keeps all four wheels loaded and the push repeatable.
+  - Hub motors and an LFP battery put the mass low and over the probe: 173 N usable push against 54 N for v1.
+  - 216 mm wheels and 150 mm clearance.
+  - LiFePO4 with a specified BMS.
+  - Cleaning levels 0 to 5 ending at a dock with a reference block, so a person only refills and swaps wear parts on a schedule.
+
+  v1 stays in the repo because the 3D replay's rover is built from it. Date: 2026-10-15.
 
 - Decision (robustness review, 2026-10-15): validation now also requires the following:
   - a tracking allowance on top of `safety_margin`;
