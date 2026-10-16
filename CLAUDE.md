@@ -12,6 +12,7 @@ Claude must never appear as an author, committer or contributor of this reposito
 - @context.md: full project context, verified research, licence and platform rules, architecture. Source of truth.
 - @EXECPLAN.md: the living execution plan. Work milestone by milestone. Keep its Progress, Surprises & Discoveries, Decision Log and Outcomes & Retrospective sections up to date as you work.
 - HANDOVER.md: current state, the step-by-step test plan with expected numbers, and open items. Read its section 0 before your first change.
+- research.md: competitors, related papers, our known flaws, and the work packages and paper plan for what to build next. Read it before planning new milestones.
 
 ## What this repo is
 `agrisim`: a pure-Python simulator of a planted tomato field where a small rover drives inter-row lanes without touching plants, probes soil moisture, and reconstructs a moisture grid plus an uncertainty grid. It also exposes a Gymnasium environment for training adaptive probing. Layer A only; no ROS or Gazebo code in this package.
