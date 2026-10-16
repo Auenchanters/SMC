@@ -1,6 +1,6 @@
 # AgriRover v1 hardware
 
-> **Superseded by [AgriRover v2](../rover-v2/DESIGN.md)** (2026-10-15): open probe bay, rocker-differential chassis with 150 mm clearance, LiFePO4 battery with a designed BMS, and probe cleaning that never needs a person. v1 is kept because the 3D replay still builds its rover from this `model.mjs`.
+> **Superseded by [AgriRover v2](../rover-v2/DESIGN.md)** (2026-10-15): open probe bay, rocker-differential chassis with 150 mm clearance, LiFePO4 battery with a designed BMS, and probe cleaning that never needs a person. v1 is kept for reference; the 3D replay now builds v2.
 
 The physical rover for the soil-moisture survey: a soil-probe module on a 4WD skid-steer RC chassis. Design, calculations and bill of materials: [DESIGN.md](DESIGN.md).
 
@@ -39,12 +39,6 @@ node hardware/rover-v1/anatomy/build.mjs --light --audit --rest-order --pose=167
 node hardware/rover-v1/anatomy/build.mjs --light --audit --rest-order --arm=0.5
 node hardware/rover-v1/anatomy/cleaning-build.mjs
 node hardware/rover-v1/anatomy/cleaning-build.mjs --light --audit
-```
-
-Then copy the model to the 3D replay, which builds its rover from it (a test fails until the copies match):
-
-```powershell
-Copy-Item hardware/rover-v1/model.mjs src/agrisim/viewer3d/rover-model.mjs
 ```
 
 `--audit` must end with `audit passed`. Commit the rebuilt HTML and SVG files: CI rebuilds them and fails if they differ from the committed ones. Run the plain `--audit` build first: it saves the page's paint order, which the `--rest-order` pose audits then check.

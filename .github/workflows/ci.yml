@@ -44,5 +44,13 @@ jobs:
       - run: node hardware/rover-v1/anatomy/cleaning-build.mjs --light --audit
       - run: node hardware/rover-v2/calc.mjs
       - run: node hardware/rover-v2/drawings.mjs
+      - run: node hardware/rover-v2/anatomy/build.mjs
+      - run: node hardware/rover-v2/anatomy/build.mjs --light --audit
+      - run: node hardware/rover-v2/anatomy/build.mjs --light --audit --rest-order --pose=270
+      - run: node hardware/rover-v2/anatomy/build.mjs --light --audit --rest-order --pose=120
+      - run: node hardware/rover-v2/anatomy/build.mjs --light --audit --rest-order --rail=-60
+      - run: node hardware/rover-v2/anatomy/build.mjs --light --audit --rest-order --twist=100
+      - run: node hardware/rover-v2/anatomy/cleaning-build.mjs
+      - run: node hardware/rover-v2/anatomy/cleaning-build.mjs --light --audit
       - name: Committed outputs match the model
         run: git diff --exit-code hardware/

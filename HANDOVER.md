@@ -10,7 +10,7 @@ State at handover (14 Oct 2026):
 
 ## 0. If you are a coding agent (Claude Code or similar), start here
 
-Read in this order: [CLAUDE.md](CLAUDE.md) (rules; Claude Code loads it automatically), this file, then [EXECPLAN.md](EXECPLAN.md) and [context.md](context.md) when you need the reasoning behind a decision. For hardware work, read [hardware/rover-v1/README.md](hardware/rover-v1/README.md) and [DESIGN.md](hardware/rover-v1/DESIGN.md).
+Read in this order: [CLAUDE.md](CLAUDE.md) (rules; Claude Code loads it automatically), this file, then [EXECPLAN.md](EXECPLAN.md) and [context.md](context.md) when you need the reasoning behind a decision. For hardware work, read [hardware/rover-v2/README.md](hardware/rover-v2/README.md) and [DESIGN.md](hardware/rover-v2/DESIGN.md) (v1 in `hardware/rover-v1/` is superseded and kept for reference).
 
 Hard rules. Each one has broken something or is a team decision, so do not work around them:
 
@@ -21,10 +21,10 @@ Hard rules. Each one has broken something or is a team decision, so do not work 
 5. **Placeholders.** Physical numbers live only in `configs/*.yaml`, marked `# PLACEHOLDER: calibrate`.
 6. **Never weaken or delete a test** to make it pass. Fix the code, or record the problem in the ExecPlan.
 7. **Generated files: do not edit them by hand.**
-   - `hardware/rover-v1/drawings/*.svg` and `hardware/rover-v1/anatomy/*.html` come from `model.mjs`. Rebuild them, then commit; CI fails if they are stale.
+   - `hardware/rover-v*/drawings/*.svg`, `hardware/rover-v*/anatomy/*.html` and `hardware/rover-v2/CALCULATIONS.md` come from each folder's `model.mjs`. Rebuild them, then commit; CI fails if they are stale.
    - `docs/img/*` (except `architecture.svg`) and `docs/media/survey.mp4` come from `scripts/make_media.py`.
    - `docs/media/agrisim-demo.mp4` and `docs/img/viewer3d*.jpg` come from `scripts/demo_video/`.
-   - `src/agrisim/viewer3d/rover-model.mjs` is a byte-for-byte copy of `hardware/rover-v1/model.mjs` (the 3D rover is built from it). After changing the model, copy it; a test fails until you do.
+   - `src/agrisim/viewer3d/rover-model.mjs` is a byte-for-byte copy of `hardware/rover-v2/model.mjs` (the 3D rover is built from it). After changing the model, copy it; a test fails until you do.
    - `src/agrisim/viewer3d/vendor/` is three.js 0.186.1 exactly as published (MIT); addons are in `vendor/jsm/` with three.js's own folder layout. Do not edit it; to upgrade, replace the files and update its README.txt and the Decision Log.
    - `src/agrisim/viewer3d/assets/` holds CC0 assets (sky photo, and later textures and models). Each one is listed with its source and licence in `assets/LICENSES.md`; add new ones there.
 8. **Pull before you edit README.md or HANDOVER.md.** Two people edit them.
@@ -39,7 +39,7 @@ uv run pytest -q
 .\scripts\check_licenses.ps1
 ```
 
-If you changed anything under `hardware/`, also run the rebuild and audit commands in [hardware/rover-v1/README.md](hardware/rover-v1/README.md). Then update the ExecPlan's Progress, Surprises & Discoveries, Decision Log and Outcomes sections, and check that CI on GitHub is green after you push.
+If you changed anything under `hardware/`, also run the rebuild and audit commands in that folder's README ([v2](hardware/rover-v2/README.md), [v1](hardware/rover-v1/README.md)). Then update the ExecPlan's Progress, Surprises & Discoveries, Decision Log and Outcomes sections, and check that CI on GitHub is green after you push.
 
 Do not run `--rerun` from an agent's shell unless the user wants the viewer. It opens a window, and the command does not return until that window is closed (see EXECPLAN, M6 surprises). To produce a recording without a window, call `run_survey(..., rerun=True, rrd_path=..., spawn=False)`.
 
@@ -79,7 +79,7 @@ Work through these in order and tick each one. "Expected" values came from the t
 | B2 | Open the new `runs\<time>_seed7\` folder | `config.yaml`, `metrics.json`, `truth.npy`, `estimate.npy`, `variance.npy`, `probes.csv`, `path.csv`, `maps.png` |
 | B3 | Run B1 again, then `fc.exe runs\<first>\metrics.json runs\<second>\metrics.json` | `FC: no differences encountered` (determinism) |
 | B4 | `uv run agrisim run --config configs/demo.yaml --seed 7 --rerun` | The Rerun viewer opens. Left: "The field from above" (robot in red, plants in green, readings as dots) and "Average map error over time". Right: a "How to read this" panel and the four maps with plain names. Press play or drag the time bar: the survey replays at 30x and the maps update after each reading. The folder gains `recording.rrd`. |
-| B4b | `uv run agrisim run --config configs/demo.yaml --seed 7 --view` | Prints the same numbers as B1, then `3D viewer: http://127.0.0.1:<port>/` and opens it in your browser. The robot drives between tomato rows, stops, pushes the probe in; marks appear and the map fills in. The "Right now" panel ends at "Survey complete", `60 of 60 (1 failed)`, `466 m`, plants touched `0`, map off by `±3.0 % points`. Ctrl+C in the terminal stops it. The folder gains `scene.json` (about 1.2 MB). |
+| B4b | `uv run agrisim run --config configs/demo.yaml --seed 7 --view` | Prints the same numbers as B1, then `3D viewer: http://127.0.0.1:<port>/` and opens it in your browser. The robot (AgriRover v2: rocker beams that follow the ground, the probe tower in the open bay) drives between tomato rows, stops, pushes the probe in; marks appear and the map fills in. The "Right now" panel ends at "Survey complete", `60 of 60 (1 failed)`, `466 m`, plants touched `0`, map off by `±3.0 % points`. Ctrl+C in the terminal stops it. The folder gains `scene.json` (about 1.2 MB). |
 | B4c | `uv run agrisim view runs\<the B4b folder>` | The same replay opens again without re-running. On a folder without `scene.json` it says to use `--view` (exit code 2). |
 | B4d | `uv run agrisim run --config configs/scenarios/rain_shower.yaml --seed 7 --policy fixed_plus_recheck --view` | RMSE `0.0303`, `59 valid / 60 used`, path `641.0 m / 2054 s`, plant contacts `0`. In the replay, from 10:00 to 20:00 of mission time it rains: streaks fall, the light dims, the soil turns darker and wetter, and the panel says "Raining 20 mm an hour". After the route, the robot goes back to a few spots; the panel says "checking again" and why. |
 | B5 | `uv run agrisim run --config configs/demo.yaml --seed 7 --policy greedy_variance --budget 30` | plant contacts `0`; the rover drives in reverse inside lanes rather than turning around |
@@ -128,7 +128,7 @@ Needs Node.js 22 or later. Install the Anatomy kit once at the pinned commit, as
 
 | # | Command | Expected |
 |---|---|---|
-| F0 | `node hardware/rover-v2/calc.mjs` then `node hardware/rover-v2/drawings.mjs` | `wrote ...CALCULATIONS.md`, `wrote ...rover-v2-views.svg 20 KB 43 parts`, and `git status` shows no change. CALCULATIONS.md shows 22.1 kg, 173 N usable probe push, 44 deg side slope, about 7.1 surveys per charge |
+| F0 | `node hardware/rover-v2/calc.mjs` then `node hardware/rover-v2/drawings.mjs` | `wrote ...CALCULATIONS.md`, `wrote ...rover-v2-views.svg 22 KB 49 parts`, and `git status` shows no change. CALCULATIONS.md shows 22.5 kg, 176 N usable probe push, 43 deg side slope, about 7.1 surveys per charge, a 28.0 s probe cycle |
 | F0b | `uv run agrisim run --config configs/scenarios/rover_v2.yaml --seed 7` | The v2 footprint passes validation: RMSE `0.0299`, path `465.7 m / 2825 s`, plant contacts `0` |
 | F1 | `node hardware/rover-v1/drawings.mjs` | `wrote ...rover-v1-views.svg 23 KB 49 parts`, and `git status` shows no change |
 | F2 | `node hardware/rover-v1/anatomy/build.mjs --light --audit` | ends with `audit passed` |
@@ -136,6 +136,10 @@ Needs Node.js 22 or later. Install the Anatomy kit once at the pinned commit, as
 | F4 | `node hardware/rover-v1/anatomy/cleaning-build.mjs --light --audit` | `audit passed` |
 | F5 | Open `hardware/rover-v1/anatomy/rover-anatomy.html` in a browser. Hover over the figure, press Space, then press A. | Hovering moves the probe. Space runs a probe cycle with cleaning, then a leaf scan. A slides the camera arm out and back. |
 | F6 | Open `hardware/rover-v1/anatomy/probe-cleaning.html` and press Space | Soil crumbs stick to the rods in the ground, are scraped off by the brushes on the way up, and fall. Then the air jets show, then the air check. |
+| F7 | `node hardware/rover-v2/anatomy/build.mjs --light --audit`, then the `--rest-order` pose audits in [hardware/rover-v2/README.md](hardware/rover-v2/README.md) (`--pose=270`, `--pose=120`, `--rail=-60`, `--twist=100`) | each ends with `audit passed` (about a minute each) |
+| F8 | `node hardware/rover-v2/anatomy/cleaning-build.mjs --light --audit` | `audit passed` |
+| F9 | Open `hardware/rover-v2/anatomy/rover-anatomy.html`. Wait, then press T, then R | The tour runs a probe cycle (the chain pays out of its magazine, the probe goes into the notch), shifts the probe 60 mm along its rail (`130 N usable`), then raises the twist pads: the beams turn ±19.5°, the bar rocks, the body stays level and rises 45 mm. T and R toggle the twist and the rail by hand |
+| F10 | Open `hardware/rover-v2/anatomy/probe-cleaning.html` and press Space | One stubborn sample escalates: wiper and brushes (level 0), air knife and a failed air check (1), a second stroke (2), then a water spray, drying and a passing check (3). Crumbs fall at each level |
 
 ### G. Demo video (optional, about 12 minutes)
 
@@ -153,7 +157,7 @@ Report problems as GitHub issues with the command, the seed and the config file 
 | gymnasium pinned to 1.3.0 (1.4.0 exists) | Upgrade once stable-baselines3 confirms 1.4 support |
 | `pathspec` (MPL-2.0) comes in via mypy | Dev tool only, never shipped; it is weak copyleft, not GPL. The team should acknowledge it. |
 | Teammate's name in CLAUDE.md | The contributor list says "teammate: TBD". Add your GitHub name there in your first commit |
-| Rover hardware design | v2 in [hardware/rover-v2/](hardware/rover-v2/DESIGN.md) replaces v1 (2026-10-15). It is on paper only. Its eight bench questions are in [DESIGN.md §9](hardware/rover-v2/DESIGN.md): soil strength, cleaning-level shares, the dock's reference block, the controller firmware licence, pivot stiffness, tyre pressure, positioning, and canopy height. Not yet done for v2: interactive anatomy figures, and the rover in the 3D replay (it still uses v1) |
+| Rover hardware design | v2 in [hardware/rover-v2/](hardware/rover-v2/DESIGN.md) replaces v1 (2026-10-15). It is on paper only. Its eight bench questions are in [DESIGN.md §9](hardware/rover-v2/DESIGN.md): soil strength, cleaning-level shares, the dock's reference block, the controller firmware licence, pivot stiffness, tyre pressure, positioning, and canopy height. Both anatomy figures and the 3D replay show v2. Its probe is pushed by a rigid zip chain (the first v2 model's linear axis could not reach; see EXECPLAN Surprises): confirm a chain rated for 176 N in this size [A] |
 | Hardware CI uses `actions/setup-node@v4` | Works today; bump it when GitHub deprecates v4 |
 | 3D replay: JavaScript is not linted or unit-tested | The Python side (scene data, server, model copy) is tested. The page itself was checked by eye and by the demo-video recorder. If it grows, add a small headless-browser smoke test |
 | 3D replay: water or soil effects | Considered [threejs-particle-fluids](https://github.com/dgreenheck/threejs-particle-fluids) (MIT) for drip-irrigation water or the probe's air blast. Not used: it needs WebGPU with no WebGL fallback, so the page would stop working on some laptops and in the headless recorder |
@@ -169,7 +173,7 @@ Report problems as GitHub issues with the command, the seed and the config file 
 - The trained model: `models/ppo_v1/model.zip` (MaskablePPO, 200k steps, seed 0, budget 30, 6 envs), plus its held-out evaluation summary.
 - All run outputs go to `runs/`, which git ignores. Nothing there is needed to reproduce anything.
 - The demo video: [docs/media/agrisim-demo.mp4](docs/media/agrisim-demo.mp4), made by [scripts/demo_video/](scripts/demo_video/).
-- Rover hardware: [hardware/rover-v1/](hardware/rover-v1/). `model.mjs` is the single source of truth for every dimension, the probe force and timing, and the bill of materials. The drawings and both figures are generated from it.
+- Rover hardware: [hardware/rover-v2/](hardware/rover-v2/) (current) and [hardware/rover-v1/](hardware/rover-v1/) (superseded). In each, `model.mjs` is the single source of truth for every dimension, the probe force and timing, and the bill of materials. The drawings, v2's CALCULATIONS.md and both folders' figures are generated from it.
 - CI: [.github/workflows/ci.yml](.github/workflows/ci.yml). The `test` job runs the quality gates on Windows and Ubuntu. The `hardware` job rebuilds and audits the rover figures and fails if the committed ones are stale.
 
 ## 5. Changes in the last session before handover
@@ -183,5 +187,7 @@ Report problems as GitHub issues with the command, the seed and the config file 
 - **Added (rover v2, 2026-10-15):** [hardware/rover-v2/](hardware/rover-v2/DESIGN.md), the physics-led redesign with an open probe bay, rocker-differential chassis, 150 mm clearance, LiFePO4 + BMS, and autonomous cleaning levels 0 to 5 with a dock. Calculations are generated from `model.mjs` (F0), and the simulator runs its footprint with `configs/scenarios/rover_v2.yaml` (F0b).
 - **Fixed (robustness review, 2026-10-15):** all 22 findings of the outside review `SMC-found-and-fixed.md`, re-checked on the current code. Highlights: validated configs could touch plants (now a tracking allowance), long `dt` hung, huge fields ran out of memory, `train` crashed with a large `stem_keepout`, NaN in configs, model/field mismatches, a busy port on Windows, and the demo script carrying on after a failure. 17 regression tests are in `tests/test_robustness.py`; D9 to D15 check them by hand.
 - **Added (M11):** weather (`weather:` in a config; `weather.py`), probe misreads (`probe.bad_contact_*`), the `recheck` and `fixed_plus_recheck` strategies, `extends:` scenario configs in `configs/scenarios/`, and rain in the 3D replay (B4d). Without a `weather:` section everything behaves exactly as before.
+
+- **Added (rover v2 visuals, 2026-10-16):** v2 anatomy figures (Fig 1 the whole rover with the probe cycle, the rail and a twist; Fig 2 the cleaning levels), audited in CI, and the 3D replay now builds v2. Fixed in the v2 model on the way: the probe drive (a 134 mm axis cannot make a 330 mm stroke; now a zip chain), the differential bar (it ran through the probe tower; now on the front box), the single rail the probe passed through (now two), and the beam tilt formula (19.5°, not 18.4°, for a 100 mm step). F0, F7 to F10.
 
 Details are in the ExecPlan's Surprises & Discoveries section.

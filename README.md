@@ -313,7 +313,7 @@ scripts/            demo.ps1 / demo.sh, check_licenses.ps1 / .sh, make_media.py,
 tests/              pytest suite
 docs/img, docs/media  README images and video
 models/ppo_v1/      trained MaskablePPO policy + its held-out evaluation
-hardware/rover-v2/  rover hardware design: model, calculations, drawings, BOM (v1, superseded, in rover-v1/)
+hardware/rover-v2/  rover hardware design: model, calculations, drawings, anatomy figures, BOM (v1, superseded, in rover-v1/)
 ```
 
 The planning documents are [context.md](context.md) (verified research, licence and platform rules; the source of truth), [EXECPLAN.md](EXECPLAN.md) (the milestone plan with every decision, surprise and result) and [CLAUDE.md](CLAUDE.md) (rules for the coding agent).

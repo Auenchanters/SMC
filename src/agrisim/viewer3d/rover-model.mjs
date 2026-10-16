@@ -1,113 +1,279 @@
-// AgriRover v1 parametric model. Single source of dimensions for the orthographic drawings,
-// the anatomy figure and DESIGN.md. Units: mm. Frame: x forward, y left, z up; origin on the
-// ground under the centre of the wheelbase (matches agrisim: x along the row, rover at lane centre).
-// Numbers marked [A] are design targets to confirm against the chassis actually bought.
+// AgriRover v2 parametric model: the single source of every dimension, mass, force, power and
+// maintenance number in DESIGN.md, CALCULATIONS.md and the drawings. Units: mm, kg, N, s, W, Wh.
+// Frame: x forward, y left, z up; origin on the ground under the probe axis (the rocker pivots).
+// Numbers marked [A] are assumptions or vendor-class figures to confirm on the bench.
+//
+// What changed from v1 and why (details in DESIGN.md):
+// - Rocker-differential chassis: two side walking beams pivot on the body, a differential bar
+//   keeps the body level between them. All four wheels stay loaded on ridges and ruts, and the
+//   probe pushes straight down over the pivot line, so its reaction is shared by all four wheels.
+// - Open tool bay between the side walls, not a well through a closed tub: the probe module is a
+//   drop-in cartridge reached from above, mud falls to the ground, nothing wet sits near the
+//   electronics. The probe can shift sideways on a rail to dodge a stone or sample the bed edge.
+// - 216 mm pneumatic hub-motor wheels and 150 mm belly clearance (v1: 150 mm wheels, 100 mm belly,
+//   56 mm motor pods). Hub motors put the heaviest parts at axle height: a low centre of mass.
+// - LiFePO4 12S battery with a designed BMS (v1: unspecified Li-ion 3S pack).
+// - Fully autonomous probe cleaning with escalation and a dock; a person only refills and replaces
+//   wear parts on a schedule.
 
 export const DIM = {
-  wheel: { r: 75, w: 65, base: 300, track: 330 }, // [A] 150 mm tyres, 300 wheelbase, 330 track
-  pod: { r: 19, y0: 92 }, // corner gear-motor pod, from y0 out to the wheel's inner face
-  tub: { x: 190, y: 112, z0: 100, z1: 165, r: 12 }, // chassis body: belly at 100 mm
-  bumper: { x0: 212, x1: 224, y: 120, z0: 92, z1: 122 }, // rear only; the scan beam is the front bumper
-  well: { rIn: 30, rOut: 33, flange: 42 }, // probe well through the chassis centre
-  // Self-cleaning cartridge in the bottom of the well (drops out from below for washing):
-  // a brush seal at the mouth wipes the rods on every pass, an air-knife ring blasts them dry.
-  cartridge: { r: 33, flangeR: 40, z0: 92, z1: 132, flangeZ1: 100, brushZ: [94, 106], airZ: 118, nozzles: 6 },
-  // Front scan beam (replaces the front bumper) with two telescopic under-leaf camera arms,
-  // one per row. Each arm: a middle and an inner stage; the camera head rides on the inner stage.
-  scan: {
-    x0: 230, x1: 272, z0: 72, z1: 112, y: 185, wall: 3, strip: 4,
-    head: { w: 34, l: 64, h: 22, z0: 81 },
-    mid: { w: 36, h: 34, wall: 2, len: 121, travel: 128 }, // hollow; rides on the beam's inner walls (ball slides)
-    inner: { w: 32, h: 30, len: 121, travel: 70 }, // rides inside the mid stage; the head bolts to its end
-    speed: 60, // mm/s [A]
-  },
-  standoff: { x: 150, y: 85, r: 6 },
-  deck: { x: 200, y: 125, z0: 180, z1: 184, r: 10, hole: 24 },
-  tower: {
-    base: { x0: -58, x1: 32, y: 48, z1: 194 }, // front edge clears the 24 mm probe hole
-    rodY: 34, rodR: 5, screwX: -34, screwR: 4, // bearing clears the 22 mm probe flange
-    top: { z0: 400, z1: 408 },
-    motor: { s: 42, h: 40 }, // NEMA 17
-  },
-  carriage: { x0: -48, x1: 18, y: 46, h: 28 },
+  wheel: { r: 108, w: 60, base: 300, track: 335 }, // [A] 8.5" pneumatic off-road hub motors
+  hub: { r: 62, w: 52 }, // motor body inside the rim
+  beam: { h: 70, w: 20, y: 123, z0: 165, overhang: 40 }, // side rocker beams (aluminium box), outboard of the body
+  axleDrop: { w: 20 }, // bracket from the beam down to the hub axle
+  pivot: { z: 200, r: 12 }, // rocker pivot stub shafts on the body side plates, at x = 0
+  body: { x: 175, yIn: 105, yOut: 108, z0: 150, z1: 250 }, // 3 mm side plates joined by front and rear boxes
+  bay: { x: 95 }, // open tool bay: |x| < 95, |y| < yIn, open below and above
+  cross: { x: 175, w: 50 }, // front and rear cross boxes (battery in the rear one)
+  // Differential bar across the front box (not over the bay, where the probe tower stands): it rocks
+  // about a fore-aft pin, and links drop to the beams 125 mm ahead of their pivots. It sits high
+  // enough to rock about 19 deg each way (a 100 mm clod under one wheel) without touching the lid.
+  diff: { x: 125, z: 300, len: 262, r: 8, pin: 10 },
+  deck: { x0: -175, x1: -95, z0: 250, z1: 254 }, // rear deck over the battery box
+  enclosure: { x0: -172, x1: -98, y: 76, h: 86 }, // electronics, behind the bay
+  // Two sideways rails across the bay, resting on the side plates fore and aft of the probe axis; the
+  // probe passes between them. The probe axis can sit at |y| <= 60 (bay half-width 105).
+  probeRail: { y: 60, z: 250, x: 30, w: 12, h: 12 },
+  sled: { x: 48, y: 36, h: 6 }, // rides the rails; carries the drive tower and hangs the cleaning station
+  tower: { x0: -40, x1: 40, y: 34, z1: 400, motorX: 52 }, // sealed drive tower; stepper beside, belt to the sprockets
+  // Rigid push chain (zip-chain type) [A]: two strands, coiled side by side in a magazine on the sled
+  // beside the tower, run through guides into the zip block at the top of the tower and lock together
+  // into a 16 x 12 mm column on the probe axis. A rigid axis would need a tower about 570 mm tall to
+  // push the probe 330 mm through the station; the chain fits in 400.
+  chain: { w: 16, d: 12, zipZ: 336, zipH: 12, drumX: 68, drumZ: 300, drumR: 26, hub: 8, strand: 5, width: 24 },
+  station: { r: 34, z0: 150, z1: 205, bore: 22, hangerX: 42 }, // cleaning station: wipers, brushes, air/water ring
   probe: {
-    needleR: 1.5, needleL: 70, needleX: [-12, 0, 12], // 3 stainless rods, FDR/RS485 soil probe
-    headR: 18, headL: 50, flangeR: 22, extR: 8,
-    tip0: 107, // parked needle tips: just above the brush seal, inside the air-knife zone
-    tof: { x0: 16.6, x1: 24, y0: -14, y1: -6, h: 10 }, // ground ToF block, inside the 30 mm bore
-    depth: 60, // insertion depth below the surface
+    needleR: 1.5, needleL: 70, needleX: [-12, 0, 12], // 3-rod stainless FDR probe, RS485
+    headR: 18, headL: 50, clampH: 6, // the head hangs from the chain column by a clamp
+    tip0: 210, // parked tips: just above the station; its nozzle ring blows up along them
+    depth: 60, // insertion depth below the local surface
+    groundSlack: 60, // extra stroke when the surface under the probe is lower (rut, hollow)
   },
-  enclosure: { x0: 60, x1: 168, y: 95, h: 70, wall: 3 },
-  lidar: { x: 200, s: 40, h0: 230, body: 22, head: 13, mast: 176 }, // mast x0; lidar centre x - 8
-  gnss: { x: -170, y: 95, top: 300, r: 30 },
-  estop: { x: -165, y: -90 },
+  scan: { x0: 280, x1: 310, z0: 150, z1: 190, y: 185, headZ: 95 }, // camera beam, heads drop to 95
+  lidar: { x: 150, z: 330, s: 40 }, // on the front box, ahead of the probe axis
+  gnss: { x: -150, y: 0, z: 400 },
+  estop: { x: -150, y: -95 },
+  waterTank: { ml: 500 },
 };
 
 const P = DIM.probe;
-// Probe stroke: from retracted to tips `depth` below ground.
-export const STROKE = P.tip0 + P.depth;
-// Carriage at rest (retracted): at full stroke its bottom clears the 4 mm lead-screw bearing on the base by 1 mm.
-export const BEARING_H = 4;
-export const CARRIAGE_Z0 = DIM.tower.base.z1 + BEARING_H + 1 + STROKE;
-export const NEEDLE_ROOT0 = P.tip0 + P.needleL;
-export const HEAD_TOP0 = NEEDLE_ROOT0 + P.headL;
-export const EXT_LEN = CARRIAGE_Z0 - HEAD_TOP0;
-export const SCAN_REACH = DIM.scan.head.l / 2 + DIM.scan.mid.len + DIM.scan.mid.travel + DIM.scan.inner.travel; // head centre, from the rover centre line
+export const STROKE = P.tip0 + P.depth + P.groundSlack;
+
+// ---- Probe drive check: thrown at load, so calc, drawings, figures and the replay all refuse a drive that cannot work.
+// The chain must fit the 400 mm tower, store the whole stroke, and be, with the probe itself, the only thing that
+// passes through the cleaning station; the probe must pass between the rails and through the station.
+{
+  const c = DIM.chain;
+  const st = DIM.station;
+  const r = DIM.probeRail;
+  const fail = (why) => {
+    throw new Error(`model.mjs, probe drive: ${why}`);
+  };
+  const towerZ0 = r.z + r.h + DIM.sled.h;
+  const headTop = P.tip0 + P.needleL + P.headL;
+  const stored = (Math.PI * (c.drumR ** 2 - c.hub ** 2)) / c.strand; // one strand's spiral
+  if (c.zipZ + c.zipH > DIM.tower.z1) fail("the zip block sticks out of the top of the tower");
+  if (c.zipZ !== headTop + P.clampH) fail("the parked probe clamp must sit right under the zip block");
+  if (c.drumX - c.drumR < DIM.tower.x1 || c.drumX + c.drumR > DIM.bay.x) fail("the magazine must sit beside the tower, inside the bay");
+  if (c.drumZ - c.drumR < towerZ0 || c.drumZ + c.drumR > DIM.tower.z1 - 50) fail("the magazine must sit on the sled, under the stepper");
+  if (stored < STROKE) fail(`the magazine stores ${Math.round(stored)} mm of chain, the stroke needs ${STROKE}`);
+  if (Math.hypot(c.w, c.d) / 2 >= st.bore || P.headR >= st.bore) fail("the chain column or the probe head does not pass the station bore");
+  if (r.x - r.w / 2 <= P.headR) fail("the probe head does not pass between the rails");
+  if (towerZ0 <= st.z1 || st.z1 >= P.tip0) fail("only the chain column and the probe may pass the station top");
+}
 export const OVERALL = {
-  length: DIM.scan.x1 + DIM.scan.strip + DIM.bumper.x1,
+  length: DIM.scan.x1 + DIM.wheel.r + DIM.wheel.base / 2 + 4, // beam front to rear tyre + guard
   width: DIM.wheel.track + DIM.wheel.w,
-  height: DIM.tower.top.z1 + DIM.tower.motor.h,
+  height: DIM.gnss.z + 18, // the GNSS antenna is the highest part
+  belly: DIM.body.z0,
+  beamClearance: DIM.beam.z0,
   wheelbase: DIM.wheel.base,
-  bellyClearance: DIM.tub.z0,
-  podClearance: DIM.wheel.r - DIM.pod.r,
 };
 
-// Probe insertion model (placeholders until measured in the target field's soil).
-export const SOIL = {
-  coneMPa: 1.2, // [A] penetration resistance of moist irrigated loam; dry or compacted soil reaches 2-3 MPa
-  shaftKPa: 10, // [A] sleeve friction along the needles
-};
-export const MASS_KG = 6.9; // [A] see DESIGN.md mass budget
-export const CG_FORWARD = 30; // mm the centre of mass sits ahead of the probe (scan beam at the front) [A]
+// ---- Mass budget: [name, kg, x, y, z of the part's centre of mass] [A] ------------------------
+export const MASS = [
+  ["hub-motor wheels, 4", 9.6, 0, 0, DIM.wheel.r],
+  ["rocker beams and axle brackets, 2", 1.3, 0, 0, DIM.beam.z0 + DIM.beam.h / 2],
+  ["body: side plates, front and rear boxes", 2.2, 0, 0, 200],
+  ["differential bar, links, pivots", 0.6, 0, 0, 250],
+  ["battery 12S LiFePO4 6 Ah with BMS, in the rear cross box", 2.4, -150, 0, 200],
+  ["2 dual BLDC controllers, front cross box", 0.7, 150, 0, 200],
+  ["probe module (rails, sled, zip-chain drive and magazine, stepper, probe)", 2.0, 0, 0, 300],
+  ["cleaning: station, pump, valves, water tank (full)", 1.0, 120, 0, 205],
+  ["electronics enclosure, Pi 5, MCU, DC-DC", 0.9, -135, 0, 295],
+  ["lidar, cameras, GNSS, e-stop", 0.5, 0, 0, 370],
+  ["scan beam, arms and camera heads", 0.8, 295, 0, 170],
+  ["cables, connectors, fasteners", 0.5, 0, 0, 230],
+];
+export const TOTAL_KG = MASS.reduce((s, m) => s + m[1], 0);
+export const CG = ["x", "y", "z"].map((_, i) => MASS.reduce((s, m) => s + m[1] * m[2 + i], 0) / TOTAL_KG);
 export const G = 9.81;
-const needleArea = P.needleX.length * Math.PI * P.needleR ** 2; // mm^2
-const needlePerimeter = P.needleX.length * 2 * Math.PI * P.needleR; // mm
-/** Push needed at a given depth (mm) in N: tip resistance plus sleeve friction. */
-export const insertionForce = (depth) =>
-  depth <= 0 ? 0 : SOIL.coneMPa * needleArea + (SOIL.shaftKPa / 1000) * needlePerimeter * depth;
-/** The most the probe can push before a wheel pair lifts: with the probe at the wheelbase centre and
- *  the centre of mass `CG_FORWARD` ahead of it, the rear wheels unload first, at W(1 - 2e/L). */
-export const AVAILABLE_N = MASS_KG * G * (1 - (2 * CG_FORWARD) / DIM.wheel.base);
+export const WEIGHT_N = TOTAL_KG * G;
 
-// Motion profile of one probe cycle (s): approach fast, insert slowly, read, retract through the
-// brush seal, blast the parked rods with air, then check the probe reads clean air before moving on.
-export const SPEED = { approach: 25, insert: 6, retract: 25, read: 2, blast: 3, check: 1 }; // mm/s, s
-export const CLEAN = { airMax: 0.02, retries: 2 }; // [A] clean if the in-air reading is within 0.02 of its baseline
+// ---- Static stability ----------------------------------------------------------------------
+// The rocker-differential leaves the body supported by both side beams across the full track,
+// and each beam by its two wheels, so the support polygon is the wheel rectangle.
+const deg = (r) => (r * 180) / Math.PI;
+export const STABILITY = {
+  rollDeg: deg(Math.atan(DIM.wheel.track / 2 / CG[2])), // side slope before tipping, static
+  pitchDeg: deg(Math.atan((DIM.wheel.base / 2 - Math.abs(CG[0])) / CG[2])),
+  // A step under one wheel tilts that beam, and the differential tilts the body by half of it.
+  stepMm: 100,
+  beamTiltDeg: deg(rockerPose({ fl: 100 }).left.th),
+  bodyPitchDeg: deg(rockerPose({ fl: 100 }).pitch),
+  // Braking from top speed in 0.25 s: the deceleration needed to tip it over is far larger.
+  tipDecelG: (DIM.wheel.base / 2 - Math.abs(CG[0])) / CG[2],
+};
+
+/** Rocker-differential pose from the ground height (mm) under each wheel: front/rear, left/right.
+ *  Each beam pitches about its pivot to keep both its wheels down (nose up is positive, radians);
+ *  the differential bar turns the beams equal and opposite relative to the body, so the body
+ *  pitches by their mean. z is how far the body rises; roll is its tilt toward the right. */
+export function rockerPose({ fl = 0, rl = 0, fr = 0, rr = 0 } = {}) {
+  const drop = DIM.pivot.z - DIM.wheel.r; // pivot above the axle line
+  const side = (f, r) => {
+    const th = Math.asin(Math.max(-1, Math.min(1, (f - r) / DIM.wheel.base))); // the axles stay a wheelbase apart
+    return { th, pivotZ: DIM.wheel.r + (f + r) / 2 + drop * Math.cos(th) };
+  };
+  const left = side(fl, rl);
+  const right = side(fr, rr);
+  const pitch = (left.th + right.th) / 2;
+  return {
+    left: { ...left, rel: left.th - pitch },
+    right: { ...right, rel: right.th - pitch },
+    pitch,
+    roll: Math.atan2(left.pivotZ - right.pivotZ, 2 * DIM.beam.y),
+    z: (left.pivotZ + right.pivotZ) / 2 - DIM.pivot.z,
+  };
+}
+
+// ---- Soil, traction and climbing --------------------------------------------------------------
+export const SOIL = {
+  coneMPa: { moist: 1.2, dry: 3.0 }, // [A] penetration resistance: irrigated loam vs dry crust
+  shaftKPa: { moist: 10, dry: 25 }, // [A] sleeve friction
+  mu: 0.55, // [A] tyre-soil traction coefficient on tilled loam
+  crr: 0.1, // [A] rolling resistance on soft tilled soil
+};
+const needleArea = P.needleX.length * Math.PI * P.needleR ** 2;
+const needlePerimeter = P.needleX.length * 2 * Math.PI * P.needleR;
+export const insertionForce = (state, depth = P.depth) =>
+  SOIL.coneMPa[state] * needleArea + (SOIL.shaftKPa[state] / 1000) * needlePerimeter * depth;
+/** The most the probe can push, at sideways offset y on the rail, before a wheel pair unloads.
+ *  Fore-aft: the push is at the pivot line, so only the centre of mass offset matters. */
+export function availableForce(y = 0) {
+  const T = DIM.wheel.track;
+  const L = DIM.wheel.base;
+  const fore = 1 - (2 * Math.abs(CG[0])) / L;
+  const side = 1 / (1 + (2 * Math.abs(y)) / T);
+  return WEIGHT_N * Math.min(fore, side);
+}
+export const PUSH_SAFETY = 0.8; // never use more than 80% of the lift-off force
+export const tyrePressureKPa = 60; // [A] run soft for flotation; ground pressure ~ inflation + carcass
+export const TRACTION = {
+  drawbarN: SOIL.mu * WEIGHT_N,
+  rollingN: SOIL.crr * WEIGHT_N,
+  // Rule of thumb for 4WD on soil: a step of about half the wheel radius climbs reliably [A].
+  stepMm: 0.5 * DIM.wheel.r,
+  maxGradeDeg: deg(Math.atan(SOIL.mu - SOIL.crr)),
+};
+
+// ---- Probe cycle, with cleaning --------------------------------------------------------------
+export const SPEED = { approach: 40, insert: 6, retract: 40, read: 2, blast: 3, check: 1 }; // mm/s, s
+export const CLEAN = {
+  airMax: 0.02, // [A] parked reading in air within 0.02 of the clean-air baseline = clean
+  wetMl: 2, // [A] water per wet clean
+  wetS: 1, dryS: 8, // spray, then dry with air
+  wetShare: 0.1, // [A] share of cycles that need a wet clean (heavy or wet soil)
+  dryRetries: 1, wetRetries: 2,
+  referenceTolerance: 0.015, // [A] VWC tolerance on the dock's reference block
+};
 export function cycle() {
-  const toGround = P.tip0; // tips reach the surface after this much travel
-  const t1 = toGround / SPEED.approach;
+  const t1 = P.tip0 / SPEED.approach;
   const t2 = t1 + P.depth / SPEED.insert;
   const t3 = t2 + SPEED.read;
-  const t4 = t3 + STROKE / SPEED.retract;
+  const t4 = t3 + (P.tip0 + P.depth) / SPEED.retract;
   const t5 = t4 + SPEED.blast;
   const t6 = t5 + SPEED.check;
   return { t1, t2, t3, t4, t5, t6 };
 }
-/** Probe travel (mm, 0 = retracted, STROKE = full depth) and phase at time t of one cycle. */
+export const WET_CLEAN_S = CLEAN.wetS + CLEAN.dryS + SPEED.check;
+/** Probe travel (mm, 0 = parked, tip0 + depth = full depth on level ground) and phase at time t of one cycle. */
 export function probeAt(t) {
   const { t1, t2, t3, t4, t5, t6 } = cycle();
+  const full = P.tip0 + P.depth;
   if (t <= 0) return { travel: 0, phase: "parked" };
   if (t < t1) return { travel: t * SPEED.approach, phase: "lowering" };
   if (t < t2) return { travel: P.tip0 + (t - t1) * SPEED.insert, phase: "inserting" };
-  if (t < t3) return { travel: STROKE, phase: "reading" };
-  if (t < t4) return { travel: STROKE - (t - t3) * SPEED.retract, phase: "retracting" };
+  if (t < t3) return { travel: full, phase: "reading" };
+  if (t < t4) return { travel: full - (t - t3) * SPEED.retract, phase: "retracting" };
   if (t < t5) return { travel: 0, phase: "air blast" };
   if (t < t6) return { travel: 0, phase: "air check" };
   return { travel: 0, phase: "parked" };
 }
 
-// ---- Primitive parts for the orthographic drawings and the BOM ----------------------------
-// box: axis-aligned [x0,y0,z0]-[x1,y1,z1]; cyl: centre, axis "x"|"y"|"z", radius, length.
+// ---- Power, battery and BMS --------------------------------------------------------------------
+export const CELL = { chem: "LiFePO4", vNom: 3.2, vMax: 3.65, vChargeTo: 3.55, vMin: 2.5, vCutSoft: 2.9, ah: 6, kg: 0.145 }; // [A] 32700 class
+export const PACK = { s: 12, p: 1 };
+export const BATTERY = {
+  vNom: CELL.vNom * PACK.s,
+  vMax: CELL.vChargeTo * PACK.s,
+  vMin: CELL.vCutSoft * PACK.s,
+  wh: CELL.vNom * PACK.s * CELL.ah * PACK.p,
+  usableShare: 0.8, // stop at 10% and charge to about 90-95%: kinder to the cells
+};
+export const BMS = {
+  ovCell: 3.65, uvCell: 2.5, softCutCell: 2.9, // V
+  ocContinuousA: 25, ocPeakA: 50, ocPeakMs: 1000, scA: 120, scUs: 200,
+  chargeTempC: [0, 45], dischargeTempC: [-20, 60], // LiFePO4 must not be charged below 0 C
+  balanceMv: 30, balanceMa: 60, // passive balancing when cells differ by > 30 mV, at the top of charge
+  ntc: 3, // two on the cells, one on the MOSFETs
+  chargeA: 3, // 0.5 C at the dock
+  returnToDockSoc: 0.3, // leave enough for the longest drive back plus a margin
+  storageSoc: 0.55,
+};
+/** Energy for a survey (Wh): drive, turns, always-on electronics, probe axis, cleaning. */
+export function surveyEnergy({ metres = 466, probes = 60, turns = 32, speed = 500 } = {}) {
+  const driveS = (metres * 1000) / speed;
+  const driveW = (TRACTION.rollingN * speed) / 1000 / 0.55; // [A] 55% motor+controller at light load
+  const turnWh = turns * ((180 * 3) / 3600); // [A] 180 W of tyre scrub for 3 s per turn in place
+  const c = cycle();
+  const missionS = driveS + probes * (c.t6 + CLEAN.wetShare * WET_CLEAN_S) + turns * 3;
+  const parts = {
+    drive: (driveW * driveS) / 3600,
+    turns: turnWh,
+    electronics: (14 * missionS) / 3600, // [A] Pi 5, MCU, lidar, GNSS, sensors
+    probeAxis: (probes * 12 * c.t4) / 3600, // [A] stepper while moving
+    cleaning: (probes * (8 * SPEED.blast + CLEAN.wetShare * 8 * (CLEAN.wetS + CLEAN.dryS))) / 3600,
+  };
+  const total = Object.values(parts).reduce((a, b) => a + b, 0);
+  return { parts, total, missionS, driveW };
+}
+export const POWER = {
+  motorLimitW: 200, // [A] per-wheel controller limit; a turn in place needs about 6 N m at 2 rad/s
+  peakA: (4 * 200) / BATTERY.vNom,
+  rails: [
+    ["Drive", "battery 30-43 V, through the e-stop contactor", "2 dual BLDC FOC controllers, current-limited"],
+    ["24 V, 3 A", "isolated DC-DC", "probe stepper, Y-rail stepper, scan-arm steppers"],
+    ["12 V, 3 A", "DC-DC", "air pump, water pump, solenoid valves, lidar"],
+    ["5.1 V, 5 A", "DC-DC with hold-up", "Raspberry Pi 5 and USB cameras"],
+    ["Probe, 12 V, 0.2 A", "isolated DC-DC and isolated RS485", "the soil probe: no current path through wet soil"],
+  ],
+};
+
+// ---- Wear parts and service (all [A] until measured) -----------------------------------------
+export const SERVICE = [
+  ["Wiper plate (polyurethane)", 5000, "probe cycles", "swap, 2 screws"],
+  ["Strip brushes", 10000, "probe cycles", "swap, slide out"],
+  ["Pump inlet filter", 20000, "probe cycles", "rinse or swap"],
+  ["Zip chain and sprockets (sealed tower)", 50000, "probe cycles", "inspect yearly"],
+  ["Probe (rods, seal)", 30000, "probe cycles", "or when the reference check drifts"],
+  ["Tyres", 300, "km", "sealant top-up each season"],
+  ["Battery (LiFePO4)", 2000, "full cycles to 80% capacity", "about 5 years at one charge a day"],
+  ["Dock water reservoir (10 L)", 5, "days of 3 surveys", "refill"],
+];
+export const CYCLES_PER_DAY = 3 * 60;
+
+// ---- Primitive parts for the orthographic drawings -------------------------------------------
 const box = (name, group, a, b, bom) => ({ kind: "box", name, group, a, b, bom });
 const cyl = (name, group, c, axis, r, len, bom) => ({ kind: "cyl", name, group, c, axis, r, len, bom });
 
@@ -115,102 +281,84 @@ export function parts(travel = 0) {
   const d = DIM;
   const out = [];
   const { r: wr, w: ww, base, track } = d.wheel;
-  for (const sx of [1, -1]) for (const sy of [1, -1]) {
-    const x = (sx * base) / 2;
-    const y = (sy * track) / 2;
-    out.push(cyl("wheel", "chassis", [x, y, wr], "y", wr, ww, 1));
-    const inner = track / 2 - ww / 2;
-    out.push(cyl("motor pod", "chassis", [x, sy * (d.pod.y0 + inner) / 2, wr], "y", d.pod.r, inner - d.pod.y0, 2));
-    out.push(box("trailing arm", "chassis", [Math.min(sx * 62, x), sy > 0 ? 113 : -123, 70], [Math.max(sx * 62, x), sy > 0 ? 123 : -113, 112], 3));
-  }
-  const t = d.tub;
-  out.push(box("chassis tub", "chassis", [-t.x, -t.y, t.z0], [t.x, t.y, t.z1], 4));
-  {
-    const b = d.bumper;
-    out.push(box("rear bumper", "chassis", [-b.x1, -b.y, b.z0], [-b.x0, b.y, b.z1], 5));
-    for (const sy of [1, -1]) out.push(box("bumper strut", "chassis", [-b.x0, sy * 70 - 6, 102], [-t.x, sy * 70 + 6, 114], 5));
-  }
-  const cr = d.cartridge;
-  out.push(cyl("cleaning cartridge flange", "chassis", [0, 0, (cr.z0 + cr.flangeZ1) / 2], "z", cr.flangeR, cr.flangeZ1 - cr.z0, 6));
-  const sc = d.scan;
-  out.push(box("scan beam", "module", [sc.x0, -sc.y, sc.z0], [sc.x1, sc.y, sc.z1], 22));
-  out.push(box("contact strip", "module", [sc.x1, -sc.y + 15, sc.z0 + 8], [sc.x1 + sc.strip, sc.y - 15, sc.z1 - 8], 22));
-  for (const sy of [1, -1]) out.push(box("beam strut", "module", [t.x, sy * 70 - 8, 84], [sc.x0, sy * 70 + 8, 100], 22));
-  for (const sx of [1, -1]) for (const sy of [1, -1]) out.push(cyl("standoff", "module", [sx * d.standoff.x, sy * d.standoff.y, (t.z1 + d.deck.z0) / 2], "z", d.standoff.r, d.deck.z0 - t.z1, 7));
-  const k = d.deck;
-  out.push(box("deck plate", "module", [-k.x, -k.y, k.z0], [k.x, k.y, k.z1], 8));
-  const tw = d.tower;
-  out.push(box("tower base", "module", [tw.base.x0, -tw.base.y, k.z1], [tw.base.x1, tw.base.y, tw.base.z1], 9));
-  for (const sy of [1, -1]) out.push(cyl("guide rod", "module", [0, sy * tw.rodY, (tw.base.z1 + tw.top.z0) / 2], "z", tw.rodR, tw.top.z0 - tw.base.z1, 10));
-  out.push(cyl("lead screw", "module", [tw.screwX, 0, (tw.base.z1 + tw.top.z0) / 2], "z", tw.screwR, tw.top.z0 - tw.base.z1, 11));
-  out.push(box("tower top plate", "module", [tw.base.x0, -tw.base.y, tw.top.z0], [tw.base.x1, tw.base.y, tw.top.z1], 9));
-  const m = tw.motor;
-  out.push(box("NEMA 17 stepper", "module", [tw.screwX - m.s / 2, -m.s / 2, tw.top.z1], [tw.screwX + m.s / 2, m.s / 2, tw.top.z1 + m.h], 12));
-  const c = d.carriage;
-  const cz = CARRIAGE_Z0 - travel;
-  out.push(box("carriage", "probe", [c.x0, -c.y, cz], [c.x1, c.y, cz + c.h], 13));
-  const p = d.probe;
-  const root = NEEDLE_ROOT0 - travel;
-  out.push(cyl("probe extension", "probe", [0, 0, (root + p.headL + cz) / 2], "z", p.extR, cz - root - p.headL, 14));
-  out.push(cyl("soil probe head", "probe", [0, 0, root + p.headL / 2], "z", p.headR, p.headL, 15));
-  out.push(cyl("probe flange", "probe", [0, 0, root + p.headL - 2], "z", p.flangeR, 4, 15));
-  for (const x of p.needleX) out.push(cyl("needle", "probe", [x, 0, root - p.needleL / 2], "z", p.needleR, p.needleL, 15));
-  const e = d.enclosure;
-  out.push(box("electronics enclosure", "module", [e.x0, -e.y, k.z1], [e.x1, e.y, k.z1 + e.h], 16));
-  const l = d.lidar;
-  out.push(box("lidar mast", "module", [l.mast, -14, k.z1], [l.mast + 4, 14, l.h0], 17));
-  out.push(box("2D lidar", "module", [l.x - l.s / 2 - 8, -l.s / 2, l.h0], [l.x + l.s / 2 - 8, l.s / 2, l.h0 + l.body], 17));
-  out.push(cyl("lidar head", "module", [l.x - 8, 0, l.h0 + l.body + l.head / 2], "z", 17, l.head, 17));
-  out.push(box("front camera", "module", [l.mast + 4, -12, l.h0 - 28], [l.mast + 24, 12, l.h0 - 6], 18));
-  const g = d.gnss;
-  out.push(cyl("gnss mast", "module", [g.x, g.y, (k.z1 + g.top) / 2], "z", 6, g.top - k.z1, 19));
-  out.push(cyl("gnss antenna", "module", [g.x, g.y, g.top + 9], "z", g.r, 18, 19));
-  const s = d.estop;
-  out.push(box("e-stop housing", "module", [s.x - 20, s.y - 20, k.z1], [s.x + 20, s.y + 20, k.z1 + 32], 20));
-  out.push(cyl("e-stop head", "module", [s.x, s.y, k.z1 + 40], "z", 20, 16, 20));
-  out.push(box("rc receiver", "module", [-130, -35, k.z1], [-90, 5, k.z1 + 16], 21));
-  return out;
-}
-
-/** The two scan-arm heads (and their inner stages) at an extension share 0..1, for the drawings. */
-export function scanHeads(share = 0) {
-  const sc = DIM.scan;
-  const out = [];
-  const reach = (sc.mid.travel + sc.inner.travel) * share;
-  const xc = (sc.x0 + sc.x1) / 2;
   for (const sy of [1, -1]) {
-    const y0 = sc.mid.len + reach;
-    const hy = [y0, y0 + sc.head.l].map((v) => sy * v);
-    out.push(box("scan head", "scan", [xc - sc.head.w / 2, Math.min(...hy), sc.head.z0], [xc + sc.head.w / 2, Math.max(...hy), sc.head.z0 + sc.head.h], 22));
-    const iy = [reach, reach + sc.inner.len].map((v) => sy * v);
-    const iz0 = sc.z0 + sc.wall + sc.mid.wall;
-    out.push(box("scan inner stage", "scan", [xc - sc.inner.w / 2, Math.min(...iy), iz0], [xc + sc.inner.w / 2, Math.max(...iy), iz0 + sc.inner.h], 22));
+    const yw = (sy * track) / 2;
+    for (const sx of [1, -1]) {
+      const x = (sx * base) / 2;
+      out.push(cyl("wheel", "chassis", [x, yw, wr], "y", wr, ww, 1));
+      out.push(cyl("hub motor", "chassis", [x, yw, wr], "y", d.hub.r, d.hub.w, 1));
+      const yb = sy * d.beam.y;
+      out.push(box("axle bracket", "chassis", [x - 14, yb - d.axleDrop.w / 2, wr - 14], [x + 14, yb + d.axleDrop.w / 2, d.beam.z0], 2));
+    }
+    const yb = sy * d.beam.y;
+    const bx = base / 2 + d.beam.overhang;
+    out.push(box("rocker beam", "chassis", [-bx, yb - d.beam.w / 2, d.beam.z0], [bx, yb + d.beam.w / 2, d.beam.z0 + d.beam.h], 2));
+    const b = d.body;
+    out.push(cyl("rocker pivot", "chassis", [0, sy * (b.yOut + d.beam.y - d.beam.w / 2) / 2, d.pivot.z], "y", d.pivot.r, d.beam.y - d.beam.w / 2 - b.yOut, 3));
+    out.push(box("body side plate", "chassis", [-b.x, sy > 0 ? b.yIn : -b.yOut, b.z0], [b.x, sy > 0 ? b.yOut : -b.yIn, b.z1], 4));
   }
+  const b = d.body;
+  for (const sx of [1, -1]) {
+    const x0 = sx > 0 ? d.bay.x : -b.x;
+    const x1 = sx > 0 ? b.x : -d.bay.x;
+    out.push(box(sx > 0 ? "front cross box" : "rear cross box (battery)", "chassis", [x0, -b.yIn, b.z0], [x1, b.yIn, b.z1], sx > 0 ? 5 : 6));
+  }
+  const df = d.diff;
+  out.push(box("diff pivot", "chassis", [df.x - df.pin, -df.pin, b.z1], [df.x + df.pin, df.pin, df.z - df.r], 3));
+  out.push(cyl("differential bar", "chassis", [df.x, 0, df.z], "y", df.r, df.len, 3));
+  for (const sy of [1, -1]) out.push(box("diff link", "chassis", [df.x - 5, sy * d.beam.y - 5, d.beam.z0 + d.beam.h], [df.x + 5, sy * d.beam.y + 5, df.z - df.r], 3));
+  out.push(box("rear deck", "module", [d.deck.x0, -b.yOut, d.deck.z0], [d.deck.x1, b.yOut, d.deck.z1], 7));
+  const e = d.enclosure;
+  out.push(box("electronics enclosure", "module", [e.x0, -e.y, d.deck.z1], [e.x1, e.y, d.deck.z1 + e.h], 8));
+  // Probe module: two rails across the bay, a sled on them carrying the drive tower, the cleaning
+  // station hanging under the sled, and the probe on the chain column (the column grows with travel).
+  const r = d.probeRail;
+  for (const sx of [1, -1]) out.push(box("Y rail", "probe", [sx * r.x - r.w / 2, -b.yOut, r.z], [sx * r.x + r.w / 2, b.yOut, r.z + r.h], 9));
+  const sz = r.z + r.h;
+  out.push(box("sled", "probe", [-d.sled.x, -d.sled.y, sz], [d.sled.x, d.sled.y, sz + d.sled.h], 9));
+  const tw = d.tower;
+  out.push(box("drive tower", "probe", [tw.x0, -tw.y, sz + d.sled.h], [tw.x1, tw.y, tw.z1], 9));
+  out.push(box("stepper (belt to the chain sprockets)", "probe", [tw.x1, -21, tw.z1 - 50], [tw.x1 + 42, 21, tw.z1 - 8], 9));
+  const c = d.chain;
+  out.push(cyl("chain magazine", "probe", [c.drumX, 0, c.drumZ], "y", c.drumR, c.width, 9));
+  out.push(box("zip block", "probe", [-14, -10, c.zipZ], [14, 10, c.zipZ + c.zipH], 9));
+  const st = d.station;
+  out.push(cyl("cleaning station", "probe", [0, 0, (st.z0 + st.z1) / 2], "z", st.r, st.z1 - st.z0, 10));
+  for (const sx of [1, -1]) out.push(box("station hanger", "probe", [sx * st.hangerX - 4, -6, st.z1], [sx * st.hangerX + 4, 6, sz], 10));
+  const p = d.probe;
+  const root = p.tip0 + p.needleL - travel;
+  const clampTop = root + p.headL + p.clampH;
+  if (c.zipZ - clampTop > 0.5) out.push(box("chain column", "probe", [-c.w / 2, -c.d / 2, clampTop], [c.w / 2, c.d / 2, c.zipZ], 9));
+  out.push(box("probe clamp", "probe", [-11, -8, root + p.headL], [11, 8, clampTop], 11));
+  out.push(cyl("soil probe head", "probe", [0, 0, root + p.headL / 2], "z", p.headR, p.headL, 11));
+  for (const x of p.needleX) out.push(cyl("needle", "probe", [x, 0, root - p.needleL / 2], "z", p.needleR, p.needleL, 11));
+  const sc = d.scan;
+  out.push(box("scan beam", "module", [sc.x0, -sc.y, sc.z0], [sc.x1, sc.y, sc.z1], 12));
+  for (const sy of [1, -1]) out.push(box("beam strut", "module", [b.x, sy * 70 - 8, 170], [sc.x0, sy * 70 + 8, 186], 12));
+  const l = d.lidar;
+  out.push(box("lidar mast", "module", [l.x - 2, -12, b.z1], [l.x + 2, 12, l.z], 13));
+  out.push(cyl("2D lidar", "module", [l.x, 0, l.z + 15], "z", l.s / 2, 30, 13));
+  out.push(cyl("gnss mast", "module", [d.gnss.x, d.gnss.y, (d.deck.z1 + d.enclosure.h + d.gnss.z) / 2], "z", 6, d.gnss.z - d.deck.z1 - d.enclosure.h, 14));
+  out.push(cyl("gnss antenna", "module", [d.gnss.x, d.gnss.y, d.gnss.z + 9], "z", 30, 18, 14));
+  out.push(cyl("e-stop", "module", [d.estop.x, d.estop.y, d.deck.z1 + 20], "z", 20, 40, 15));
   return out;
 }
 
-// Bill of materials: ref -> item. Class-level choices; exact parts are picked at purchase.
 export const BOM = [
-  [1, "Wheels, 150 mm pneumatic or foam-filled tyres, 4", "chassis kit"],
-  [2, "Corner gear-motors 12 V with hall encoders, 4", "chassis kit"],
-  [3, "Independent trailing-arm suspension, 4", "chassis kit"],
-  [4, "4WD skid-steer chassis tub with centre probe well, Li-ion 3S pack and dual motor driver inside", "chassis kit + cut"],
-  [5, "Rear spring bumper with microswitches; front contact strip on the scan beam", "module"],
-  [6, "Self-cleaning probe cartridge: brush seal, air-knife ring, drop-out bayonet; 12 V air pump in the chassis", "module"],
-  [7, "Standoffs M5, 15 mm, 4 (universal mounting pattern 300 x 170)", "module"],
-  [8, "Module deck, 3 mm aluminium, 400 x 250", "module"],
-  [9, "Probe tower base and top plate", "module"],
-  [10, "Guide rods 10 mm with LM10UU bushings, 2", "module"],
-  [11, "Lead screw T8 x 8 mm lead with brass nut", "module"],
-  [12, "NEMA 17 stepper, driven by a TMC2209 (StallGuard detects hard soil)", "module"],
-  [13, "Carriage plate with cable gland", "module"],
-  [14, "Probe extension tube 16 mm", "module"],
-  [15, "Soil probe: 3-rod stainless FDR, RS485 Modbus, VWC + temperature + EC, with a downward ToF ground sensor", "module"],
-  [16, "IP54 electronics enclosure: Raspberry Pi 5, Pico 2 MCU, TMC2209, RS485 transceiver, 5 V 5 A buck, fuse block", "module"],
-  [17, "2D LiDAR (360 deg, DTOF) on a front mast, for row following and stem detection", "module"],
-  [18, "Front camera (Pi Camera Module 3 Wide), logging and future row vision", "module"],
-  [19, "GNSS antenna on a mast (standard GNSS; RTK upgrade path)", "module"],
-  [20, "E-stop mushroom button, cuts motor power", "module"],
-  [21, "RC receiver for manual drive and kill switch", "module"],
-  [22, "Front scan beam with twin telescopic under-leaf camera arms (upward camera, ring light, window wiper)", "module"],
+  [1, "Hub-motor wheels 8.5 in pneumatic, BLDC with halls, 4 (sealant-filled tyres)", "buy"],
+  [2, "Side rocker beams 30 x 70 aluminium box, with axle drop brackets, 2", "make"],
+  [3, "Rocker pivots (stainless stub shafts, sealed bearings) and differential bar with rod-end links", "make + buy"],
+  [4, "Body side plates, 3 mm aluminium, carrying the rocker pivots; cables and air/water lines run along them", "make"],
+  [5, "Front cross box: 2 dual-channel BLDC FOC controllers with current sensing (CAN)", "make + buy"],
+  [6, "Rear cross box: 12S LiFePO4 6 Ah pack, BMS, main fuse, e-stop contactor, precharge", "make + buy"],
+  [7, "Rear deck plate, 3 mm aluminium", "make"],
+  [8, "IP65 electronics enclosure: Pi 5, MCU, DC-DC rails, isolated RS485, Gore vent", "buy + make"],
+  [9, "Probe module: two Y rails and a sled; sealed tower with a rigid zip-chain drive coiled in a magazine; 24 V stepper with stall detection", "make + buy"],
+  [10, "Cleaning station: PU wiper plate, strip brushes, air/water ring; pump, tank 0.5 L, valves", "make + buy"],
+  [11, "Soil probe: 3-rod stainless FDR, RS485, VWC + temperature + EC, electropolished rods", "buy"],
+  [12, "Front scan beam with drop-down under-leaf camera heads (v1 arms, raised)", "make"],
+  [13, "2D lidar on a front mast", "buy"],
+  [14, "GNSS antenna (RTK-ready)", "buy"],
+  [15, "E-stop, latching, cuts the drive contactor", "buy"],
+  [16, "Dock: charging contacts, probe wash cup with brush, reference block, 10 L water reservoir", "make + buy"],
 ];

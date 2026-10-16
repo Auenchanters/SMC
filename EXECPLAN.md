@@ -30,9 +30,16 @@ opens a Rerun viewer showing the field, plants, lanes, the moving rover, probe p
 - [x] M11 Weather, probe misreads and rechecks (2026-10-15). Rain and evapotranspiration change the soil during a mission; the rover corrects old readings with its rain gauge and can go back to spots it doubts (`recheck`, `fixed_plus_recheck`). Scenario configs in `configs/scenarios/`. See Outcomes for the honest result.
 - [ ] M12 onward: toward a test bench for field robots (roadmap below, not started).
 - [x] Outside the milestones: rover hardware v2 in `hardware/rover-v2/` (2026-10-15), a redesign from the physics after the team lead's review of v1. See Decision Log.
+- [x] Outside the milestones: rover v2 visuals (2026-10-16): interactive anatomy figures (the whole rover; the cleaning levels), audited in CI, and the 3D replay switched to v2. The v2 model was corrected on the way (zip-chain probe drive, differential bar, two rails, beam tilt). See Surprises and Decision Log.
 - [x] Pre-handover review (2026-10-14): two crash bugs fixed, Rerun layout fixed, hardware CI job added, demo video and its recording scripts added. See Surprises, Decision Log and Outcomes.
 
 ## Surprises & Discoveries
+
+- Rover v2 visuals (2026-10-16): the first v2 model (2d4316e) could not work as drawn, and only showed once the parts had to move.
+  - Its probe stroke was 330 mm, but its linear axis spanned z 266 to 400 (134 mm); `parts(travel)` dropped the carriage to z 100, through the rail and the cleaning station. A telescopic axis does not fix it either. The probe head parks with its top at z 330 and is at z 0 to 60 at full depth. Whatever pushes it from above must still pass the station (top at z 205) then, so it is at least 145 to 205 mm long, and parked it would stand 475 to 535 mm up, whatever telescopes above it. Hence the zip chain (Decision Log).
+  - The differential bar ran through the probe tower, and the probe axis through the single Y rail.
+  - The rocker kinematics used `atan(step / wheelbase)`, but the axles stay a wheelbase apart along the beam, so a 100 mm step tilts the beam `asin(1/3)` = 19.5 deg, not 18.4 (the body 9.7 deg, not 9.2). Corrected in `model.mjs`, CALCULATIONS.md and DESIGN.md.
+  - Lesson: animate a design (a pose audit, or the replay) before believing its drawings; static views at rest hid all four.
 
 - Robustness review (2026-10-15, report `SMC-found-and-fixed.md` from an outside review at `ec499ad`; its patch file was not available, so every finding was reproduced on `c7e2d73` and fixed again here). All 22 reproduced. The serious ones:
   - Validation accepted configs where the rover touched plants (34 contacts on seed 7 with a 0.8 m rover, `safety_margin: 0`, `row_spacing: 1.0`, `headland: 1.5`). The cause was a half-degree heading wobble while leaving a lane, with the rover's corner exactly at the canopy edge. Clearance checks now add a tracking allowance: 1.5 cm, plus the corner swing at 0.12 rad (4.3 cm for the demo rover). A fuzz of 300 random configs within 1% of the new limits, with two strategies each, gave 0 contacts.
@@ -83,12 +90,14 @@ opens a Rerun viewer showing the field, plants, lanes, the moving rover, probe p
 - Decision (rover v2, 2026-10-15): redesign rather than patch v1. The team lead found v1 impractical: the probe was buried at the centre, it rode too low and felt unstable, and the electronics, battery and longevity were not designed. Cleaning also still needed a person when it failed. The v2 choices, each from a calculation in `hardware/rover-v2/CALCULATIONS.md`:
   - The probe stays between the axles, because by Newton's third law only there does the whole weight resist the push. It sits in an open bay rather than a well, so it can be seen, reached and swapped from above.
   - A rocker-differential with no springs keeps all four wheels loaded and the push repeatable.
-  - Hub motors and an LFP battery put the mass low and over the probe: 173 N usable push against 54 N for v1.
+  - Hub motors and an LFP battery put the mass low and over the probe: 176 N usable push against 54 N for v1 (173 N before the probe drive was corrected; see Surprises).
   - 216 mm wheels and 150 mm clearance.
   - LiFePO4 with a specified BMS.
   - Cleaning levels 0 to 5 ending at a dock with a reference block, so a person only refills and swaps wear parts on a schedule.
 
-  v1 stays in the repo because the 3D replay's rover is built from it. Date: 2026-10-15.
+  v1 stays in the repo for reference (the 3D replay built v1 until 2026-10-16). Date: 2026-10-15.
+
+- Decision (rover v2 visuals, 2026-10-16): the probe is pushed by a rigid zip chain, not a linear axis. Its two strands coil side by side in a magazine on the sled beside the tower and lock into a 16 x 12 mm column; only that column and the probe pass the cleaning station, the tower stays at 400 mm, and the 28.0 s cycle is unchanged. The user chose this over a taller tower (about 570 mm, against the canopy limit) and over a telescopic stage beside a C-shaped station (see Surprises for why a telescopic axis could not work). The chain's rating at 176 N is an assumption [A] to confirm with a vendor. The probe module's mass went from 1.6 to 2.0 kg [A]; with it the total is 22.5 kg (was 22.1), the centre of mass 178 mm up (was 176), the usable push 176 N centred (was 172 in CALCULATIONS.md, 173 in DESIGN.md) and 130 N at 60 mm to the side (was 128), and the side slope before tipping 43 deg (was 44). `model.mjs` now checks the drive at load and throws if a change breaks it. Same day, for the same figures: the differential bar moved from the bay (where it ran through the probe tower) to a pivot on the front box, 300 mm up so it can rock about 19 deg each way; the single Y rail (the probe passed through it) became two rails fore and aft of the probe, resting on the side plates (the old rail floated 2 mm above them); the cleaning station hangs from the sled, so it stays under the probe when the rail shifts it. The 3D replay now builds v2 (`viewer3d/js/rover.js`: beams pitch on their pivots from the ground under each tyre, the body takes their mean, the bar rocks, the chain column grows with the probe's travel). No new dependencies.
 
 - Decision (robustness review, 2026-10-15): validation now also requires the following:
   - a tracking allowance on top of `safety_margin`;

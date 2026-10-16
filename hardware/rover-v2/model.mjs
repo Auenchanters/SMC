@@ -25,17 +25,27 @@ export const DIM = {
   body: { x: 175, yIn: 105, yOut: 108, z0: 150, z1: 250 }, // 3 mm side plates joined by front and rear boxes
   bay: { x: 95 }, // open tool bay: |x| < 95, |y| < yIn, open below and above
   cross: { x: 175, w: 50 }, // front and rear cross boxes (battery in the rear one)
-  diff: { z: 268, len: 290, r: 8 }, // differential bar across the top, pivoted at the body centre
+  // Differential bar across the front box (not over the bay, where the probe tower stands): it rocks
+  // about a fore-aft pin, and links drop to the beams 125 mm ahead of their pivots. It sits high
+  // enough to rock about 19 deg each way (a 100 mm clod under one wheel) without touching the lid.
+  diff: { x: 125, z: 300, len: 262, r: 8, pin: 10 },
   deck: { x0: -175, x1: -95, z0: 250, z1: 254 }, // rear deck over the battery box
   enclosure: { x0: -172, x1: -98, y: 76, h: 86 }, // electronics, behind the bay
-  probeRail: { y: 60, z: 252 }, // sideways rail over the bay: probe axis can sit at |y| <= 60 (bay half-width 105)
-  tower: { x0: -40, x1: 40, y: 34, z1: 400, motorX: 52 }, // linear axis; stepper beside, belt drive
-  carriage: { x0: -26, x1: 26, y: 30, h: 26 },
-  station: { r: 34, z0: 150, z1: 205 }, // cleaning station at the bay floor (wipers, air/water ring)
+  // Two sideways rails across the bay, resting on the side plates fore and aft of the probe axis; the
+  // probe passes between them. The probe axis can sit at |y| <= 60 (bay half-width 105).
+  probeRail: { y: 60, z: 250, x: 30, w: 12, h: 12 },
+  sled: { x: 48, y: 36, h: 6 }, // rides the rails; carries the drive tower and hangs the cleaning station
+  tower: { x0: -40, x1: 40, y: 34, z1: 400, motorX: 52 }, // sealed drive tower; stepper beside, belt to the sprockets
+  // Rigid push chain (zip-chain type) [A]: two strands, coiled side by side in a magazine on the sled
+  // beside the tower, run through guides into the zip block at the top of the tower and lock together
+  // into a 16 x 12 mm column on the probe axis. A rigid axis would need a tower about 570 mm tall to
+  // push the probe 330 mm through the station; the chain fits in 400.
+  chain: { w: 16, d: 12, zipZ: 336, zipH: 12, drumX: 68, drumZ: 300, drumR: 26, hub: 8, strand: 5, width: 24 },
+  station: { r: 34, z0: 150, z1: 205, bore: 22, hangerX: 42 }, // cleaning station: wipers, brushes, air/water ring
   probe: {
     needleR: 1.5, needleL: 70, needleX: [-12, 0, 12], // 3-rod stainless FDR probe, RS485
-    headR: 18, headL: 50, extR: 8,
-    tip0: 210, // parked tips: above the wipers, inside the air ring
+    headR: 18, headL: 50, clampH: 6, // the head hangs from the chain column by a clamp
+    tip0: 210, // parked tips: just above the station; its nozzle ring blows up along them
     depth: 60, // insertion depth below the local surface
     groundSlack: 60, // extra stroke when the surface under the probe is lower (rut, hollow)
   },
@@ -48,6 +58,29 @@ export const DIM = {
 
 const P = DIM.probe;
 export const STROKE = P.tip0 + P.depth + P.groundSlack;
+
+// ---- Probe drive check: thrown at load, so calc, drawings, figures and the replay all refuse a drive that cannot work.
+// The chain must fit the 400 mm tower, store the whole stroke, and be, with the probe itself, the only thing that
+// passes through the cleaning station; the probe must pass between the rails and through the station.
+{
+  const c = DIM.chain;
+  const st = DIM.station;
+  const r = DIM.probeRail;
+  const fail = (why) => {
+    throw new Error(`model.mjs, probe drive: ${why}`);
+  };
+  const towerZ0 = r.z + r.h + DIM.sled.h;
+  const headTop = P.tip0 + P.needleL + P.headL;
+  const stored = (Math.PI * (c.drumR ** 2 - c.hub ** 2)) / c.strand; // one strand's spiral
+  if (c.zipZ + c.zipH > DIM.tower.z1) fail("the zip block sticks out of the top of the tower");
+  if (c.zipZ !== headTop + P.clampH) fail("the parked probe clamp must sit right under the zip block");
+  if (c.drumX - c.drumR < DIM.tower.x1 || c.drumX + c.drumR > DIM.bay.x) fail("the magazine must sit beside the tower, inside the bay");
+  if (c.drumZ - c.drumR < towerZ0 || c.drumZ + c.drumR > DIM.tower.z1 - 50) fail("the magazine must sit on the sled, under the stepper");
+  if (stored < STROKE) fail(`the magazine stores ${Math.round(stored)} mm of chain, the stroke needs ${STROKE}`);
+  if (Math.hypot(c.w, c.d) / 2 >= st.bore || P.headR >= st.bore) fail("the chain column or the probe head does not pass the station bore");
+  if (r.x - r.w / 2 <= P.headR) fail("the probe head does not pass between the rails");
+  if (towerZ0 <= st.z1 || st.z1 >= P.tip0) fail("only the chain column and the probe may pass the station top");
+}
 export const OVERALL = {
   length: DIM.scan.x1 + DIM.wheel.r + DIM.wheel.base / 2 + 4, // beam front to rear tyre + guard
   width: DIM.wheel.track + DIM.wheel.w,
@@ -65,7 +98,7 @@ export const MASS = [
   ["differential bar, links, pivots", 0.6, 0, 0, 250],
   ["battery 12S LiFePO4 6 Ah with BMS, in the rear cross box", 2.4, -150, 0, 200],
   ["2 dual BLDC controllers, front cross box", 0.7, 150, 0, 200],
-  ["probe module (axis, stepper, carriage, probe, rail)", 1.6, 0, 0, 300],
+  ["probe module (rails, sled, zip-chain drive and magazine, stepper, probe)", 2.0, 0, 0, 300],
   ["cleaning: station, pump, valves, water tank (full)", 1.0, 120, 0, 205],
   ["electronics enclosure, Pi 5, MCU, DC-DC", 0.9, -135, 0, 295],
   ["lidar, cameras, GNSS, e-stop", 0.5, 0, 0, 370],
@@ -86,11 +119,33 @@ export const STABILITY = {
   pitchDeg: deg(Math.atan((DIM.wheel.base / 2 - Math.abs(CG[0])) / CG[2])),
   // A step under one wheel tilts that beam, and the differential tilts the body by half of it.
   stepMm: 100,
-  beamTiltDeg: deg(Math.atan(100 / DIM.wheel.base)),
-  bodyPitchDeg: deg(Math.atan(100 / DIM.wheel.base)) / 2,
+  beamTiltDeg: deg(rockerPose({ fl: 100 }).left.th),
+  bodyPitchDeg: deg(rockerPose({ fl: 100 }).pitch),
   // Braking from top speed in 0.25 s: the deceleration needed to tip it over is far larger.
   tipDecelG: (DIM.wheel.base / 2 - Math.abs(CG[0])) / CG[2],
 };
+
+/** Rocker-differential pose from the ground height (mm) under each wheel: front/rear, left/right.
+ *  Each beam pitches about its pivot to keep both its wheels down (nose up is positive, radians);
+ *  the differential bar turns the beams equal and opposite relative to the body, so the body
+ *  pitches by their mean. z is how far the body rises; roll is its tilt toward the right. */
+export function rockerPose({ fl = 0, rl = 0, fr = 0, rr = 0 } = {}) {
+  const drop = DIM.pivot.z - DIM.wheel.r; // pivot above the axle line
+  const side = (f, r) => {
+    const th = Math.asin(Math.max(-1, Math.min(1, (f - r) / DIM.wheel.base))); // the axles stay a wheelbase apart
+    return { th, pivotZ: DIM.wheel.r + (f + r) / 2 + drop * Math.cos(th) };
+  };
+  const left = side(fl, rl);
+  const right = side(fr, rr);
+  const pitch = (left.th + right.th) / 2;
+  return {
+    left: { ...left, rel: left.th - pitch },
+    right: { ...right, rel: right.th - pitch },
+    pitch,
+    roll: Math.atan2(left.pivotZ - right.pivotZ, 2 * DIM.beam.y),
+    z: (left.pivotZ + right.pivotZ) / 2 - DIM.pivot.z,
+  };
+}
 
 // ---- Soil, traction and climbing --------------------------------------------------------------
 export const SOIL = {
@@ -142,6 +197,19 @@ export function cycle() {
   return { t1, t2, t3, t4, t5, t6 };
 }
 export const WET_CLEAN_S = CLEAN.wetS + CLEAN.dryS + SPEED.check;
+/** Probe travel (mm, 0 = parked, tip0 + depth = full depth on level ground) and phase at time t of one cycle. */
+export function probeAt(t) {
+  const { t1, t2, t3, t4, t5, t6 } = cycle();
+  const full = P.tip0 + P.depth;
+  if (t <= 0) return { travel: 0, phase: "parked" };
+  if (t < t1) return { travel: t * SPEED.approach, phase: "lowering" };
+  if (t < t2) return { travel: P.tip0 + (t - t1) * SPEED.insert, phase: "inserting" };
+  if (t < t3) return { travel: full, phase: "reading" };
+  if (t < t4) return { travel: full - (t - t3) * SPEED.retract, phase: "retracting" };
+  if (t < t5) return { travel: 0, phase: "air blast" };
+  if (t < t6) return { travel: 0, phase: "air check" };
+  return { travel: 0, phase: "parked" };
+}
 
 // ---- Power, battery and BMS --------------------------------------------------------------------
 export const CELL = { chem: "LiFePO4", vNom: 3.2, vMax: 3.65, vChargeTo: 3.55, vMin: 2.5, vCutSoft: 2.9, ah: 6, kg: 0.145 }; // [A] 32700 class
@@ -197,7 +265,7 @@ export const SERVICE = [
   ["Wiper plate (polyurethane)", 5000, "probe cycles", "swap, 2 screws"],
   ["Strip brushes", 10000, "probe cycles", "swap, slide out"],
   ["Pump inlet filter", 20000, "probe cycles", "rinse or swap"],
-  ["Belt and lead nut (behind a bellows)", 50000, "probe cycles", "inspect yearly"],
+  ["Zip chain and sprockets (sealed tower)", 50000, "probe cycles", "inspect yearly"],
   ["Probe (rods, seal)", 30000, "probe cycles", "or when the reference check drifts"],
   ["Tyres", 300, "km", "sealant top-up each season"],
   ["Battery (LiFePO4)", 2000, "full cycles to 80% capacity", "about 5 years at one charge a day"],
@@ -235,24 +303,33 @@ export function parts(travel = 0) {
     const x1 = sx > 0 ? b.x : -d.bay.x;
     out.push(box(sx > 0 ? "front cross box" : "rear cross box (battery)", "chassis", [x0, -b.yIn, b.z0], [x1, b.yIn, b.z1], sx > 0 ? 5 : 6));
   }
-  out.push(cyl("differential bar", "chassis", [0, 0, d.diff.z], "y", d.diff.r, d.diff.len, 3));
-  for (const sy of [1, -1]) out.push(box("diff link", "chassis", [-5, sy * (d.diff.len / 2) - 5, d.beam.z0 + d.beam.h], [5, sy * (d.diff.len / 2) + 5, d.diff.z], 3));
+  const df = d.diff;
+  out.push(box("diff pivot", "chassis", [df.x - df.pin, -df.pin, b.z1], [df.x + df.pin, df.pin, df.z - df.r], 3));
+  out.push(cyl("differential bar", "chassis", [df.x, 0, df.z], "y", df.r, df.len, 3));
+  for (const sy of [1, -1]) out.push(box("diff link", "chassis", [df.x - 5, sy * d.beam.y - 5, d.beam.z0 + d.beam.h], [df.x + 5, sy * d.beam.y + 5, df.z - df.r], 3));
   out.push(box("rear deck", "module", [d.deck.x0, -b.yOut, d.deck.z0], [d.deck.x1, b.yOut, d.deck.z1], 7));
   const e = d.enclosure;
   out.push(box("electronics enclosure", "module", [e.x0, -e.y, d.deck.z1], [e.x1, e.y, d.deck.z1 + e.h], 8));
-  // Probe module: rail across the bay, tower on the rail, cleaning station at the bay floor.
+  // Probe module: two rails across the bay, a sled on them carrying the drive tower, the cleaning
+  // station hanging under the sled, and the probe on the chain column (the column grows with travel).
   const r = d.probeRail;
-  out.push(box("Y rail", "probe", [-12, -b.yIn, r.z], [12, b.yIn, r.z + 14], 9));
+  for (const sx of [1, -1]) out.push(box("Y rail", "probe", [sx * r.x - r.w / 2, -b.yOut, r.z], [sx * r.x + r.w / 2, b.yOut, r.z + r.h], 9));
+  const sz = r.z + r.h;
+  out.push(box("sled", "probe", [-d.sled.x, -d.sled.y, sz], [d.sled.x, d.sled.y, sz + d.sled.h], 9));
   const tw = d.tower;
-  out.push(box("linear axis", "probe", [tw.x0, -tw.y, r.z + 14], [tw.x1, tw.y, tw.z1], 9));
-  out.push(box("stepper (belt drive)", "probe", [tw.x1, -21, tw.z1 - 50], [tw.x1 + 42, 21, tw.z1 - 8], 9));
+  out.push(box("drive tower", "probe", [tw.x0, -tw.y, sz + d.sled.h], [tw.x1, tw.y, tw.z1], 9));
+  out.push(box("stepper (belt to the chain sprockets)", "probe", [tw.x1, -21, tw.z1 - 50], [tw.x1 + 42, 21, tw.z1 - 8], 9));
+  const c = d.chain;
+  out.push(cyl("chain magazine", "probe", [c.drumX, 0, c.drumZ], "y", c.drumR, c.width, 9));
+  out.push(box("zip block", "probe", [-14, -10, c.zipZ], [14, 10, c.zipZ + c.zipH], 9));
   const st = d.station;
   out.push(cyl("cleaning station", "probe", [0, 0, (st.z0 + st.z1) / 2], "z", st.r, st.z1 - st.z0, 10));
+  for (const sx of [1, -1]) out.push(box("station hanger", "probe", [sx * st.hangerX - 4, -6, st.z1], [sx * st.hangerX + 4, 6, sz], 10));
   const p = d.probe;
   const root = p.tip0 + p.needleL - travel;
-  const cz = tw.z1 - 30 - travel;
-  out.push(box("carriage", "probe", [d.carriage.x0, -d.carriage.y, cz], [d.carriage.x1, d.carriage.y, cz + d.carriage.h], 9));
-  out.push(cyl("probe extension", "probe", [0, 0, (root + p.headL + cz) / 2], "z", p.extR, Math.max(1, cz - root - p.headL), 11));
+  const clampTop = root + p.headL + p.clampH;
+  if (c.zipZ - clampTop > 0.5) out.push(box("chain column", "probe", [-c.w / 2, -c.d / 2, clampTop], [c.w / 2, c.d / 2, c.zipZ], 9));
+  out.push(box("probe clamp", "probe", [-11, -8, root + p.headL], [11, 8, clampTop], 11));
   out.push(cyl("soil probe head", "probe", [0, 0, root + p.headL / 2], "z", p.headR, p.headL, 11));
   for (const x of p.needleX) out.push(cyl("needle", "probe", [x, 0, root - p.needleL / 2], "z", p.needleR, p.needleL, 11));
   const sc = d.scan;
@@ -276,7 +353,7 @@ export const BOM = [
   [6, "Rear cross box: 12S LiFePO4 6 Ah pack, BMS, main fuse, e-stop contactor, precharge", "make + buy"],
   [7, "Rear deck plate, 3 mm aluminium", "make"],
   [8, "IP65 electronics enclosure: Pi 5, MCU, DC-DC rails, isolated RS485, Gore vent", "buy + make"],
-  [9, "Probe module: Y rail, belt linear axis behind a bellows, 24 V stepper with stall detection", "make + buy"],
+  [9, "Probe module: two Y rails and a sled; sealed tower with a rigid zip-chain drive coiled in a magazine; 24 V stepper with stall detection", "make + buy"],
   [10, "Cleaning station: PU wiper plate, strip brushes, air/water ring; pump, tank 0.5 L, valves", "make + buy"],
   [11, "Soil probe: 3-rod stainless FDR, RS485, VWC + temperature + EC, electropolished rods", "buy"],
   [12, "Front scan beam with drop-down under-leaf camera heads (v1 arms, raised)", "make"],

@@ -10,7 +10,7 @@ const PHASE = {
   lowering: "Lowering the probe to the ground",
   inserting: "Pushing the probe into the soil",
   reading: "Measuring the soil moisture",
-  retracting: "Pulling the probe out; brushes wipe the soil off",
+  retracting: "Pulling the probe out; a wiper plate and brushes scrape the soil off",
   "air blast": "Blowing the probe dry with air",
   "air check": "Checking the probe is clean",
   parked: "Probe parked",

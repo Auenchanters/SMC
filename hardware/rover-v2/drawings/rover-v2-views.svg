@@ -21,9 +21,9 @@
 <rect class="soil" x="169" y="222" width="132" height="16"/>
 <circle cx="205" cy="200.4" r="12.4" class="solid"/>
 <circle cx="265" cy="200.4" r="12.4" class="solid"/>
-<rect x="234" y="168.4" width="2" height="6.6" rx="0.6" class="solid"/>
 <circle cx="205" cy="200.4" r="21.6" class="solid"/>
 <circle cx="265" cy="200.4" r="21.6" class="solid"/>
+<rect x="209" y="163.6" width="2" height="11.4" rx="0.6" class="solid"/>
 <rect x="202.2" y="189" width="5.6" height="14.2" rx="0.6" class="solid"/>
 <rect x="262.2" y="189" width="5.6" height="14.2" rx="0.6" class="solid"/>
 <rect x="197" y="175" width="76" height="14" rx="0.6" class="solid"/>
@@ -34,29 +34,35 @@
 <rect x="237.1" y="166" width="0.6" height="14" rx="0" class="solid"/>
 <rect x="234.7" y="166" width="0.6" height="14" rx="0" class="solid"/>
 <rect x="232.3" y="166" width="0.6" height="14" rx="0" class="solid"/>
+<rect x="225.8" y="169.6" width="1.6" height="11.4" rx="0.6" class="solid"/>
+<rect x="242.6" y="169.6" width="1.6" height="11.4" rx="0.6" class="solid"/>
 <rect x="263.8" y="142" width="2.4" height="12" rx="0" class="solid"/>
-<rect x="233.4" y="148" width="3.2" height="8" rx="0" class="solid"/>
+<rect x="232.8" y="154.8" width="4.4" height="1.2" rx="0.6" class="solid"/>
+<rect x="208" y="163.6" width="4" height="8.4" rx="0.6" class="solid"/>
+<rect x="232.2" y="152.4" width="5.6" height="2.4" rx="0.6" class="solid"/>
+<circle cx="221.4" cy="162" r="5.2" class="solid"/>
 <rect x="204.6" y="156" width="0.8" height="16" rx="0.6" class="solid"/>
 <rect x="231.4" y="156" width="7.2" height="10" rx="0" class="solid"/>
 <rect x="201" y="150" width="8" height="6" rx="0" class="solid"/>
 <rect x="218.6" y="143.6" width="8.4" height="8.4" rx="0.6" class="solid"/>
-<rect x="229.8" y="142.8" width="10.4" height="5.2" rx="0.6" class="solid"/>
 <rect x="259" y="138.4" width="12" height="3.6" rx="0" class="solid"/>
-<rect x="227" y="142" width="16" height="26.8" rx="0.6" class="solid"/>
+<rect x="227" y="142" width="16" height="26.4" rx="0.6" class="solid"/>
 <rect x="228.2" y="181" width="13.6" height="11" rx="0" class="solid"/>
+<rect x="225.4" y="168.4" width="19.2" height="1.2" rx="0.6" class="solid"/>
 <rect x="254.6" y="154" width="14.8" height="17.2" rx="0.6" class="solid"/>
 <rect x="179" y="184.8" width="21" height="3.2" rx="0.6" class="solid"/>
 <rect x="200" y="172" width="16" height="20" rx="0.6" class="solid"/>
 <rect x="254" y="172" width="16" height="20" rx="0.6" class="solid"/>
-<rect x="232.6" y="168.8" width="4.8" height="2.8" rx="0.6" class="solid"/>
 <rect x="200" y="172" width="70" height="20" rx="0.6" class="solid"/>
 <rect x="254" y="171.2" width="16" height="0.8" rx="0.6" class="solid"/>
+<rect x="227.8" y="169.6" width="2.4" height="2.4" rx="0.6" class="solid"/>
+<rect x="239.8" y="169.6" width="2.4" height="2.4" rx="0.6" class="solid"/>
 <circle cx="235" cy="182" r="2.4" class="solid"/>
+<rect x="209" y="163.6" width="2" height="11.4" rx="0.6" class="solid"/>
+<circle cx="210" cy="162" r="1.6" class="solid"/>
 <rect x="202.2" y="189" width="5.6" height="14.2" rx="0.6" class="solid"/>
 <rect x="262.2" y="189" width="5.6" height="14.2" rx="0.6" class="solid"/>
 <rect x="197" y="175" width="76" height="14" rx="0.6" class="solid"/>
-<circle cx="235" cy="168.4" r="1.6" class="solid"/>
-<rect x="234" y="168.4" width="2" height="6.6" rx="0.6" class="solid"/>
 <rect x="173" y="184" width="6" height="8" rx="0.6" class="solid"/>
 <circle cx="205" cy="200.4" r="12.4" class="solid"/>
 <circle cx="265" cy="200.4" r="12.4" class="solid"/>
@@ -65,13 +71,19 @@
 <rect x="237.1" y="220" width="0.6" height="14" rx="0" class="phantom"/>
 <rect x="234.7" y="220" width="0.6" height="14" rx="0" class="phantom"/>
 <rect x="232.3" y="220" width="0.6" height="14" rx="0" class="phantom"/>
-<rect x="233.4" y="202" width="3.2" height="8" rx="0" class="phantom"/>
+<rect x="225.8" y="169.6" width="1.6" height="11.4" rx="0.6" class="phantom"/>
+<rect x="242.6" y="169.6" width="1.6" height="11.4" rx="0.6" class="phantom"/>
+<rect x="233.4" y="154.8" width="3.2" height="54" rx="0.6" class="phantom"/>
+<rect x="232.8" y="208.8" width="4.4" height="1.2" rx="0.6" class="phantom"/>
+<rect x="232.2" y="152.4" width="5.6" height="2.4" rx="0.6" class="phantom"/>
+<circle cx="221.4" cy="162" r="5.2" class="phantom"/>
 <rect x="231.4" y="210" width="7.2" height="10" rx="0" class="phantom"/>
 <rect x="218.6" y="143.6" width="8.4" height="8.4" rx="0.6" class="phantom"/>
-<rect x="229.8" y="196.8" width="10.4" height="5.2" rx="0.6" class="phantom"/>
-<rect x="227" y="142" width="16" height="26.8" rx="0.6" class="phantom"/>
+<rect x="227" y="142" width="16" height="26.4" rx="0.6" class="phantom"/>
 <rect x="228.2" y="181" width="13.6" height="11" rx="0" class="phantom"/>
-<rect x="232.6" y="168.8" width="4.8" height="2.8" rx="0.6" class="phantom"/>
+<rect x="225.4" y="168.4" width="19.2" height="1.2" rx="0.6" class="phantom"/>
+<rect x="227.8" y="169.6" width="2.4" height="2.4" rx="0.6" class="phantom"/>
+<rect x="239.8" y="169.6" width="2.4" height="2.4" rx="0.6" class="phantom"/>
 <text class="vtitle" x="235" y="252" text-anchor="middle">LEFT SIDE ELEVATION (from +y)</text>
 </g>
 <g data-view="front">
@@ -89,21 +101,27 @@
 <rect x="53.3" y="188" width="10.4" height="24.8" rx="0" class="solid"/>
 <rect x="119.5" y="178.8" width="12" height="43.2" rx="0" class="solid"/>
 <rect x="52.5" y="178.8" width="12" height="43.2" rx="0" class="solid"/>
+<rect x="90.8" y="169.6" width="2.4" height="11.4" rx="0.6" class="solid"/>
+<rect x="70.4" y="169.6" width="43.2" height="2.4" rx="0.6" class="solid"/>
 <rect x="91.7" y="166" width="0.6" height="14" rx="0" class="solid"/>
 <rect x="91.7" y="166" width="0.6" height="14" rx="0" class="solid"/>
-<rect x="120" y="168.4" width="2" height="6.6" rx="0.6" class="solid"/>
-<rect x="62" y="168.4" width="2" height="6.6" rx="0.6" class="solid"/>
-<rect x="63" y="166.8" width="58" height="3.2" rx="0" class="solid"/>
-<rect x="90.4" y="148" width="3.2" height="8" rx="0" class="solid"/>
+<rect x="90.4" y="154.8" width="3.2" height="1.2" rx="0.6" class="solid"/>
 <rect x="113.6" y="179.6" width="1" height="4.8" rx="0" class="solid"/>
 <rect x="69.4" y="179.6" width="1" height="4.8" rx="0" class="solid"/>
-<rect x="71" y="168.8" width="42" height="2.8" rx="0.6" class="solid"/>
 <rect x="91.7" y="166" width="0.6" height="14" rx="0" class="solid"/>
+<rect x="90" y="152.4" width="4" height="2.4" rx="0.6" class="solid"/>
 <rect x="88.4" y="156" width="7.2" height="10" rx="0" class="solid"/>
-<rect x="86" y="142.8" width="12" height="5.2" rx="0.6" class="solid"/>
 <rect x="85.2" y="181" width="13.6" height="11" rx="0" class="solid"/>
-<rect x="85.2" y="142" width="13.6" height="26.8" rx="0.6" class="solid"/>
+<rect x="70.4" y="169.6" width="43.2" height="2.4" rx="0.6" class="solid"/>
+<rect x="85.2" y="142" width="13.6" height="26.4" rx="0.6" class="solid"/>
+<rect x="90.8" y="169.6" width="2.4" height="11.4" rx="0.6" class="solid"/>
+<rect x="84.8" y="168.4" width="14.4" height="1.2" rx="0.6" class="solid"/>
 <rect x="87.8" y="143.6" width="8.4" height="8.4" rx="0.6" class="solid"/>
+<rect x="89.6" y="156.8" width="4.8" height="10.4" rx="0" class="solid"/>
+<rect x="115.6" y="163.6" width="2" height="11.4" rx="0.6" class="solid"/>
+<rect x="66.4" y="163.6" width="2" height="11.4" rx="0.6" class="solid"/>
+<rect x="65.8" y="160.4" width="52.4" height="3.2" rx="0" class="solid"/>
+<rect x="90" y="163.6" width="4" height="8.4" rx="0.6" class="solid"/>
 <rect x="89.6" y="156" width="4.8" height="16" rx="0.6" class="solid"/>
 <rect x="114.6" y="189" width="4" height="14.2" rx="0.6" class="solid"/>
 <rect x="65.4" y="189" width="4" height="14.2" rx="0.6" class="solid"/>
@@ -120,16 +138,22 @@
 <rect x="104.4" y="184.8" width="3.2" height="3.2" rx="0.6" class="solid"/>
 <rect x="76.4" y="184.8" width="3.2" height="3.2" rx="0.6" class="solid"/>
 <rect x="55" y="184" width="74" height="8" rx="0.6" class="solid"/>
+<rect x="90.8" y="169.6" width="2.4" height="11.4" rx="0.6" class="phantom"/>
+<rect x="70.4" y="169.6" width="43.2" height="2.4" rx="0.6" class="phantom"/>
 <rect x="91.7" y="220" width="0.6" height="14" rx="0" class="phantom"/>
 <rect x="91.7" y="220" width="0.6" height="14" rx="0" class="phantom"/>
-<rect x="90.4" y="202" width="3.2" height="8" rx="0" class="phantom"/>
-<rect x="71" y="168.8" width="42" height="2.8" rx="0.6" class="phantom"/>
+<rect x="90.8" y="154.8" width="2.4" height="54" rx="0.6" class="phantom"/>
+<rect x="90.4" y="208.8" width="3.2" height="1.2" rx="0.6" class="phantom"/>
 <rect x="91.7" y="220" width="0.6" height="14" rx="0" class="phantom"/>
+<rect x="90" y="152.4" width="4" height="2.4" rx="0.6" class="phantom"/>
 <rect x="88.4" y="210" width="7.2" height="10" rx="0" class="phantom"/>
-<rect x="86" y="196.8" width="12" height="5.2" rx="0.6" class="phantom"/>
 <rect x="85.2" y="181" width="13.6" height="11" rx="0" class="phantom"/>
-<rect x="85.2" y="142" width="13.6" height="26.8" rx="0.6" class="phantom"/>
+<rect x="70.4" y="169.6" width="43.2" height="2.4" rx="0.6" class="phantom"/>
+<rect x="85.2" y="142" width="13.6" height="26.4" rx="0.6" class="phantom"/>
+<rect x="90.8" y="169.6" width="2.4" height="11.4" rx="0.6" class="phantom"/>
+<rect x="84.8" y="168.4" width="14.4" height="1.2" rx="0.6" class="phantom"/>
 <rect x="87.8" y="143.6" width="8.4" height="8.4" rx="0.6" class="phantom"/>
+<rect x="89.6" y="156.8" width="4.8" height="10.4" rx="0" class="phantom"/>
 <text class="vtitle" x="92" y="252" text-anchor="middle">FRONT ELEVATION (from +x)</text>
 </g>
 <g data-view="plan">
@@ -158,21 +182,27 @@
 <rect x="200" y="51" width="16" height="42" rx="0.6" class="solid"/>
 <rect x="254" y="51" width="16" height="42" rx="0.6" class="solid"/>
 <rect x="254" y="50.4" width="16" height="43.2" rx="0.6" class="solid"/>
-<rect x="232.6" y="51" width="4.8" height="42" rx="0.6" class="solid"/>
-<rect x="234" y="100" width="2" height="2" rx="0.6" class="solid"/>
-<rect x="234" y="42" width="2" height="2" rx="0.6" class="solid"/>
-<rect x="233.4" y="43" width="3.2" height="58" rx="0" class="solid"/>
+<rect x="227.8" y="50.4" width="2.4" height="43.2" rx="0.6" class="solid"/>
+<rect x="239.8" y="50.4" width="2.4" height="43.2" rx="0.6" class="solid"/>
+<rect x="225.8" y="70.8" width="1.6" height="2.4" rx="0.6" class="solid"/>
+<rect x="242.6" y="70.8" width="1.6" height="2.4" rx="0.6" class="solid"/>
+<rect x="225.4" y="64.8" width="19.2" height="14.4" rx="0.6" class="solid"/>
 <circle cx="237.4" cy="72" r="0.3" class="solid"/>
 <circle cx="235" cy="72" r="0.3" class="solid"/>
 <circle cx="232.6" cy="72" r="0.3" class="solid"/>
+<rect x="208" y="70" width="4" height="4" rx="0.6" class="solid"/>
+<rect x="209" y="95.6" width="2" height="2" rx="0.6" class="solid"/>
+<rect x="209" y="46.4" width="2" height="2" rx="0.6" class="solid"/>
 <circle cx="265" cy="53" r="4" class="solid"/>
+<rect x="208.4" y="45.8" width="3.2" height="52.4" rx="0" class="solid"/>
+<rect x="216.2" y="69.6" width="10.4" height="4.8" rx="0" class="solid"/>
 <circle cx="235" cy="72" r="3.6" class="solid"/>
 <rect x="204.6" y="69.6" width="0.8" height="4.8" rx="0.6" class="solid"/>
+<rect x="232.8" y="70.4" width="4.4" height="3.2" rx="0.6" class="solid"/>
 <rect x="254.6" y="56.8" width="14.8" height="30.4" rx="0.6" class="solid"/>
+<rect x="232.2" y="70" width="5.6" height="4" rx="0.6" class="solid"/>
 <circle cx="205" cy="72" r="4" class="solid"/>
-<circle cx="235" cy="72" r="1.6" class="solid"/>
 <rect x="218.6" y="67.8" width="8.4" height="8.4" rx="0.6" class="solid"/>
-<rect x="229.8" y="66" width="10.4" height="12" rx="0.6" class="solid"/>
 <rect x="227" y="65.2" width="16" height="13.6" rx="0.6" class="solid"/>
 <circle cx="265" cy="72" r="1.2" class="solid"/>
 <circle cx="265" cy="72" r="6" class="solid"/>
@@ -213,7 +243,7 @@
 <text x="304" y="146.40000000000003">6</text><text x="312" y="146.40000000000003">Rear cross box: 12S LiFePO4 6 Ah pack, BMS, main f…</text>
 <text x="304" y="150.80000000000004">7</text><text x="312" y="150.80000000000004">Rear deck plate, 3 mm aluminium</text>
 <text x="304" y="155.20000000000005">8</text><text x="312" y="155.20000000000005">IP65 electronics enclosure: Pi 5, MCU, DC-DC rails…</text>
-<text x="304" y="159.60000000000005">9</text><text x="312" y="159.60000000000005">Probe module: Y rail, belt linear axis behind a be…</text>
+<text x="304" y="159.60000000000005">9</text><text x="312" y="159.60000000000005">Probe module: two Y rails and a sled; sealed tower…</text>
 <text x="304" y="164.00000000000006">10</text><text x="312" y="164.00000000000006">Cleaning station: PU wiper plate, strip brushes, a…</text>
 <text x="304" y="168.40000000000006">11</text><text x="312" y="168.40000000000006">Soil probe: 3-rod stainless FDR, RS485, VWC + temp…</text>
 <text x="304" y="172.80000000000007">12</text><text x="312" y="172.80000000000007">Front scan beam with drop-down under-leaf camera h…</text>

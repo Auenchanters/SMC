@@ -52,8 +52,8 @@ def test_server_serves_viewer_and_scene(cfg: SimConfig, tmp_path: Path) -> None:
 
 def test_viewer_rover_model_is_the_hardware_model() -> None:
     copy = (VIEWER / "rover-model.mjs").read_bytes()
-    assert copy == (REPO / "hardware" / "rover-v1" / "model.mjs").read_bytes(), (
-        "copy hardware/rover-v1/model.mjs to src/agrisim/viewer3d/rover-model.mjs"
+    assert copy == (REPO / "hardware" / "rover-v2" / "model.mjs").read_bytes(), (
+        "copy hardware/rover-v2/model.mjs to src/agrisim/viewer3d/rover-model.mjs"
     )
 
 
