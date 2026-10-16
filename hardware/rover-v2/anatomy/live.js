@@ -29,26 +29,15 @@ const move = (els, by) => {
 const usableAt = (y) => D.usable[clamp(Math.round(Math.abs(y)), 0, D.railMax)];
 const forceOf = (depth) => (depth <= 0 ? 0 : D.soil.coneMPa.dry * D.area + (D.soil.shaftKPa.dry / 1000) * D.perimeter * depth);
 
-// ---- the chain coil on the magazine's near cheek: its outer turn shrinks as the chain pays out
-function coilSvg(travel) {
-  const C = D.chain;
-  const stored = (Math.PI * (C.drumR ** 2 - C.hub ** 2)) / C.strand;
-  const rOut = Math.sqrt(C.hub ** 2 + (Math.max(0, stored - travel) * C.strand) / Math.PI);
-  const turns = (rOut - C.hub) / C.strand;
-  const n = Math.max(2, Math.round(turns * 48));
-  const at = (x, z) => iso([x, C.width / 2 + 0.05, z], P);
-  const pts = Array.from({ length: n + 1 }, (_, i) => {
-    const u = i / n;
-    const a = -u * turns * Math.PI * 2;
-    const r = C.hub + u * (rOut - C.hub);
-    return at(C.drumX + Math.cos(a) * r, C.drumZ + Math.sin(a) * r);
-  });
-  // The chain's free end runs out to the rim, where it leaves for the guides.
-  const rim = C.drumR - 1.5;
-  const aEnd = -turns * Math.PI * 2;
-  pts.push(at(C.drumX + Math.cos(aEnd) * rim, C.drumZ + Math.sin(aEnd) * rim));
-  const circle = (r) => pathOf(Array.from({ length: 49 }, (_, i) => at(C.drumX + Math.cos((i / 48) * Math.PI * 2) * r, C.drumZ + Math.sin((i / 48) * Math.PI * 2) * r)), true);
-  return lineSvg(pathOf(pts), { tone: "lo" }) + lineSvg(circle(C.hub), { tone: "mid" }) + lineSvg(circle(rim), { tone: "faint" });
+// ---- the bellows below the carriage: one pleat about every 6 mm of its length
+function bellowsSvg(cz) {
+  const A3 = D.axis;
+  const B2 = A3.bellows;
+  const h = cz - A3.z0;
+  const n = Math.max(1, Math.round(h / 6));
+  const plan = { x: -B2.x, y: B2.y0, w: 2 * B2.x, d: B2.y1 - B2.y0, r: 0.4 };
+  const pleats = Array.from({ length: n - 1 }, (_, i) => sideSeam(plan, A3.z0 + ((i + 1) * h) / n, P, 2)).join("");
+  return solidSvg(slabOf(plan, A3.z0, h, P, 2), { tone: "lo", inner: lineSvg(pleats, { tone: "faint" }) });
 }
 // Behind the notch the soil hides the rods below its surface (the line where it meets the probe's plane).
 function soilClip(y) {
@@ -89,7 +78,7 @@ function place(lift, rail, travel) {
   if (Math.abs(travel - shown.travel) >= 0.01) {
     const t = translateAlong(P, [0, 0, -travel]);
     for (const el of PROBE) el.setAttribute("transform", t);
-    partEl.coil.innerHTML = coilSvg(travel);
+    partEl.bellows.innerHTML = bellowsSvg(D.axis.carriageZ0 - travel);
   }
   shown.lift = lift;
   shown.rail = rail;

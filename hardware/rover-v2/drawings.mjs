@@ -11,9 +11,9 @@ const f = (v) => Math.round(v * 100) / 100;
 
 // View definitions: screen u (right), v (up), depth (toward the viewer).
 const VIEWS = {
-  side: { title: "LEFT SIDE ELEVATION (from +y)", u: (p) => -p[0], v: (p) => p[2], d: (p) => p[1], ox: 235, oy: 222 },
-  front: { title: "FRONT ELEVATION (from +x)", u: (p) => p[1], v: (p) => p[2], d: (p) => p[0], ox: 92, oy: 222 },
-  plan: { title: "PLAN (from above)", u: (p) => -p[0], v: (p) => -p[1], d: (p) => p[2], ox: 235, oy: 72 },
+  side: { title: "LEFT SIDE ELEVATION (from +y)", u: (p) => -p[0], v: (p) => p[2], d: (p) => p[1], ox: 235, oy: 238 },
+  front: { title: "FRONT ELEVATION (from +x)", u: (p) => p[1], v: (p) => p[2], d: (p) => p[0], ox: 92, oy: 238 },
+  plan: { title: "PLAN (from above)", u: (p) => -p[0], v: (p) => -p[1], d: (p) => p[2], ox: 235, oy: 66 },
 };
 
 function corners(part) {
@@ -100,7 +100,7 @@ for (const [name, view] of Object.entries(VIEWS)) {
   }
   out.push(drawView(view, 0));
   if (name !== "plan") out.push(drawView(view, DIM.probe.tip0 + DIM.probe.depth, true));
-  out.push(`<text class="vtitle" x="${view.ox}" y="${name === "plan" ? 22 : 252}" text-anchor="middle">${view.title}</text>`);
+  out.push(`<text class="vtitle" x="${view.ox}" y="${name === "plan" ? 20 : 272}" text-anchor="middle">${view.title}</text>`);
   out.push("</g>");
 }
 // Centre lines: wheel axles and the probe axis.

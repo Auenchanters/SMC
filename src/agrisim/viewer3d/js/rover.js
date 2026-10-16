@@ -20,7 +20,7 @@ function partMaterial(name) {
   if (/e-stop/.test(name)) return M.red;
   if (/stepper|lidar$|probe head/.test(name)) return M.black;
   if (/pivot|differential bar|extension|needle/.test(name)) return M.chrome;
-  if (/drive tower|probe clamp/.test(name)) return M.blue;
+  if (/linear axis|axis top plate|carriage/.test(name)) return M.blue;
   if (/rocker beam|axle bracket|diff link|diff pivot|deck|rail|sled|hanger|scan beam|strut|mast/.test(name)) return M.alu;
   if (/cleaning station/.test(name)) return M.orange;
   if (/enclosure|gnss antenna/.test(name)) return M.white;
@@ -108,7 +108,7 @@ function wheelAssembly(p, tyreMat) {
 
 const BEAM = /^(wheel|hub motor|axle bracket|rocker beam)$/;
 const DIFF = /^(differential bar|diff link)$/; // the bar rocks on its pin; the links ride with it
-const MOVING = /^(probe clamp|soil probe head|needle)$/; // what the probe stroke moves; the chain column grows
+const MOVING = /^(carriage|probe extension|soil probe head|needle)$/; // what the probe stroke moves
 // The diff links meet the beams this far ahead of and above their pivots.
 const LINK_X = DIM.diff.x;
 const LINK_H = DIM.beam.z0 + DIM.beam.h - DIM.pivot.z;
@@ -140,13 +140,7 @@ export function buildRover(view) {
     } else if (DIFF.test(p.name)) into(diff, partMesh(p));
     else (MOVING.test(p.name) ? probe : root).add(partMesh(p));
   }
-  // The chain column: a unit-tall bar hanging from the sprockets, stretched to the probe's travel.
-  const C = DIM.chain;
-  const column = new THREE.Mesh(new THREE.BoxGeometry(C.w * MM, 1, C.d * MM).translate(0, -0.5, 0), M.dark);
-  column.position.copy(v3(0, 0, C.zipZ));
-  column.castShadow = true;
-  column.visible = false;
-  root.add(probe, diff, beams.left, beams.right, column);
+  root.add(probe, diff, beams.left, beams.right);
   view.scene.add(root);
   const lift = new THREE.Vector3();
   return {
@@ -174,8 +168,6 @@ export function buildRover(view) {
       diff.rotation.x = Math.asin(rise / DIM.beam.y);
       for (const w of wheels) w.rotation.z = -(w.userData.left ? here.rollL : here.rollR) / WHEEL_R;
       probe.position.y = -travel * MM;
-      column.visible = travel > 0.5;
-      column.scale.y = Math.max(travel, 0.5) * MM;
     },
   };
 }

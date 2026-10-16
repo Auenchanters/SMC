@@ -208,17 +208,10 @@ function probeSvg(t) {
   }
   parts.unshift(S(G.disc(root, top, PR.headR, F, P, { steps: 48 }), { tone: "hi", lit: true }) + Ln(k.sideArc(0, 0, PR.headR, root + 14, P, 48), { tone: "lo" }));
   shapes.push(A.disc(F, root, top, PR.headR, { name: "probe.head", ground: true }));
-  // The clamp on the head, and the chain column it hangs from, drawn long enough to reach the cut at
-  // any travel; the clip ends it there.
-  const CH = D.chain;
-  const clampTop = root + PR.headL + PR.clampH;
+  // The extension rod, drawn long enough to reach the cut at any travel; the clip ends it there.
   if (root + PR.headL < SHOW_TOP) {
-    const clamp = { x: -11, y: -8, w: 22, d: 16, r: 1 };
-    const col = { x: -CH.w / 2, y: -CH.d / 2, w: CH.w, d: CH.d, r: 0.6 };
-    parts.unshift(S(k.slabOf(clamp, root + PR.headL, PR.clampH, P, 2, 0.3), { tone: "mid" }));
-    parts.unshift(S(k.slabOf(col, clampTop, SHOW_TOP + PR.tip0 + PR.depth - clampTop, P, 2), { tone: "lo" }));
-    shapes.push(A.slab(clamp, root + PR.headL, Math.min(PR.clampH, SHOW_TOP - root - PR.headL), { name: "probe.clamp", ground: true }, 2));
-    if (SHOW_TOP - clampTop > 0.2) shapes.push(A.slab(col, clampTop, SHOW_TOP - clampTop, { name: "probe.column", ground: true }, 2));
+    parts.unshift(S(G.disc(root + PR.headL, SHOW_TOP + PR.tip0 + PR.depth, PR.extR, F, P, { steps: 32 }), { tone: "hi" }));
+    shapes.push(A.disc(F, root + PR.headL, SHOW_TOP, PR.extR, { name: "probe.ext", ground: true }));
   }
   return { svg: parts.join(""), shapes, root };
 }

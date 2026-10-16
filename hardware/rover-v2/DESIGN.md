@@ -29,11 +29,11 @@ Status: **design targets, not built or tested.** Every number comes from [model.
 Pushing the probe into the soil pushes the rover up with the same force. The push can never exceed the weight holding the rover down, and it is only that large if the push acts at the centre of the supports. So:
 
 - **The probe stays between the axles.** This is the only place where the full weight resists the push. Putting it behind the rear axle (v1 calculated 25 N) or outside the wheels (which would also reach into the plant row) throws most of the weight away. v2 keeps the probe on the line between the axles, but in an **open bay you can see and reach** (Section 3), not inside the machine.
-- **Mass is useful when it sits low and over the probe.** The four hub motors (9.6 kg) sit at axle height, and the battery and the controllers are balanced fore and aft of the probe. The centre of mass ends up within a millimetre of the probe axis and 178 mm off the ground.
-- **Result:** 176 N usable push, with the probe centred and a 20% safety margin. That is 1.7 x the 106 N dry-crust estimate, against v1's 54 N. With the probe moved 60 mm to one side, 130 N is still usable.
+- **Mass is useful when it sits low and over the probe.** The four hub motors (9.6 kg) sit at axle height, and the battery and the controllers are balanced fore and aft of the probe. The centre of mass ends up within a millimetre of the probe axis and 186 mm off the ground.
+- **Result:** 175 N usable push, with the probe centred and a 20% safety margin. That is 1.6 x the 106 N dry-crust estimate, against v1's 54 N. With the probe moved 60 mm to one side, 129 N is still usable.
 
 ### 2.2 Staying upright: the support polygon
-A rover tips when the line straight down from its centre of mass leaves the polygon of wheel contacts. With a 335 mm track, a 300 mm wheelbase and the centre of mass at 178 mm, v2 tolerates a 43 deg side slope and a 40 deg fore-aft slope before tipping (static). It needs 0.84 g of braking to tip forward, and a stop from 0.5 m/s in 0.25 s is 0.2 g. Wider is not possible: the lane between canopies is 0.60 m, and the simulator's clearance check uses the 0.40 m width.
+A rover tips when the line straight down from its centre of mass leaves the polygon of wheel contacts. With a 335 mm track, a 300 mm wheelbase and the centre of mass at 186 mm, v2 tolerates a 42 deg side slope and a 39 deg fore-aft slope before tipping (static). It needs 0.80 g of braking to tip forward, and a stop from 0.5 m/s in 0.25 s is 0.2 g. Wider is not possible: the lane between canopies is 0.60 m, and the simulator's clearance check uses the 0.40 m width.
 
 ### 2.3 Uneven ground: a rocker-differential, no springs
 Each side's two wheels hang from a **rocker beam** that pivots on the body. A **differential bar** across the front box links the two beams, so the body takes the average of their angles.
@@ -55,11 +55,12 @@ This is the same mechanism as planetary rovers, minus the third wheel pair. It h
 ## 3. Layout: the open tool bay
 The body has a front box (motor controllers, cleaning pump and water tank) and a rear box (battery and BMS), joined by two 3 mm side plates that carry the rocker pivots. Between them is an **open tool bay**, 190 x 210 mm, open below and above.
 
-- **The probe module is one drop-in unit:** a sled on two sideways rails, a sealed drive tower with its stepper beside it (not on top: lower), the cleaning station hanging under the sled, and the probe. The station rides the rail with the probe, so it is under the probe wherever the rail puts it. It is held by two thumb screws, one M12 connector and one push-fit air/water line. A spare can be swapped in a minute, from above, without tools.
+- **The probe module is one drop-in unit:** a sled on two sideways rails, a belt-driven linear axis with its stepper beside it (not on top: lower), the cleaning station hanging under the sled, and the probe. The station rides the rail with the probe, so it is under the probe wherever the rail puts it. It is held by two thumb screws, one M12 connector and one push-fit air/water line. A spare can be swapped in a minute, from above, without tools.
 - **The cleaning station sits at the floor of the bay,** directly under the parked probe. Scraped soil falls straight back onto the ground, never into the machine.
 - **The sideways rail (plus or minus 60 mm) does two jobs.** If the probe hits a stone, it shifts 5 cm and tries again without driving. It can also sample nearer the bed edge, where the roots are, when the soil is moist enough for the lower push off-centre.
 - **Wet and dry zones are separated.** Only the bay and the station get muddy. The electronics sit in a sealed enclosure on the rear deck, behind the bay. The battery is in its own sealed box.
-- **The probe is pushed by a rigid push chain, not a linear axis.** The probe parks with its tips 210 mm up and must travel 330 mm, through a cleaning station whose top is 205 mm up, and the tower may not be taller than 400 mm (canopy, §9). Any rigid push rod would have to reach below the station at full depth, so parked it would stand about 570 mm tall; telescoping stages above it do not change that. A zip chain does: two strands, coiled side by side in a magazine on the sled beside the tower, run through guides into a zip block at the top of the tower and lock together into a 16 x 12 mm column that pushes the probe. Only that column and the probe pass through the station. The magazine holds 384 mm of each strand for the 330 mm stroke, and the chain, guides and magazine are sealed, because mud and grit are what kill drives. `model.mjs` checks all of this when it loads and refuses a drive that does not fit.
+- **The linear axis is behind a bellows,** because mud and grit are what kill belts and bearings. Its height follows from the stroke: the probe parks with its tips 210 mm up (just above the cleaning station, whose top is 205 mm up) and travels 290 mm (60 mm into the soil plus 20 mm for a surface lower than level). Only the extension rod may pass through the station, so at full stroke the carriage sits just above the sled, on the compressed bellows, and the axis stands 624 mm tall; `model.mjs` computes it and throws if the carriage would go below the rails. A rigid push chain (fits a 400 mm tower) and a slotted station with the axis beside it were considered: small chains of this push and stroke are rare and costly and their magazine is one more part for mud to jam, and a slot lets mud into the drive. A belt axis is what a student team can buy and fix.
+- **Lower ground:** if the time-of-flight sensor finds the surface more than 20 mm below level under the probe, the probe shifts along the rail to find level ground, or the reading counts as failed (cleaning level 4 in Section 4 covers a failed reading).
 
 Alternatives considered:
 - **Rear-mounted probe:** easy to reach, but about a quarter of the push.
@@ -165,7 +166,7 @@ LFP's extra weight sits low and over the probe, so here it helps.
 
 | Threat in a field | What v2 does |
 |---|---|
-| Mud and water | Open bay, so mud falls through. Sealed boxes; IP67 connectors; the probe drive sealed in its tower; sealed (2RS) bearings in the pivots. |
+| Mud and water | Open bay, so mud falls through. Sealed boxes; IP67 connectors; the linear axis behind a bellows; sealed (2RS) bearings in the pivots. |
 | Dust | IP65 enclosure with a membrane vent; the lidar window is cleaned at the dock. |
 | Fertiliser salts and irrigation water | 316 stainless fasteners and probe rods; anodised aluminium; nylon washers between stainless and aluminium to stop galvanic corrosion; conformal-coated boards. |
 | Sun (UV and heat) | ASA or UV-stabilised PETG printed parts (never PLA); white enclosure with a sun shield; LFP cells. |
@@ -181,11 +182,11 @@ Wear parts and service intervals are in [CALCULATIONS.md](CALCULATIONS.md#wear-p
 
 ## 9. Open questions to settle on the bench
 
-1. **Real soil strength in the target field,** dry and after irrigation. This decides whether 176 N is enough or whether ballast is needed.
+1. **Real soil strength in the target field,** dry and after irrigation. This decides whether 175 N is enough or whether ballast is needed.
 2. **The share of cycles that reach each cleaning level** in the team's soil, and the actual wiper and brush life.
 3. **A reference block material** whose permittivity is stable with temperature [A], for the dock check.
 4. **Hub-motor controllers:** check the firmware licence before modifying or shipping any of it. Some popular hoverboard firmwares are GPL.
-5. **The rocker pivot's stiffness** under the probe push. The body should not tilt more than 1 deg at 176 N.
+5. **The rocker pivot's stiffness** under the probe push. The body should not tilt more than 1 deg at 175 N.
 6. **Tyre pressure** against sinkage in freshly tilled soil.
 7. **Along-row positioning** without RTK (unchanged from v1).
-8. **Canopy height:** whether the 400 mm probe axis and the 418 mm GNSS antenna clear the lowest leaves in real staked rows.
+8. **Canopy height:** whether the 624 mm probe axis (now the tallest part) and the 418 mm GNSS antenna clear the lowest leaves in real staked rows. If they do not, the axis height is set by the stroke: less ground slack, or a shorter parked height, is what would lower it.

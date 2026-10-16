@@ -410,18 +410,16 @@ const SC = D.scan;
   }
 }
 
-// ---------------------------------------------------------------- probe module: rails, sled, drive tower, station, probe
+// ---------------------------------------------------------------- probe module: rails, sled, linear axis, station, probe
 const RL = D.probeRail;
 const SL = D.sled;
 const TW = D.tower;
-const CH = D.chain;
-const RIM = CH.drumR - 1.5; // the magazine cheek's rim line
+const CA = D.carriage;
 const STN = D.station;
 const PB = D.probe;
 const SZ = RL.z + RL.h; // sled underside
-const TZ = SZ + SL.h; // tower floor (the sled's top)
+const TZ = SZ + SL.h; // the axis stands on the sled's top
 const HOLE = STN.bore; // the probe passes the sled through a hole this size
-const WALL = 3;
 // Rails: fixed to the body, resting on the side plates fore and aft of the probe axis. The front rail
 // carries a scale for the sideways offset.
 for (const sx of [1, -1]) {
@@ -442,29 +440,34 @@ for (const sx of [1, -1]) {
   put("sled", [0, 0, SZ + SL.h / 2], S(k.slabOf(plan, SZ, SL.h, P, 3, 0.4), { tone: "mid" }) + `<path class="rv-void" d="${hole}"/>` + Ln(hole, { tone: "lo" }) +
     Dots(k.corners(plan, 5).map(([x, y]) => at([x, y, TZ])), { size: 0.6, tone: "hi" }), shapes, { ride: "module" });
 }
-// Drive tower: a sealed box (drawn with its near wall cut away) holding the zip block, with the
-// parked probe inside it. Back, side and top walls; a low lip where the near wall was cut.
-const T_IN = { x0: TW.x0 + WALL, x1: TW.x1 - WALL, y0: -TW.y + WALL, y1: TW.y - WALL, z1: TW.z1 - WALL };
-box("tower.back", [TW.x0, -TW.y, TZ], [TW.x1, T_IN.y0, TW.z1], { tone: "mid" }, { r: 0.6, steps: 2, ride: "module" });
-box("tower.left", [TW.x0, T_IN.y0, TZ], [T_IN.x0, TW.y, T_IN.z1], { tone: "mid" }, { r: 0.6, steps: 2, ride: "module" });
-box("tower.right", [T_IN.x1, T_IN.y0, TZ], [TW.x1, TW.y, T_IN.z1], { tone: "mid" }, {
-  r: 0.6, steps: 2, ride: "module", extra: Dots([[TZ + 8], [T_IN.z1 - 8]].flatMap(([z]) => [at([TW.x1, -TW.y + 8, z]), at([TW.x1, TW.y - 8, z])]), { size: 0.45 }),
-});
-box("tower.top", [TW.x0, T_IN.y0, T_IN.z1], [TW.x1, TW.y, TW.z1], { tone: "mid" }, {
-  r: 0.6, steps: 2, bevel: 0.4, ride: "module", extra: Dots(k.corners({ x: TW.x0, y: -TW.y, w: TW.x1 - TW.x0, d: 2 * TW.y, r: 1 }, 5).map(([x, y]) => at([x, y, TW.z1])), { size: 0.5 }),
-});
-box("tower.lip", [T_IN.x0, T_IN.y1, TZ], [T_IN.x1, TW.y, TZ + 8], { tone: "mid" }, { r: 0.4, steps: 2, ride: "module" });
-// Zip block: the two strands lock together here into the column; two sprockets show on its near face.
+// Linear axis: an aluminium extrusion standing on the sled behind the probe with the belt inside it,
+// a top plate with the belt pulley, the stepper beside it near the top, and a bellows below the
+// carriage that keeps mud off the belt (rebuilt live as the carriage moves).
+const AX = { y0: -TW.y, y1: -TW.y + TW.back, z1: TW.z1 - TW.cap };
+const BELLOWS = { x: 14, y0: AX.y1, y1: AX.y1 + 10 };
 {
-  const zb = { x0: -14, x1: 14, y0: -10, y1: 10, z0: CH.zipZ, z1: CH.zipZ + CH.zipH };
-  const sprockets = [-7, 7].map((x) => G.frameOf([x, zb.y1, (zb.z0 + zb.z1) / 2], [0, 1, 0], [1, 0, 0], [0, 0, 1]));
-  box("zip.block", [zb.x0, zb.y0, zb.z0], [zb.x1, zb.y1, zb.z1], { tone: "mid" }, {
-    r: 1, steps: 2, bevel: 0.3, ride: "module",
-    extra: Ln(sprockets.map((F) => G.circleOf(F, 0, 5, P, 32)).join(""), { tone: "lo" }) + Dots(sprockets.map((F) => at(F.o)), { size: 0.5, tone: "hi" }),
+  const face = AX.y1 + 0.05;
+  const slots = [-18, 18].map((x) => path3([[x, face, TZ], [x, face, AX.z1]])).join("");
+  box("axis", [TW.x0, AX.y0, TZ], [TW.x1, AX.y1, AX.z1], { tone: "mid" }, { r: 0.6, steps: 2, ride: "module", extra: Ln(slots, { tone: "lo" }) });
+  const top = { x: TW.x0, y: -TW.y, w: TW.x1 - TW.x0, d: 2 * TW.y, r: 1.5 };
+  box("axis.top", [TW.x0, -TW.y, AX.z1], [TW.x1, TW.y, TW.z1], { tone: "mid" }, {
+    r: 1.5, steps: 2, bevel: 0.4, ride: "module",
+    extra: Dots(k.corners(top, 5).map(([x, y]) => at([x, y, TW.z1])), { size: 0.5 }) + Ln(k.ring(0, AX.y1 + 10, 9, TW.z1, P, 32), { tone: "faint" }),
   });
-  box("zip.bracket", [-10, T_IN.y0, zb.z1 - 4], [10, zb.y0, zb.z1], { tone: "mid" }, { r: 0.4, steps: 2, ride: "module" });
 }
-// Stepper beside the tower, and the chain magazine under it on the sled.
+function bellowsSvg(cz) {
+  const B2 = BELLOWS;
+  const plan = { x: -B2.x, y: B2.y0, w: 2 * B2.x, d: B2.y1 - B2.y0, r: 0.4 };
+  const h = cz - TZ;
+  const n = Math.max(1, Math.round(h / 6));
+  const pleats = Array.from({ length: n - 1 }, (_, i) => k.sideSeam(plan, TZ + ((i + 1) * h) / n, P, 2)).join("");
+  return S(k.slabOf(plan, TZ, h, P, 2), { tone: "lo", inner: Ln(pleats, { tone: "faint" }) });
+}
+{
+  const cz = M.CARRIAGE_Z0 - (POSE >= 0 ? POSE : 0);
+  put("bellows", [0, (BELLOWS.y0 + BELLOWS.y1) / 2, (TZ + cz) / 2], `<g data-part="bellows">${bellowsSvg(cz)}</g>`,
+    [A.slab({ x: -BELLOWS.x, y: BELLOWS.y0, w: 2 * BELLOWS.x, d: BELLOWS.y1 - BELLOWS.y0, r: 0.4 }, TZ, cz - TZ, { name: "bellows", owner: "axis" }, 2)], { ride: "module" });
+}
 {
   const m = { x0: TW.x1, x1: TW.x1 + 42, y: 21, z0: TW.z1 - 50, z1: TW.z1 - 8 };
   const plan = { x: m.x0, y: -m.y, w: m.x1 - m.x0, d: 2 * m.y, r: 3 };
@@ -474,48 +477,6 @@ box("tower.lip", [T_IN.x0, T_IN.y1, TZ], [T_IN.x1, TW.y, TZ + 8], { tone: "mid" 
   });
   box("stepper.cap.high", [m.x0, -m.y, m.z1 - 7], [m.x1, m.y, m.z1], { tone: "mid" }, { r: 3, steps: 3, bevel: 0.4, ride: "module", extra: Dots(k.corners(plan, 5).map(([x, y]) => at([x, y, m.z1])), { size: 0.55 }) });
   box("stepper.plug", [m.x1 - 20, m.y, m.z0 + 2], [m.x1 - 8, m.y + 5, m.z0 + 10], { tone: "hi" }, { r: 0.8, steps: 2, ride: "module" });
-  const MF = G.frameOf([CH.drumX, -CH.width / 2, CH.drumZ], [0, 1, 0], [1, 0, 0], [0, 0, 1]);
-  // The near cheek shows the coil: a spiral of chain whose outer turn shrinks as the chain pays out.
-  disc("magazine", MF, 0, CH.width, CH.drumR, { tone: "mid" }, {
-    steps: 64, ride: "module",
-    extra: `<g data-part="coil">${coilSvg(0)}</g>` + Dots(G.dotsOf(MF, CH.width, CH.drumR - 3, 8, P, { all: true }), { size: 0.45 }),
-  });
-  box("magazine.bracket", [TW.x1, -CH.width / 2 - 4, CH.drumZ - 5], [CH.drumX, -CH.width / 2, CH.drumZ + 5], { tone: "mid" }, { r: 0.4, steps: 2, ride: "module" });
-}
-function coilSvg(travel) {
-  const stored = (Math.PI * (CH.drumR ** 2 - CH.hub ** 2)) / CH.strand;
-  const left = Math.max(0, stored - travel);
-  const rOut = Math.sqrt(CH.hub ** 2 + (left * CH.strand) / Math.PI);
-  const turns = (rOut - CH.hub) / CH.strand;
-  const n = Math.max(2, Math.round(turns * 48));
-  const pts = Array.from({ length: n + 1 }, (_, i) => {
-    const u = i / n;
-    const a = -u * turns * Math.PI * 2;
-    const r = CH.hub + u * (rOut - CH.hub);
-    return [CH.drumX + Math.cos(a) * r, CH.width / 2 + 0.05, CH.drumZ + Math.sin(a) * r];
-  });
-  // The chain's free end runs out to the rim, where it leaves for the guides.
-  const aEnd = -turns * Math.PI * 2;
-  pts.push([CH.drumX + Math.cos(aEnd) * RIM, CH.width / 2 + 0.05, CH.drumZ + Math.sin(aEnd) * RIM]);
-  const circle = (r) => k.pathOf(Array.from({ length: 49 }, (_, i) => at([CH.drumX + Math.cos((i / 48) * Math.PI * 2) * r, CH.width / 2 + 0.05, CH.drumZ + Math.sin((i / 48) * Math.PI * 2) * r])), true);
-  return Ln(path3(pts), { tone: "lo" }) + Ln(circle(CH.hub), { tone: "mid" }) + Ln(circle(RIM), { tone: "faint" });
-}
-// Chain guides: the two strands leave the magazine side by side, enter the tower through glands in its
-// wall, and reach the zip block from opposite sides (the far one over the top of the block).
-const GUIDE_R = 2.5;
-{
-  const z = CH.zipZ + CH.zipH / 2;
-  const top = [CH.drumX, 0, CH.drumZ + CH.drumR];
-  for (const [id, y] of [["a", 6], ["b", -6]]) {
-    const outer = G.frameOf([TW.x1, y, z], [1, 0, 0], [0, 1, 0], [0, 0, 1]);
-    disc(`gland.${id}`, outer, 0, 3, 4.5, { tone: "hi" }, { steps: 6, ride: "module", owner: `guide.${id}` });
-    disc(`gland.${id}.in`, outer, -WALL - 3, -WALL, 4.5, { tone: "hi" }, { steps: 6, ride: "module", owner: `guide.${id}` });
-    cable(`guide.${id}.out`, [[top[0], y, top[2]], [top[0], y, z], [TW.x1 + 3, y, z]], GUIDE_R, { tone: "lo", bend: 8, ride: "module", ends: [false, false] });
-    const inside = id === "a"
-      ? [[T_IN.x1 - 3, y, z], [14, y, z]]
-      : [[T_IN.x1 - 3, y, z], [26, y, z], [26, y, z + 16], [-26, y, z + 16], [-26, y, z], [-14, y, z]];
-    cable(`guide.${id}.in`, inside, GUIDE_R, { tone: "lo", bend: 6, ride: "module", ends: [false, false] });
-  }
 }
 // Cleaning station: hangs from the sled on two hangers, so it rides the rail under the probe.
 {
@@ -537,7 +498,7 @@ const GUIDE_R = 2.5;
 }
 
 // ---------------------------------------------------------------- the probe (moves), in three clipped layers
-// Top: above the sled, seen through the cut tower wall; mid: between the sled and the station, and down
+// Top: above the sled, with the carriage; mid: between the sled and the station, and down
 // into its bore; low: below the station. Each layer draws the whole probe and its own clip keeps the part
 // that shows there, held in the module's frame while the probe moves inside it.
 const travel = POSE >= 0 ? POSE : 0;
@@ -550,22 +511,22 @@ const belowLine = (z) => `M-2000 ${at([0, 0, z])[1].toFixed(2)}H4000V4000H-2000Z
 function probeParts(t, zMin, zMax, layer) {
   const root = ROOT0 - t;
   const head = [root, root + PB.headL];
-  const clampTop = head[1] + PB.clampH;
   const parts = [];
   const shapes = [];
   const span = (a, b) => [Math.max(a, zMin), Math.min(b, zMax)];
   const F = frameZ(0, 0, 0);
-  // The column is drawn long enough to reach the zip block at any travel; the top layer's clip ends it there.
-  const colTop = clampTop + M.STROKE + 10;
-  parts.push({ d: k.depthOf([0, 0, (clampTop + CH.zipZ) / 2], P), svg: S(k.slabOf({ x: -CH.w / 2, y: -CH.d / 2, w: CH.w, d: CH.d, r: 0.6 }, clampTop, colTop - clampTop, P, 2), { tone: "lo" }) });
+  // The carriage and the extension rod it holds the head by.
+  const cz = M.CARRIAGE_Z0 - t;
+  const car = { x: CA.x0, y: AX.y1, w: CA.x1 - CA.x0, d: CA.y - AX.y1, r: 2 };
+  parts.push({ d: k.depthOf([0, 0, cz + CA.h / 2], P), svg: S(k.slabOf(car, cz, CA.h, P, 3, 0.4), { tone: "hi" }) + Dots(k.corners(car, 5).map(([x, y]) => at([x, y, cz + CA.h])), { size: 0.5 }) });
   {
-    const [a, b] = span(clampTop, CH.zipZ);
-    if (b - a > 0.2) shapes.push(A.slab({ x: -CH.w / 2, y: -CH.d / 2, w: CH.w, d: CH.d, r: 0.6 }, a, b - a, { name: `probe.${layer}.column` }, 2));
+    const [a, b] = span(cz, cz + CA.h);
+    if (b - a > 0.2) shapes.push(A.slab(car, a, b - a, { name: `probe.${layer}.carriage` }, 3));
   }
-  parts.push({ d: k.depthOf([0, 0, head[1] + 3], P), svg: S(k.slabOf({ x: -11, y: -8, w: 22, d: 16, r: 1 }, head[1], PB.clampH, P, 2, 0.3), { tone: "mid" }) + Dots([at([-7, 8, head[1] + 3]), at([7, 8, head[1] + 3])], { size: 0.4 }) });
+  parts.push({ d: k.depthOf([0, 0, (head[1] + cz) / 2], P), svg: S(G.disc(head[1], cz, PB.extR, F, P, { steps: 32 }), { tone: "hi", inner: Ln(G.arcOf(F, cz - 12, PB.extR, P), { tone: "faint" }) }) });
   {
-    const [a, b] = span(head[1], clampTop);
-    if (b - a > 0.2) shapes.push(A.slab({ x: -11, y: -8, w: 22, d: 16, r: 1 }, a, b - a, { name: `probe.${layer}.clamp` }, 2));
+    const [a, b] = span(head[1], cz);
+    if (b - a > 0.2) shapes.push(A.disc(F, a, b, PB.extR, { name: `probe.${layer}.ext` }));
   }
   parts.push({ d: k.depthOf([0, 0, (head[0] + head[1]) / 2], P), svg: S(G.disc(head[0], head[1], PB.headR, F, P, { steps: 48 }), { tone: "hi", lit: true, inner: Ln(G.arcOf(F, head[0] + 14, PB.headR, P) + G.arcOf(F, head[0] + 34, PB.headR, P), { tone: "lo" }) }) });
   {
@@ -602,7 +563,7 @@ const layerItem = (name, part, zMin, zMax, clips, soil = false) => {
   }
   // A layer with nothing in it yet keeps its slot with a mark on the ground, which it never draws.
   const shapes = pp.shapes.length ? pp.shapes : [A.box([-1, -1, 0], [1, 1, 0.1], { name: `${name}.empty`, ground: true })];
-  return put(name, [0, 0, (Math.max(zMin, -60) + Math.min(zMax, CH.zipZ)) / 2 - travel / 2], defs + inner, shapes, { ride: "module", solid: !standIn });
+  return put(name, [0, 0, (Math.max(zMin, -60) + Math.min(zMax, TW.z1)) / 2 - travel / 2], defs + inner, shapes, { ride: "module", solid: !standIn });
 };
 // Where the rail has moved the probe behind the notch, the soil hides the rods below its surface.
 function soilClip(y) {
@@ -611,7 +572,7 @@ function soilClip(y) {
   const b = at([1000, y, 0]);
   return `M${a[0].toFixed(2)} ${a[1].toFixed(2)}L${b[0].toFixed(2)} ${b[1].toFixed(2)}L${b[0].toFixed(2)} -2000L${a[0].toFixed(2)} -2000Z`;
 }
-layerItem("probe.top", "probe-top", TZ, 1000, [aboveRim(0, 0, HOLE, TZ), belowLine(CH.zipZ)]);
+layerItem("probe.top", "probe-top", TZ, 1000, [aboveRim(0, 0, HOLE, TZ)]);
 layerItem("probe.mid", "probe-mid", STN.z1, SZ, [aboveRim(0, 0, STN.bore, STN.z1), belowLine(SZ)]);
 // The probe is drawn whole in every layer, so record what each clip hides for the support check too.
 for (const [a, b] of [[SZ, TZ], [STN.z0, STN.z1]]) probeParts(travel, a, b, "hidden").shapes.forEach((shape) => record(A.moved(shape, RIDES.module)));
@@ -622,8 +583,8 @@ const CAPTION =
   `The body hangs between two rocker beams carrying ${2 * WH.r} mm hub-motor wheels (${WH.base} mm wheelbase, ${WH.track} mm track); a differential bar on the front box makes the body take the mean of the two beams' angles. ` +
   `The pads in the tray lift the front-left and rear-right wheels ${M.STABILITY.stepMm} mm, a twist: the beams turn ${((TW100.near.th * 180) / Math.PI).toFixed(1)}° each way, the bar rocks, and the body stays level, rising ${(TW100.bodyZ - REST.bodyZ).toFixed(0)} mm with all four wheels down (one ${M.STABILITY.stepMm} mm clod alone tilts its beam ${M.STABILITY.beamTiltDeg.toFixed(1)}° and the body ${M.STABILITY.bodyPitchDeg.toFixed(1)}°). ` +
   `The probe works in an open bay between the axles, on the pivot line, where the whole ${M.TOTAL_KG.toFixed(1)} kg holds it down: ${(M.PUSH_SAFETY * M.availableForce(0)).toFixed(0)} N usable push centred, ${(M.PUSH_SAFETY * M.availableForce(RL.y)).toFixed(0)} N with the probe ${RL.y} mm to one side on its rail. ` +
-  `A rigid zip chain, coiled in a magazine beside the drive tower, lowers it at ${M.SPEED.approach} mm/s and pushes it ${PB.depth} mm into the soil at ${M.SPEED.insert} mm/s; the push shown is for dry crust in the placeholder soil model. On the way back up the cleaning station hanging under the sled wipes, brushes and blows the rods (Fig 2). ` +
-  `Cycle ${M.cycle().t6.toFixed(1)} s, played 3× fast; the rail shift and the twist run at an illustrative pace. The tower is drawn with its near wall cut away. Design targets, not a built rover.`;
+  `A carriage on a ${TW.z1} mm belt-driven axis (as tall as the ${M.STROKE} mm stroke needs, with only the extension rod passing the cleaning station) lowers it at ${M.SPEED.approach} mm/s and pushes it ${PB.depth} mm into the soil at ${M.SPEED.insert} mm/s; the push shown is for dry crust in the placeholder soil model. On the way back up the cleaning station hanging under the sled wipes, brushes and blows the rods (Fig 2). ` +
+  `Cycle ${M.cycle().t6.toFixed(1)} s, played 3× fast; the rail shift and the twist run at an illustrative pace. A bellows keeps mud off the belt below the carriage. Design targets, not a built rover.`;
 
 // ---------------------------------------------------------------- order, page
 // The page draws in the order settled for the rest pose. Pose audits with --rest-order reuse those keys
@@ -649,7 +610,7 @@ const materialOf = (name) => (MATERIAL.find(([re]) => re.test(name)) ?? [null, "
 const groups = R.items.map((item) => `<g class="it${materialOf(item.name) ? " " + materialOf(item.name) : ""}" data-name="${item.name}" data-ride="${item.ride}">${item.svg}</g>`).join("");
 
 const LABEL_TEXT =
-  "AgriRover v2 standing on a soil test tray with a cutaway notch. Each side's two wheels, pneumatic tyres on hub motors, hang from a rocker beam that pivots on the body; a differential bar across the front box links the two beams so the body takes the mean of their angles. Two pads in the tray under the front-left and rear-right wheels rise like clods: the beams tilt opposite ways, the bar rocks, and the body only rises, level, with all four wheels on the ground. Between the front box (motor controllers, pump, water tank) and the rear box (battery and BMS) is an open bay: a probe module rides a sideways rail across it, pushes a three-rod soil probe down through a cleaning station at the bay floor into the soil, and can shift sideways to dodge a stone. A white electronics enclosure with a GNSS antenna and an emergency stop sits on the rear deck; a lidar stands on the front box and a scan beam with two folded camera heads runs across the front.";
+  "AgriRover v2 standing on a soil test tray with a cutaway notch. Each side's two wheels, pneumatic tyres on hub motors, hang from a rocker beam that pivots on the body; a differential bar across the front box links the two beams so the body takes the mean of their angles. Two pads in the tray under the front-left and rear-right wheels rise like clods: the beams tilt opposite ways, the bar rocks, and the body only rises, level, with all four wheels on the ground. Between the front box (motor controllers, pump, water tank) and the rear box (battery and BMS) is an open bay: a probe module rides two sideways rails across it: a carriage on a tall belt-driven axis pushes a three-rod soil probe, on an extension rod, down through a cleaning station hanging below into the soil, and the module can shift sideways to dodge a stone. A white electronics enclosure with a GNSS antenna and an emergency stop sits on the rear deck; a lidar stands on the front box and a scan beam with two folded camera heads runs across the front.";
 const svg = k.figureSvg({ width: W, height: H, label: LABEL_TEXT, body: [...back, `<g class="rv-rover">${groups}</g>`] });
 
 const C = M.cycle();
@@ -677,7 +638,7 @@ const DATA = {
   usable: Array.from({ length: RL.y + 1 }, (_, y) => M.PUSH_SAFETY * M.availableForce(y)),
   railMax: RL.y,
   station: { z0: STN.z0, z1: STN.z1 },
-  chain: { drumX: CH.drumX, drumZ: CH.drumZ, drumR: CH.drumR, hub: CH.hub, strand: CH.strand, width: CH.width },
+  axis: { z0: TZ, carriageZ0: M.CARRIAGE_Z0, bellows: BELLOWS },
   notchY0: NOTCH.y0,
   needleR: PB.needleR,
   clean: M.CLEAN.airMax,

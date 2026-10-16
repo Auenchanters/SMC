@@ -19,7 +19,7 @@ node hardware/rover-v2/calc.mjs
 node hardware/rover-v2/drawings.mjs
 ```
 
-`model.mjs` checks the probe drive when it loads (the zip chain fits the 400 mm tower, its magazine holds the whole stroke, only the chain column and the probe pass the cleaning station) and throws if a change breaks it.
+`model.mjs` derives the probe axis height from the stroke and checks it when it loads (the carriage never goes below the rails, only the extension rod and the probe pass the cleaning station, the head passes between the rails); it throws if a change breaks that.
 
 The anatomy figures are built with the Anatomy skill kit (MIT, https://github.com/wheresryan22/anatomy), pinned as described in [../rover-v1/README.md](../rover-v1/README.md) (CI uses the same commit). Build both themes and audit the geometry:
 
