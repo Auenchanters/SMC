@@ -112,7 +112,7 @@ uv run agrisim gate runs\suite_20261017T120000Z\report.json --fail-on sota
 - `--fresh-key` fixes the fresh fields so a run can be repeated exactly (the report records the key; without it a random key is used). CI uses the commit SHA.
 - Each run writes `runs\suite_<UTC time>\report.md`, `report.json` (everything in the report, as data), `rows.csv` (one row per run) and `brief.md`.
 - **`brief.md` closes the improvement loop.** It is written for the next person or coding agent who works on our entry: the gates still failing, nearest first (smallest Holm p against the hardest baseline, with our win rate); the metrics not yet saturated; our map against the global accuracy levels, next to what the clairvoyant oracle reaches on the same fields (if even the oracle misses a level, no strategy can reach it in this world); and the rules of the loop (change only the entry, tune on development seeds 0-99, commit, score the commit, keep `baseline.json` only if the score rose). Hand it to the agent as its task; its run writes the next brief. CI adds it to the job summary and the artifact.
-- The quick tier is 4 tasks × (16 public + 16 fresh) fields; the full tier is 8 tasks × (64 + 64). On 8 workers the quick tier takes a few minutes and the full tier about half an hour.
+- The quick tier is 4 tasks × (16 public + 16 fresh) fields; the full tier is 8 tasks × (64 + 64). On 8 workers the quick tier takes about 4 minutes and the full tier about 40.
 
 After a real improvement, record it so later pushes are held to it, then commit `benchmarks/v1/baseline.json`:
 
@@ -138,6 +138,42 @@ uv run agrisim suite --write-lock
 ## 9. Results
 
 Only from `agrisim suite` runs, latest first.
+
+### Re-run from a fresh GitHub clone (17 October 2026, commit `a158688`)
+
+The same entry, `planned_survey`, unchanged since `cca381b`. Only the brief, the Windows worker speed-up and the docs changed in between. The run used a clean clone of `main` from GitHub, a fresh virtual environment, and the full tier, with fresh key = the commit SHA `a15868872786b2c69a56d43333eb0db8d1bf72f0`. That is a new set of fresh fields. It took 39 min on 8 workers: 15,232 surveys, 0 crashes, 0 plant contacts. The regression gate passed against the `baseline.json` recorded at `cca381b`, which was not updated: nothing about the strategy changed.
+
+**Status: below state of the art.** Overall **75.8** [95% CI 70.2, 81.1], against 73.9 [69.9, 79.1] on the earlier fields. The best real strategy again:
+- spatial coverage 60.7;
+- lawnmower 53.8;
+- fixed_plus_recheck 53.7;
+- MoistureMapper A2 48.3 and A1 44.7;
+- greedy_variance 37.8;
+- recheck 35.8;
+- mi_greedy 30.6;
+- greedy_variance_per_cost 15.9;
+- DOV −116.
+
+The oracles scored 98.6 (`oracle_rmse`) and 65.2 (`oracle_dry`).
+
+Our entry beats every baseline on 5 of 24 task metrics (8 earlier). All 5 are `dry_f1`: `demo_b60`, `rain_b60`, `drying_b60`, `rough_b60` and `large_b60`. Two more fall just short:
+- `demo_b30` `dry_f1`: Holm p 0.06 against the lawnmower, recheck and MoistureMapper A2;
+- `v2_b30` `dry_f1`: p 0.09 against the lawnmower and greedy variance.
+
+`harsh_b60` `dry_f1` is still unbeaten against 9 baselines, with Holm p 0.06 to 0.68. `rain_b60` RMSE, won in the earlier run, is now short against fixed_plus_recheck (p 0.21) and spatial coverage (p 0.26). It saturates 2 of 24: `crps` and `dry_f1` on `demo_b60`.
+
+| task | rmse | crps | dry_f1 | probes by deadline | mission |
+|---|---|---|---|---|---|
+| demo_b30 | 55.8 [44.6, 66.8] | 106 [82.2, 137] | 79.4 [56.0, 111] | 30 of 30 | 17 min |
+| demo_b60 | 70.8 [60.8, 82.3] | 106 [90.1, 129] | **115** [97.7, 137] | 60 of 60 | 30 min |
+| v2_b30 | 46.6 [35.9, 55.9] | 92.9 [75.1, 115] | 76.8 [50.2, 111] | 30 of 30 | 27 min |
+| rain_b60 | 47.7 [37.2, 57.9] | 67.7 [52.8, 84.8] | **70.1** [49.3, 89.6] | 60 of 60 | 44 min |
+| drying_b60 | 70.5 [63.7, 77.8] | 102 [89.4, 116] | **87.2** [78.4, 95.0] | 60 of 60 | 30 min |
+| rough_b60 | 49.5 [37.4, 60.7] | 76.9 [58.4, 95.3] | **49.2** [27.7, 77.4] | 60 of 60 | 30 min |
+| large_b60 | 62.4 [51.6, 73.2] | 97.2 [78.3, 118] | **94.8** [75.2, 119] | 60 of 60 | 43 min |
+| harsh_b60 | 53.1 [34.6, 69.1] | 107 [77.1, 152] | 59.7 [42.0, 76.7] | 60 of 60 | 28 min |
+
+What this adds: the overall score and the ranking hold on new fields, while individual significant wins near the threshold come and go. The map's ubRMSE is within the SMAP requirement (0.04) on all 8 tasks again (`rough_b60` 0.0391). RMSE reaches 0.03 on `demo_b60` and `drying_b60`. The quick tier on the same clone passed the hard and regression gates (63.8 [49.2, 77.5] on 16 fresh fields per task, which is too few for any per-task win to reach significance).
 
 ### `planned_survey` (17 October 2026, commit `cca381b`)
 

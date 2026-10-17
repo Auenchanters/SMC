@@ -4,7 +4,7 @@ You are taking over a finished first version of the soil-moisture survey simulat
 
 State (17 Oct 2026; first handover 14 Oct):
 - ExecPlan milestones M0 to M9, M11 (weather, probe misreads, rechecks) and M12 (agribench, the benchmark) are done, plus the 3D replay and rover v2. M10 (photoreal replay) has phases 1 to 3 done; phase 4 (plants) is open. 131 tests pass.
-- Our agribench entry `planned_survey` scores 73.9 (0 = random, 100 = clairvoyant oracle), the best real strategy, but the benchmark still says "below state of the art". Every `agrisim suite` run writes `brief.md`, the next task for whoever improves the entry ([benchmarks/README.md](benchmarks/README.md)).
+- Our agribench entry `planned_survey` scores 73.9 and, on a second set of fresh fields from a clean GitHub clone, 75.8 (0 = random, 100 = clairvoyant oracle). It is the best real strategy, but the benchmark still says "below state of the art". Every `agrisim suite` run writes `brief.md`, the next task for whoever improves the entry ([benchmarks/README.md](benchmarks/README.md)).
 - CI is green: tests on Windows and Ubuntu, a hardware job that rebuilds and audits the rover figures, and the agribench quick tier.
 - Every decision, surprise and result is in [EXECPLAN.md](EXECPLAN.md).
 - Nothing is half-finished in the code. Open items are in section 3.
