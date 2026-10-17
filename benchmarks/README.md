@@ -110,7 +110,8 @@ uv run agrisim gate runs\suite_20261017T120000Z\report.json --fail-on sota
 ```
 
 - `--fresh-key` fixes the fresh fields so a run can be repeated exactly (the report records the key; without it a random key is used). CI uses the commit SHA.
-- Each run writes `runs\suite_<UTC time>\report.md`, `report.json` (everything in the report, as data) and `rows.csv` (one row per run).
+- Each run writes `runs\suite_<UTC time>\report.md`, `report.json` (everything in the report, as data), `rows.csv` (one row per run) and `brief.md`.
+- **`brief.md` closes the improvement loop.** It is written for the next person or coding agent who works on our entry: the gates still failing, nearest first (smallest Holm p against the hardest baseline, with our win rate); the metrics not yet saturated; our map against the global accuracy levels, next to what the clairvoyant oracle reaches on the same fields (if even the oracle misses a level, no strategy can reach it in this world); and the rules of the loop (change only the entry, tune on development seeds 0-99, commit, score the commit, keep `baseline.json` only if the score rose). Hand it to the agent as its task; its run writes the next brief. CI adds it to the job summary and the artifact.
 - The quick tier is 4 tasks × (16 public + 16 fresh) fields; the full tier is 8 tasks × (64 + 64). On 8 workers the quick tier takes a few minutes and the full tier about half an hour.
 
 After a real improvement, record it so later pushes are held to it, then commit `benchmarks/v1/baseline.json`:

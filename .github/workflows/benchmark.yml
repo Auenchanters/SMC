@@ -33,7 +33,7 @@ jobs:
           --out runs/ci --fail-on hard
       - name: Report
         if: always()
-        run: cat runs/ci/suite_*/report.md >> "$GITHUB_STEP_SUMMARY"
+        run: cat runs/ci/suite_*/report.md runs/ci/suite_*/brief.md >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -61,7 +61,7 @@ jobs:
           --fresh-key "${{ github.sha }}" --out runs/ci --fail-on hard
       - name: Report
         if: always()
-        run: cat runs/ci/suite_*/report.md >> "$GITHUB_STEP_SUMMARY"
+        run: cat runs/ci/suite_*/report.md runs/ci/suite_*/brief.md >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v7
         if: always()
         with:

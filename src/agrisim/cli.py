@@ -250,7 +250,7 @@ def suite(
     ] = False,
 ) -> None:
     """Run agribench: our entry against every baseline and the oracle, on frozen worlds and on
-    fresh fields; write runs/suite_<timestamp>/report.md, report.json and rows.csv."""
+    fresh fields; write runs/suite_<timestamp>/report.md, report.json, rows.csv and brief.md."""
     import json
     import secrets
     from datetime import UTC, datetime
@@ -302,6 +302,7 @@ def suite(
     (out_dir / "report.json").write_text(json.dumps(report, indent=1), encoding="utf-8")
     text = sb.report_markdown(report)
     (out_dir / "report.md").write_text(text, encoding="utf-8")
+    (out_dir / "brief.md").write_text(sb.agent_brief(report), encoding="utf-8")  # what to improve
     typer.echo(text)
     if update_baseline:
         new = sb.baseline_from(rows, spec, sol, meta, old)

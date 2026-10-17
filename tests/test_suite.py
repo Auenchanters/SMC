@@ -266,6 +266,9 @@ def test_suite_end_to_end(tmp_path: Path) -> None:
     rows = (out / "rows.csv").read_text(encoding="utf-8").strip().splitlines()
     assert len(rows) == 1 + (5 + 3) * 5  # (public + fresh seeds) x (entry, 3 baselines, oracle)
     assert "tiny" in (out / "report.md").read_text(encoding="utf-8")
+    brief = (out / "brief.md").read_text(encoding="utf-8")  # the next agent's input
+    for part in ("`greedy_variance`", "## Gates still failing", "global accuracy", "--fresh-key"):
+        assert part in brief
     board = report["leaderboard"]
     if board:  # empty only if no ceiling was clearly above the floor on these few fields
         assert board["random"] == 0.0  # the floor scores 0 by definition

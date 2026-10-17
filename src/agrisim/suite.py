@@ -863,3 +863,128 @@ def report_markdown(rep: dict[str, Any]) -> str:
 
 def rep_metrics(split: dict[str, Any]) -> list[str]:
     return [*split["scores"], "ubrmse", "coverage95"]
+
+
+NEXT_STATUS = {  # what the next status asks for
+    "hard_fail": "fix the crash, plant contact or edited frozen file first",
+    "regression": "win back what dropped against baseline.json first",
+    "below_sota": "beat every baseline on every task metric (status below_saturation)",
+    "below_saturation": "a lower bound of at least the target on every task metric (saturated)",
+    "saturated": "nothing left in v1: propose a harder benchmark version",
+}
+LOOP_RULES = """## How to work on this (the improvement loop)
+
+1. Read `EXECPLAN.md` (Decision Log, Surprises) for what was already tried; do not repeat it.
+2. Change only our entry: `benchmarks/solution.yaml` and the strategy or mapper code it names
+   (`src/agrisim/policies.py`; `mapping` may set method, variogram_model, min_readings). Never edit
+   `benchmarks/v1/` (LOCK.json). Policies and mappers never read the truth (the truth-swap test).
+3. Choose and tune on development seeds 0-99 only, never on public (200-263) or fresh fields.
+4. Pass ruff, mypy, pytest and the licence gate, commit, then score that commit on fields drawn
+   from it:
+
+```powershell
+uv run agrisim suite --tier full --workers 8 --fresh-key <commit SHA> --update-baseline
+```
+
+5. Keep `benchmarks/v1/baseline.json` only if the overall score rose and the regression gate passed
+   (otherwise `git checkout benchmarks/v1/baseline.json`). Record the result, and what did not work,
+   in `EXECPLAN.md`. The run writes the next brief.
+"""
+
+
+def agent_brief(rep: dict[str, Any]) -> str:
+    """What to improve next, from one report: the input of the improvement loop (brief.md).
+    Gates still failing come nearest first (smallest Holm p against the hardest baseline)."""
+    g, o, alpha, status = rep["gates"], rep["overall"], rep["alpha"], rep["status"]
+    entry = rep["entry"]
+    lines = [
+        f"# agribench brief: what to improve next ({rep['tier']} tier)",
+        "",
+        f"Entry `{entry['strategy']}`"
+        + (f", mapping {entry['mapping']}" if entry["mapping"] else "")
+        + f"; commit `{rep.get('commit') or 'unknown'}`, fresh key `{rep.get('fresh_key')}`.",
+        f"Status **{status}**: {STATUS_TEXT[status]}. Next: {NEXT_STATUS[status]}.",
+        f"Overall {_f(o['iqm'], 3)} [95% CI {_f(o['lo'], 3)}, {_f(o['hi'], 3)}] (0 = random, "
+        f"100 = clairvoyant oracle). Beats every baseline on {g['sota']['passed']}/"
+        f"{g['sota']['total']} task metrics; saturated on {g['saturation']['passed']}/"
+        f"{g['saturation']['total']}.",
+        "",
+    ]
+    blockers = [*g["hard"]["errors"], *g["hard"]["plant_contacts"], *g["hard"]["lock_problems"]]
+    blockers += [
+        f"regression: {i['task']}/{i['metric']} {i['delta']:+.1f} {i['unit']}"
+        for i in g["regression"]["items"]
+        if i["regressed"]
+    ]
+    if blockers:
+        lines += ["## Blockers (fix these first)", "", *[f"- {b}" for b in blockers], ""]
+    todo = []
+    for name, t in rep["tasks"].items():
+        f = t["splits"]["fresh"]
+        for metric, s in f["sota"].items():
+            unbeaten = sorted(
+                ((b, v) for b, v in s["vs"].items() if v["p_holm"] >= alpha),
+                key=lambda kv: -kv[1]["p_holm"],
+            )
+            if unbeaten:
+                todo.append((unbeaten[0][1]["p_holm"], name, metric, f["scores"][metric], unbeaten))
+    lines += [
+        "## Gates still failing, nearest first",
+        "",
+        "Each row is a task metric where some baseline is not yet beaten (one-sided Wilcoxon, "
+        f"Holm, alpha {alpha}). Win rate = share of fields where we are better.",
+        "",
+        "| task | metric | our score [95% CI] | not yet beaten: Holm p, our win rate |",
+        "|---|---|---|---|",
+    ]
+    lines += [
+        f"| {name} | {metric} | {_f(sc['score'], 3)} [{_f(sc['lo'], 3)}, {_f(sc['hi'], 3)}] | "
+        + ", ".join(f"{b} {v['p_holm']:.2g}, {v['win_rate']:.2f}" for b, v in unbeaten)
+        + " |"
+        for _, name, metric, sc, unbeaten in sorted(todo, key=lambda x: x[0])
+    ] or ["| none | | | |"]
+    short = sorted(
+        (sc["lo"] if sc["informative"] else -math.inf, name, metric)
+        for name, t in rep["tasks"].items()
+        for metric, sc in t["splits"]["fresh"]["scores"].items()
+        if not sc["saturated"]
+    )
+    lines += [
+        "",
+        f"## Not yet saturated (lower bound under {rep['saturation_target']:g}), nearest first",
+        "",
+        ", ".join(f"{n}/{m} {_f(lo, 3)}" for lo, n, m in reversed(short)) or "none",
+        "",
+        "## Against global accuracy levels (fresh fields)",
+        "",
+        "Our map against external levels; in brackets the clairvoyant oracle on the same fields, "
+        "with the same probe and mapper. If even the oracle misses a level, no strategy can reach "
+        "it in this world: that needs a better probe, mapper or more probes.",
+        "",
+        "| task | RMSE | ubRMSE | "
+        + " | ".join(f"{ref} ({m} <= {lim:g})" for ref, m, lim in REFERENCES)
+        + " |",
+        "|---|---|---|" + "---|" * len(REFERENCES),
+    ]
+    for name, t in rep["tasks"].items():
+        st = t["splits"]["fresh"]["strategies"]
+        ours = st[CANDIDATE]
+        best = {m: min(st[x][m][0] for x in st if x in ORACLES) for m in ("rmse", "ubrmse")}
+        cells = [
+            ("yes" if ours[m][0] <= lim else "no")
+            + f" (oracle {'yes' if best[m] <= lim else 'no'})"
+            for _, m, lim in REFERENCES
+        ]
+        lines.append(
+            f"| {name} | {_f(ours['rmse'][0])} ({_f(best['rmse'])}) | "
+            f"{_f(ours['ubrmse'][0])} ({_f(best['ubrmse'])}) | " + " | ".join(cells) + " |"
+        )
+    flags = [
+        f"{n}/{m}: public {v['public_minus_fresh']:+.1f} points above fresh (tuned to public?)"
+        for n, t in rep["tasks"].items()
+        for m, v in t["generalisation"].items()
+        if v["suspect"]
+    ] + [f"{x}: ceiling not clearly above floor" for x in g["saturation"]["uninformative"]]
+    if flags:
+        lines += ["", "## Flags", "", *[f"- {x}" for x in flags]]
+    return "\n".join([*lines, "", LOOP_RULES])
