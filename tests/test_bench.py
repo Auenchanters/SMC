@@ -1,9 +1,10 @@
+import sys
 from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
 
-from agrisim.bench import mean_ci95, parse_seeds, run_benchmark
+from agrisim.bench import full_speed, mean_ci95, parse_seeds, run_benchmark
 from agrisim.cli import app
 from agrisim.config import SimConfig
 from agrisim.policies import STRATEGIES
@@ -24,6 +25,11 @@ def test_bad_seeds_are_a_clean_cli_error(tmp_path: Path, demo_path: Path) -> Non
     assert res.exit_code == 2
     assert "bad seed range" in res.output
     assert not any(tmp_path.iterdir())  # no empty output folder left behind
+
+
+def test_full_speed_is_accepted_on_windows_only() -> None:
+    # Fails if the ctypes call is wrong (sizes, handle type): the initializer would hide that.
+    assert full_speed() == (sys.platform == "win32")
 
 
 def test_mean_ci95() -> None:

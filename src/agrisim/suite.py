@@ -33,7 +33,7 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field, PositiveFloat, PositiveInt, model_validator
 from scipy import stats
 
-from agrisim.bench import mean_ci95, parse_seeds
+from agrisim.bench import full_speed, mean_ci95, parse_seeds
 from agrisim.config import SimConfig, load
 from agrisim.metrics import ORACLES, crps_gaussian, dry_f1, truth_on_grid
 from agrisim.policies import LEARNED, STRATEGIES
@@ -381,7 +381,9 @@ def run_jobs(
     os.environ.update(dict.fromkeys(THREAD_VARS, "1"))
     try:
         ctx = multiprocessing.get_context("spawn")  # same behaviour on Windows and Linux
-        with ProcessPoolExecutor(max_workers=workers, mp_context=ctx) as pool:
+        with ProcessPoolExecutor(
+            max_workers=workers, mp_context=ctx, initializer=full_speed
+        ) as pool:
             return collect(pool.map(suite_job, jobs, chunksize=4))
     finally:
         for v, old in saved.items():

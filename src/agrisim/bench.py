@@ -4,6 +4,7 @@ import csv
 import dataclasses
 import math
 import multiprocessing
+import sys
 from collections.abc import Sequence
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
@@ -85,6 +86,35 @@ def bench_one(job: tuple[SimConfig, int, str, int, Path | None]) -> BenchRow:
     )
 
 
+def full_speed() -> bool:
+    """Pool initializer: opt this process out of Windows 11 EcoQoS throttling, which otherwise
+    gives workers of a run started from a background terminal 0.3-0.45 of a core each.
+    Best effort: True if Windows accepted it, False otherwise (other OS, older Windows)."""
+    if sys.platform != "win32":
+        return False
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        k32 = ctypes.WinDLL("kernel32")
+        k32.GetCurrentProcess.restype = wintypes.HANDLE
+        k32.SetProcessInformation.argtypes = (
+            wintypes.HANDLE,
+            ctypes.c_int,
+            ctypes.c_void_p,
+            wintypes.DWORD,
+        )
+        # PROCESS_POWER_THROTTLING_STATE: Version 1, ControlMask EXECUTION_SPEED, StateMask 0 (off)
+        state = (wintypes.ULONG * 3)(1, 1, 0)
+        process_power_throttling = 4
+        ok = k32.SetProcessInformation(
+            k32.GetCurrentProcess(), process_power_throttling, state, ctypes.sizeof(state)
+        )
+        return bool(ok)
+    except Exception:  # never crash a run over speed
+        return False
+
+
 def run_benchmark(
     cfg: SimConfig,
     seeds: Sequence[int],
@@ -99,7 +129,7 @@ def run_benchmark(
     if workers <= 1:
         return [bench_one(j) for j in jobs]
     ctx = multiprocessing.get_context("spawn")  # same behaviour on Windows and Linux
-    with ProcessPoolExecutor(max_workers=workers, mp_context=ctx) as pool:
+    with ProcessPoolExecutor(max_workers=workers, mp_context=ctx, initializer=full_speed) as pool:
         return list(pool.map(bench_one, jobs))
 
 
