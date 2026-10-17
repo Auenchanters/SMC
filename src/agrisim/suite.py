@@ -313,7 +313,7 @@ def suite_job(job: Job) -> SuiteRow:
     label, strategy = label_strategy.split(":", 1)
     start = time.perf_counter()
     try:
-        res = run_survey(cfg, seed, strategy, budget=budget, model=model)
+        res = run_survey(cfg, seed, strategy, budget=budget, model=model, deadline=deadline)
         s = score_at_deadline(res, deadline, threshold)
         r = res.run_metrics
         return SuiteRow(

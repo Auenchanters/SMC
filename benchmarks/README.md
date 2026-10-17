@@ -21,7 +21,7 @@ So agribench re-implements the competitors inside one simulator and judges every
 
 Our entry is a probing strategy plus, optionally, mapper settings (`solution.yaml`). Everything else, the field, soil, probe, rover and weather, is a frozen world file.
 
-Each **task** is a world, a probe budget and a **deadline**. After the run, the map is rebuilt from the readings taken by the deadline and scored against the truth at the deadline. A strategy that drives too far simply has fewer readings when the time is up, so travel counts without a separate cost term. This is the "equal mission time" comparison from research.md (hypothesis H1).
+Each **task** is a world, a probe budget and a **deadline**. After the run, the map is rebuilt from the readings taken by the deadline and scored against the truth at the deadline. A strategy that drives too far simply has fewer readings when the time is up, so travel counts without a separate cost term. This is the "equal mission time" comparison from research.md (hypothesis H1). Every strategy is told the probe budget and the deadline, as a real mission planner would be (`run_survey(deadline=...)`, `Context.deadline`); the published baselines ignore the deadline, so their runs did not change when this was added.
 
 Gated metrics, per task:
 

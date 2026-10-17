@@ -1,6 +1,7 @@
 """Survey simulation: drive, probe, map, score."""
 
 import dataclasses
+import math
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from itertools import chain
@@ -99,6 +100,7 @@ def _adaptive_legs(
     probes: int,
     readings: list[ProbeReading],
     here: ProbeSite,
+    deadline: float = math.inf,
 ) -> Iterator[list[Waypoint]]:
     """One leg per probe: lane-graph path from the current site to the chosen one.
 
@@ -121,7 +123,8 @@ def _adaptive_legs(
         if visited.all() and not isinstance(policy, Recheck):
             return
         t = readings[-1].t if readings else 0.0
-        k = policy.choose(Context(here, sites, site_xy, visited, tuple(readings), graph, budget, t))
+        ctx = Context(here, sites, site_xy, visited, tuple(readings), graph, budget, t, deadline)
+        k = policy.choose(ctx)
         site = sites[k]
         if times[k]:
             step = 0.15 * int(times[k]) * (1 if site.x < mid_x else -1)
@@ -141,9 +144,11 @@ def run_survey(
     rrd_path: Path | None = None,
     spawn: bool = True,
     model: Path | None = None,
+    deadline: float = math.inf,
 ) -> RunResult:
     """Simulate one survey. `policy`: one of policies.STRATEGIES ("full_coverage" = fixed) or
-    "ppo" with `model` = path to a trained MaskablePPO zip."""
+    "ppo" with `model` = path to a trained MaskablePPO zip. `deadline`: the mission time the
+    adaptive strategies are told to finish by (agribench tasks); the run itself is not cut."""
     policy = FIXED if policy == "full_coverage" else policy
     budget = cfg.survey.probe_budget if budget is None else budget
     rng_field, rng_soil, rng_probe, rng_policy, rng_weather, rng_pos = world_rngs(seed)
@@ -170,14 +175,16 @@ def run_survey(
             chooser = make_policy(policy, cfg, rng_policy)
             end_site = ProbeSite(end.x, end.y, lane)
             legs = chain(
-                legs, _adaptive_legs(chooser, cfg, layout, budget, again, readings, end_site)
+                legs,
+                _adaptive_legs(chooser, cfg, layout, budget, again, readings, end_site, deadline),
             )
     else:
         if policy in ORACLES:  # the benchmark ceiling: reads the truth (reference only)
             chooser = ClairvoyantOracle(cfg, truth, policy)
         else:
             chooser = make_policy(policy, cfg, rng_policy, model)
-        legs = _adaptive_legs(chooser, cfg, layout, budget, budget, readings, graph.start_site())
+        start_site = graph.start_site()
+        legs = _adaptive_legs(chooser, cfg, layout, budget, budget, readings, start_site, deadline)
 
     viz = None
     if rerun:

@@ -119,3 +119,80 @@ def test_lanes_without_probe_sites_get_no_stops(cfg: SimConfig) -> None:
     plan = LanePlanner.plan_full_coverage(_layout(far, 0), far)
     assert plan.stops == ()
     assert len(plan.waypoints) == 2 * len(_layout(far, 0).lanes)
+
+
+def test_tour_visits_every_stop_and_beats_the_given_order(cfg: SimConfig) -> None:
+    from agrisim.policies import tour
+
+    lay = _layout(cfg, 0)
+    graph = LaneGraph.from_layout(lay)
+    sites = lay.candidate_probe_sites(cfg.survey.candidate_spacing)
+    stops = [sites[i] for i in np.random.default_rng(0).choice(len(sites), 25, replace=False)]
+    order, length = tour(graph.start_site(), stops, graph)
+    assert sorted(order) == list(range(25))
+    pts = [graph.start_site(), *stops]
+    given = sum(graph.distances(a, [b])[0] for a, b in itertools.pairwise(pts))
+    assert length < 0.6 * given  # 294 m against 588 m for this draw
+    walked = [graph.start_site(), *(stops[i] for i in order)]
+    assert length == pytest.approx(
+        sum(graph.distances(a, [b])[0] for a, b in itertools.pairwise(walked))
+    )
+
+
+def test_planned_survey_fits_its_plan_to_the_deadline(cfg: SimConfig) -> None:
+    from agrisim.policies import PLANNED
+    from agrisim.sim import run_survey
+
+    roomy = run_survey(cfg, 3, PLANNED, budget=30, deadline=1500.0)
+    assert max(r.t for r in roomy.readings) <= 1500.0  # every probe in time
+    # Too little time for 30 probes: it plans fewer, spread over the whole field, instead of
+    # running out of time part-way along a route (as spatial coverage does).
+    gx, gy = np.meshgrid(np.arange(0.5, 30, 1.0), np.arange(0.5, 20, 1.0))
+    cells = np.column_stack([gx.ravel(), gy.ravel()])
+
+    def in_time(strategy: str) -> np.ndarray:
+        res = run_survey(cfg, 4, strategy, budget=30, deadline=600.0)
+        return np.array([(r.x, r.y) for r in res.readings if r.t <= 600.0])
+
+    def gap(p: np.ndarray) -> float:  # farthest any cell is from a reading
+        return float(np.linalg.norm(cells[:, None] - p[None], axis=2).min(axis=1).max())
+
+    ours, theirs = in_time(PLANNED), in_time("spatial_coverage")
+    assert len(ours) > len(theirs) and gap(ours) < 0.8 * gap(theirs)  # 26 vs 19; 5.9 vs 7.7 m
+
+
+def test_planned_survey_waits_out_the_rain() -> None:
+    from pathlib import Path
+
+    from agrisim.config import load
+    from agrisim.policies import PLANNED
+    from agrisim.sim import run_survey
+
+    rain = load(Path(__file__).resolve().parents[1] / "configs" / "scenarios" / "rain_shower.yaml")
+    assert rain.weather is not None
+    over = max(e.start_s + e.duration_s for e in rain.weather.rain)
+    res = run_survey(rain, 0, PLANNED, budget=60, deadline=3000.0)
+    assert max(r.t for r in res.readings) <= 3000.0
+    assert sum(r.t >= over for r in res.readings) >= 40  # spatial coverage: 15 of 60
+
+
+def test_misclassification_gain_peaks_at_the_edge_of_a_dry_patch(cfg: SimConfig) -> None:
+    from agrisim.policies import Context, acquisition
+    from agrisim.sensor import ProbeReading
+
+    lay = _layout(cfg, 0)
+    graph = LaneGraph.from_layout(lay)
+    sites = tuple(lay.candidate_probe_sites(cfg.survey.candidate_spacing))
+    xy = np.array([(s.x, s.y) for s in sites])
+    patch = np.array([20.0, 10.6])  # a smooth wet field with one dry patch
+    d2 = ((xy - patch) ** 2).sum(axis=1)
+    value = 0.27 - 0.12 * np.exp(-d2 / 18)  # 0.15 at its centre, the threshold 0.18
+    taken = np.random.default_rng(1).choice(len(sites), 30, replace=False)
+    readings = tuple(ProbeReading(*xy[k], 0.0, float(value[k]), True) for k in taken)
+    visited = np.zeros(len(sites), dtype=bool)
+    visited[taken] = True
+    out = acquisition(cfg, Context(graph.start_site(), sites, xy, visited, readings, graph, 40))
+    assert out is not None
+    ivr, emr = out
+    assert np.isfinite(ivr).all() and np.isfinite(emr).all() and (emr >= -1e-12).all()
+    assert np.sqrt(d2[int(np.argmax(emr))]) < 5.0  # where the threshold is in doubt
