@@ -255,7 +255,7 @@ uv run pytest -q
 .\scripts\check_licenses.ps1
 ```
 
-There are 131 tests, about 5 to 10 minutes, with no network needed. They cover:
+There are 131 tests, about 2 to 4 minutes, with no network needed. They cover:
 
 - geometry validation;
 - field determinism;
