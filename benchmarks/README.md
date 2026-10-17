@@ -136,7 +136,63 @@ uv run agrisim suite --write-lock
 
 ## 9. Results
 
-Only from `agrisim suite` runs. First full run: 17 October 2026, code at `b300fb6` plus this milestone's changes, fresh key `full-2026-10-17`. That is 14,208 surveys (8 tasks × 128 fields × up to 14 strategies), with 0 crashes and 0 plant contacts, in 76 minutes on 14 workers (17.8 CPU-hours measured, inflated by laptop throttling; about 10 CPU-hours unloaded). `baseline.json` was recorded from this run.
+Only from `agrisim suite` runs, latest first.
+
+### `planned_survey` (17 October 2026, commit `cca381b`)
+
+Full tier, fresh key = the commit SHA `cca381b9f63dca653f53df67866e670077b7c479` (fields drawn after the strategy was frozen), 15,232 surveys, 0 crashes, 0 plant contacts, 55 min on 14 workers. `baseline.json` was recorded from this run. The 1,536 public-field values of `greedy_variance` match the old `baseline.json` exactly, so telling strategies the deadline changed no baseline.
+
+**Status: below state of the art.** The overall score rose from 28.5 to **73.9** [95% CI 69.9, 79.1], the best of any real strategy. Our entry beats every baseline on 8 of 24 task metrics: `dry_f1` on every task except `harsh_b60`, and `rmse` on `rain_b60`. It saturates 4 of them: `crps` on `demo_b30`, `demo_b60` and `large_b60`, and `dry_f1` on `demo_b60`.
+
+The strategy (`policies.PlannedSurvey`):
+1. Coverage sites (k-means, as spatial coverage) for 80% of the budget, routed by nearest neighbour plus 2-opt on the lane graph. If the whole budget would not fit before the deadline, fewer probes are planned.
+2. When rain is forecast before the deadline, the rover drives to the farthest planned site rather than probing soil the rain is about to change, as long as the rest of the plan still fits after the rain.
+3. The last 20% of the budget goes where a reading helps the map most: integrated variance reduction plus 30 times the expected misclassification reduction for the dry threshold (research.md WP3), per second of driving and probing, and only where the remaining probes still fit before the deadline.
+
+Its two weights were chosen on development seeds 0-49 and confirmed on 50-99. No public or fresh field was used for tuning.
+
+Leaderboard (fresh fields):
+
+| rank | strategy | score |
+|---|---|---|
+| ref. | oracle_rmse | 97.8 |
+| 1 | **planned_survey (our entry)** | **73.9** |
+| ref. | oracle_dry | 72.6 |
+| 2 | spatial_coverage (Walvoort et al. 2010) | 58.0 |
+| 3 | fixed_spacing (lawnmower) | 55.1 |
+| 4 | fixed_plus_recheck (ours) | 54.6 |
+| 5 | moisturemapper_a1 (CASE 2025) | 48.8 |
+| 6 | moisturemapper_a2 | 45.3 |
+| 7 | greedy_variance (the old entry) | 32.1 |
+| 8 | recheck (ours) | 27.6 |
+| 9 | mi_greedy (Krause 2008) | 25.8 |
+| 10 | greedy_variance_per_cost (ours) | 15.7 |
+| 11 | random | 0.0 |
+| 12 | dov (DOV-style) | −116 |
+
+Our entry per task (normalised score [95% CI], 64 fresh fields; **bold** = beats every baseline, one-sided Wilcoxon with Holm):
+
+| task | rmse | crps | dry_f1 | probes by deadline | mission |
+|---|---|---|---|---|---|
+| demo_b30 | 58.9 [48.6, 70.0] | 121 [101, 156] | **64.9** [45.3, 87.3] | 30 of 30 | 16 min |
+| demo_b60 | 73.9 [66.9, 82.5] | 117 [102, 139] | **118** [100, 142] | 60 of 60 | 31 min |
+| v2_b30 | 41.8 [29.7, 54.1] | 98.8 [67.3, 148] | **62.6** [44.3, 82.1] | 30 of 30 | 26 min |
+| rain_b60 | **50.5** [42.8, 59.2] | 75.0 [63.4, 91.7] | **60.8** [41.7, 79.8] | 60 of 60 | 44 min |
+| drying_b60 | 65.4 [58.9, 71.6] | 98.2 [88.4, 111] | **87.7** [72.8, 106] | 60 of 60 | 30 min |
+| rough_b60 | 45.2 [34.7, 55.6] | 72.2 [54.7, 94.6] | **52.4** [34.1, 74.7] | 60 of 60 | 30 min |
+| large_b60 | 69.7 [63.9, 75.4] | 104 [92.9, 118] | **83.7** [71.4, 96.4] | 60 of 60 | 43 min |
+| harsh_b60 | 59.5 [43.4, 76.7] | 114 [84.5, 170] | 72.8 [52.2, 98.4] | 60 of 60 | 28 min |
+
+What this says:
+- **Probing by the dry threshold is what moves the score.** The coverage route alone ties spatial coverage. The last fifth of the budget, aimed at cells whose dry/not-dry call is in doubt, lifts `dry_f1` above every baseline on 7 of 8 tasks while costing little RMSE.
+- **Time-awareness**: every probe is taken before the deadline on every task. On `rain_b60` the rover waits out the shower (44 min missions against 29 min for spatial coverage), and this is the only task where it also beats every baseline on RMSE.
+- **RMSE and CRPS on soil that does not change tie with the coverage designs, and this looks close to the honest limit of v1.** Measured on development seeds: two noise draws of the same design differ by 7 to 15% RMSE per field, so a significant win needs a consistent 3 to 4% gain. An exchange-optimised design lowers the integrated kriging variance only 0.3 to 1.9% below k-means. Kriging with the true variogram gives the same RMSE as the fitted one, and the exponential model is already the best of the five the entry may choose. The dry and wet patches hold only about 9% of the squared error. Under a stationary random field, variance-only adaptivity cannot beat a good space-filling design (research.md Section 7.3), and it ties in practice too. Reaching `below_saturation` (beating every baseline on every metric) would need information the v1 fields do not offer to a strategy that cannot see the truth. Whether v2 should gate RMSE and CRPS differently is a decision for the team.
+- **`harsh_b60` dry F1 is not won yet.** The probe reads 0.02 wet, so probes at the edge of a dry zone read wet and shrink the mapped dry area. Dry soil also makes half of the probes there fail. Treating failures as likely-dry pseudo-readings and retrying them made no measurable difference.
+- **Against external levels**, the map's ubRMSE is now within the SMAP requirement (0.04) on all 8 tasks (`rough_b60` 0.0389). RMSE reaches the factory-calibrated probe class (0.03) on `demo_b60`, `drying_b60` and `rain_b60`.
+
+### First full run (17 October 2026, entry `greedy_variance`)
+
+Code at `b300fb6` plus the agribench milestone, fresh key `full-2026-10-17`. That is 14,208 surveys (8 tasks × 128 fields × up to 14 strategies), with 0 crashes and 0 plant contacts, in 76 minutes on 14 workers (17.8 CPU-hours measured, inflated by laptop throttling; about 10 CPU-hours unloaded). `baseline.json` was first recorded from this run.
 
 **Status: below state of the art.** Our entry, `greedy_variance`, beats every baseline on 0 of 24 task metrics, and none is saturated. Overall score **28.5** [95% CI 23.8, 34.2]. Every one of the 24 ceilings is informative.
 

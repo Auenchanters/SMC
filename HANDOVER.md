@@ -119,7 +119,7 @@ Work through these in order and tick each one. "Expected" values came from the t
 
 | # | What to do | Expected |
 |---|---|---|
-| G1 | `uv run agrisim suite --tier quick --workers 8 --fresh-key handover` | About 4 to 6 minutes; prints `N/1792 runs` as it goes, then the report and `wrote runs\suite_<time>`. Status `BELOW STATE OF THE ART` today, exit code 1 at the default `--fail-on saturation`. The hard gate and the regression gate (against `benchmarks\v1\baseline.json`) pass |
+| G1 | `uv run agrisim suite --tier quick --workers 8 --fresh-key handover` | About 4 to 6 minutes; prints `N/1920 runs` as it goes, then the report and `wrote runs\suite_<time>`. Status `BELOW STATE OF THE ART` today, exit code 1 at the default `--fail-on saturation`. The hard gate and the regression gate (against `benchmarks\v1\baseline.json`) pass |
 | G2 | Run G1 again with the same key | The same scores to the last digit (the report's `overall` and `tasks` match) |
 | G3 | Add a comment line to `benchmarks\v1\worlds\demo.yaml`, run G1 with `--fail-on hard`, then undo the edit | `HARD FAIL` and `worlds/demo.yaml: changed`, exit code 1 |
 | G4 | Set `strategy: oracle_rmse` in `benchmarks\solution.yaml`, run G1, then undo | Rejected: an oracle reads the truth and cannot be the entry |
