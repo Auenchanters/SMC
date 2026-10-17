@@ -255,7 +255,7 @@ uv run pytest -q
 .\scripts\check_licenses.ps1
 ```
 
-There are 125 tests, about 2 to 4 minutes, with no network needed. They cover:
+There are 131 tests, about 5 to 10 minutes, with no network needed. They cover:
 
 - geometry validation;
 - field determinism;
@@ -272,7 +272,9 @@ There are 125 tests, about 2 to 4 minutes, with no network needed. They cover:
 - clean CLI errors for bad configs and policies;
 - Gymnasium's `check_env`;
 - an end-to-end train-and-eval smoke test;
-- agribench: CRPS against its definition, the scoring and statistics, the hash lock, the regression ratchet, and **a truth-swap test showing no strategy or mapper can see the hidden truth** (the oracle's readings change, so the test can see a leak).
+- agribench: CRPS against its definition, the scoring and statistics, the hash lock, the regression ratchet, the improvement brief, and **a truth-swap test showing no strategy or mapper can see the hidden truth** (the oracle's readings change, so the test can see a leak);
+- our agribench entry `planned_survey`: its 2-opt route, fitting the plan to a deadline, waiting out forecast rain, and the dry-threshold gain peaking at a dry patch's edge;
+- the Windows worker speed-up (it never fails a run).
 
 `mypy` runs in strict mode. The licence gate fails on any GPL, AGPL or LGPL package. CI runs all of this on **windows-latest and ubuntu-latest** on every push, and the agribench quick tier as a separate job ([benchmark.yml](.github/workflows/benchmark.yml)).
 

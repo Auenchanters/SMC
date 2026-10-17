@@ -2,9 +2,10 @@
 
 You are taking over a finished first version of the soil-moisture survey simulator and the first rover hardware design. This page tells you how to set it up, how to test it end to end, what results to expect, and what is still open. Read [README.md](README.md) first for what the project does, or watch the 3-minute demo: [docs/media/agrisim-demo.mp4](docs/media/agrisim-demo.mp4). The quickest way to see what the project does is the 3D replay: `uv run agrisim run --config configs/demo.yaml --seed 7 --view`.
 
-State at handover (14 Oct 2026):
-- ExecPlan milestones M0 to M9 are done, plus a 3D replay viewer and M11 (weather, probe misreads, rechecks). 92 tests pass.
-- CI is green: tests on Windows and Ubuntu, plus a hardware job that rebuilds and audits the rover figures.
+State (17 Oct 2026; first handover 14 Oct):
+- ExecPlan milestones M0 to M9, M11 (weather, probe misreads, rechecks) and M12 (agribench, the benchmark) are done, plus the 3D replay and rover v2. M10 (photoreal replay) has phases 1 to 3 done; phase 4 (plants) is open. 131 tests pass.
+- Our agribench entry `planned_survey` scores 73.9 (0 = random, 100 = clairvoyant oracle), the best real strategy, but the benchmark still says "below state of the art". Every `agrisim suite` run writes `brief.md`, the next task for whoever improves the entry ([benchmarks/README.md](benchmarks/README.md)).
+- CI is green: tests on Windows and Ubuntu, a hardware job that rebuilds and audits the rover figures, and the agribench quick tier.
 - Every decision, surprise and result is in [EXECPLAN.md](EXECPLAN.md).
 - Nothing is half-finished in the code. Open items are in section 3.
 
@@ -89,7 +90,7 @@ Work through these in order and tick each one. "Expected" values came from the t
 
 | # | Command | Expected |
 |---|---|---|
-| C1 | `uv run agrisim bench --config configs/demo.yaml --seeds 0-49 --budget 30 --workers 4` | About 40 s. Summary RMSE: fixed_spacing `0.03225`, random `0.03671`, greedy_variance `0.0327`, greedy_variance_per_cost `0.03866`; plant_contacts `0 +/- 0` for all |
+| C1 | `uv run agrisim bench --config configs/demo.yaml --seeds 0-49 --budget 30 --workers 4 --strategies fixed_spacing,random,greedy_variance,greedy_variance_per_cost` | About 40 s (without `--strategies` it runs all 12 strategies and takes several minutes). Summary RMSE: fixed_spacing `0.03225`, random `0.03671`, greedy_variance `0.0327`, greedy_variance_per_cost `0.03866`; plant_contacts `0 +/- 0` for all |
 | C2 | Same as C1 with `--workers 1` | Same numbers as C1 (serial = parallel), slower |
 | C3 | `uv run agrisim eval --model models/ppo_v1/model.zip --config configs/demo.yaml --seeds 100-149 --budget 30 --workers 6` | About 50 s. Matches [models/ppo_v1/eval_seeds100-149_budget30.md](models/ppo_v1/eval_seeds100-149_budget30.md), e.g. ppo RMSE `0.03573` |
 | C4 | `uv run agrisim train --config configs/demo.yaml --timesteps 2000 --seed 0 --out runs/ppo_smoke` | Finishes in about 75 s and writes `runs\ppo_smoke\model.zip` |
@@ -176,6 +177,8 @@ Report problems as GitHub issues with the command, the seed and the config file 
 | PPO environment has no weather or rechecks | On purpose, so the M8 evaluation stays reproducible. Add both before retraining |
 | Test bench for field robots (long-term aim) | The staged roadmap is in EXECPLAN.md ("Roadmap: toward a test bench"). Step 1 is calibrating against one real field |
 | Phase 2 (Gazebo / ROS 2 in WSL2) | Separate plan, not started |
+| agribench: our entry is below state of the art | `planned_survey` beats every baseline on 8 of 24 task metrics. Map error and CRPS tie the coverage designs on soil that does not change, which the evidence says is near the honest limit of v1; whether v2 should gate them differently is a team decision. Dry-zone detection in `harsh_b60` is not won. The latest `runs/suite_*/brief.md` lists what to try next ([benchmarks/README.md](benchmarks/README.md) Section 9) |
+| M10 phase 4 (plants in the 3D replay) | Not started; phases 1 to 3 are done |
 
 ## 4. Where things live
 
@@ -197,6 +200,7 @@ Report problems as GitHub issues with the command, the seed and the config file 
 - **Added (rover v2, 2026-10-15):** [hardware/rover-v2/](hardware/rover-v2/DESIGN.md), the physics-led redesign with an open probe bay, rocker-differential chassis, 150 mm clearance, LiFePO4 + BMS, and autonomous cleaning levels 0 to 5 with a dock. Calculations are generated from `model.mjs` (F0), and the simulator runs its footprint with `configs/scenarios/rover_v2.yaml` (F0b).
 - **Fixed (robustness review, 2026-10-15):** all 22 findings of the outside review `SMC-found-and-fixed.md`, re-checked on the current code. Highlights: validated configs could touch plants (now a tracking allowance), long `dt` hung, huge fields ran out of memory, `train` crashed with a large `stem_keepout`, NaN in configs, model/field mismatches, a busy port on Windows, and the demo script carrying on after a failure. 17 regression tests are in `tests/test_robustness.py`; D9 to D15 check them by hand.
 - **Added (M11):** weather (`weather:` in a config; `weather.py`), probe misreads (`probe.bad_contact_*`), the `recheck` and `fixed_plus_recheck` strategies, `extends:` scenario configs in `configs/scenarios/`, and rain in the 3D replay (B4d). Without a `weather:` section everything behaves exactly as before.
+- **Added (M12, 2026-10-17):** agribench (`agrisim suite`, `agrisim gate`, `benchmarks/`), competitor baselines, the clairvoyant ceiling and CI per push (section D2). Then our entry `planned_survey` (28.5 to 73.9), `brief.md` after every suite run (the improvement loop), and suite and bench workers that Windows no longer throttles in the background (a full tier ran about 3.5 to 7 times faster).
 
 - **Added (rover v2 visuals, 2026-10-16):** v2 anatomy figures (Fig 1 the whole rover with the probe cycle, the rail and a twist; Fig 2 the cleaning levels), audited in CI, and the 3D replay now builds v2. Fixed in the v2 model on the way: the probe axis (a 134 mm axis cannot make a 330 mm stroke; now 624 mm tall for a 290 mm stroke), the differential bar (it ran through the probe tower; now on the front box), the single rail the probe passed through (now two), and the beam tilt formula (19.5°, not 18.4°, for a 100 mm step). F0, F7 to F10.
 
