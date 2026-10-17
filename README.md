@@ -30,6 +30,7 @@ A pure-Python simulator of a planted tomato field. A small differential-drive ro
 
 - [Why this exists](#why-this-exists)
 - [Results](#results)
+- [Benchmark: agribench](#benchmark-agribench)
 - [How it works](#how-it-works)
 - [Architecture](#architecture)
 - [Screenshots](#screenshots)
@@ -97,6 +98,16 @@ Going back helps a little, by 2 to 3% on the same fields, and it does so on 18 o
 
 ```powershell
 uv run agrisim run --config configs/scenarios/rain_shower.yaml --seed 7 --policy fixed_plus_recheck --view
+```
+
+## Benchmark: agribench
+
+`agrisim bench` compares strategies at equal probe counts. **agribench** (`agrisim suite`) is the strict test that runs on every push. It has 8 frozen tasks: the demo field, rover v2's slow probe, rain, drying, patchy soil, a bigger field, and a harsh world where dry soil makes probes fail and positions are off by 0.3 m. Each task has a deadline, so driving costs probes. Fresh fields are drawn from the commit, so nobody can tune to them. Scores run from 0 (random) to 100 (a clairvoyant oracle) and are compared field by field against re-implemented published methods. It is designed to stay red until our entry is genuinely near the oracle. Protocol, rules and sources: [benchmarks/README.md](benchmarks/README.md).
+
+First full run (17 Oct 2026, 14,208 surveys, 0 plant contacts): **below state of the art.** Our entry (`greedy_variance`) scores **28.5** [95% CI 23.8, 34.2]. Spatial coverage (Walvoort et al. 2010) leads the real strategies at 55.0, then fixed_plus_recheck 53.1, the lawnmower 52.7 and MoistureMapper A1 51.8. The oracle reaches 96.8. Greedy variance loses because it runs out of time: it has taken only 22 to 45 of its probes at the deadline.
+
+```powershell
+uv run agrisim suite --tier quick --workers 8
 ```
 
 ## How it works
@@ -244,7 +255,7 @@ uv run pytest -q
 .\scripts\check_licenses.ps1
 ```
 
-There are 92 tests, about 50 to 140 s, with no network needed. They cover:
+There are 125 tests, about 2 to 4 minutes, with no network needed. They cover:
 
 - geometry validation;
 - field determinism;
@@ -260,9 +271,10 @@ There are 92 tests, about 50 to 140 s, with no network needed. They cover:
 - serial and parallel bench giving identical results;
 - clean CLI errors for bad configs and policies;
 - Gymnasium's `check_env`;
-- an end-to-end train-and-eval smoke test.
+- an end-to-end train-and-eval smoke test;
+- agribench: CRPS against its definition, the scoring and statistics, the hash lock, the regression ratchet, and **a truth-swap test showing no strategy or mapper can see the hidden truth** (the oracle's readings change, so the test can see a leak).
 
-`mypy` runs in strict mode. The licence gate fails on any GPL, AGPL or LGPL package. CI runs all of this on **windows-latest and ubuntu-latest** on every push.
+`mypy` runs in strict mode. The licence gate fails on any GPL, AGPL or LGPL package. CI runs all of this on **windows-latest and ubuntu-latest** on every push, and the agribench quick tier as a separate job ([benchmark.yml](.github/workflows/benchmark.yml)).
 
 ## Regenerating the images and video
 
@@ -298,17 +310,19 @@ src/agrisim/
   control.py    turn-in-place + pure pursuit, reverse along lanes
   safety.py     rectangle-vs-canopy contact test (KD-tree, vectorised)
   mapping.py    Mapper protocol: GlobalMean, IDW, Kriging (PyKrige)
-  metrics.py    map and run metrics (may read the truth)
-  policies.py   fixed, random, greedy variance, variance per cost
+  metrics.py    map and run metrics, CRPS, the benchmark's clairvoyant oracle (may read the truth)
+  policies.py   fixed, random, greedy variance, variance per cost, recheck, published baselines
   sim.py        run_survey(): drive, probe, map, score
   env.py        Gymnasium env, MaskablePPO training, learned policy
   bench.py      multi-seed benchmark, 95% intervals, Markdown summary
+  suite.py      agribench: frozen tasks, fresh fields, normalised scores, paired tests, gates
   viz.py        Rerun logging
   view3d.py     3D replay: scene.json and a local web server
   viewer3d/     the 3D replay page (three.js 0.186.1 bundled, MIT)
   io.py         Windows-safe run folders and outputs
-  cli.py        agrisim run | bench | train | eval | view
+  cli.py        agrisim run | bench | suite | gate | train | eval | view
 configs/demo.yaml   all placeholder numbers, marked "PLACEHOLDER: calibrate"
+benchmarks/         agribench: protocol (README.md), our entry (solution.yaml), frozen v1/ suite
 scripts/            demo.ps1 / demo.sh, check_licenses.ps1 / .sh, make_media.py, demo_video/
 tests/              pytest suite
 docs/img, docs/media  README images and video

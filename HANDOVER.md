@@ -115,6 +115,16 @@ Work through these in order and tick each one. "Expected" values came from the t
 | D15 | Start `uv run agrisim view <a --view run folder> --port 8765 --no-browser` in two terminals | The second one is refused: `cannot listen on port 8765` |
 | D8 | Set `field: stem_keepout: 5.0` in a copy and run B1 | Runs to the end: `0 valid / 0 used`, path `465.7 m`, lane coverage `1.000`, plant contacts `0`, and the map metrics are `nan` (no readings). No point on any lane is 5 m from every stem. This used to crash. (With `0.7`, only 34 sites remain, in plant gaps and lane ends: `33 valid / 34 used`.) |
 
+### D2. The benchmark (agribench, [benchmarks/README.md](benchmarks/README.md))
+
+| # | What to do | Expected |
+|---|---|---|
+| G1 | `uv run agrisim suite --tier quick --workers 8 --fresh-key handover` | About 4 to 6 minutes; prints `N/1792 runs` as it goes, then the report and `wrote runs\suite_<time>`. Status `BELOW STATE OF THE ART` today, exit code 1 at the default `--fail-on saturation`. The hard gate and the regression gate (against `benchmarks\v1\baseline.json`) pass |
+| G2 | Run G1 again with the same key | The same scores to the last digit (the report's `overall` and `tasks` match) |
+| G3 | Add a comment line to `benchmarks\v1\worlds\demo.yaml`, run G1 with `--fail-on hard`, then undo the edit | `HARD FAIL` and `worlds/demo.yaml: changed`, exit code 1 |
+| G4 | Set `strategy: oracle_rmse` in `benchmarks\solution.yaml`, run G1, then undo | Rejected: an oracle reads the truth and cannot be the entry |
+| G5 | `uv run agrisim gate <the G1 folder>\report.json --fail-on hard` | Prints the status; exit code 0 |
+
 ### E. Exploratory (try to break it)
 
 - Change the field: `row_spacing` 0.9 to 1.5, `length_x` 10 to 60, `plant_dropout_prob` 0 to 0.5. Plant contacts must stay 0 whenever the config is accepted.

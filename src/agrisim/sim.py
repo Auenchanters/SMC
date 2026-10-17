@@ -1,5 +1,6 @@
 """Survey simulation: drive, probe, map, score."""
 
+import dataclasses
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from itertools import chain
@@ -12,7 +13,15 @@ from agrisim.config import SimConfig
 from agrisim.control import PurePursuit, drive_segment, poses
 from agrisim.field import FieldLayout, ProbeSite
 from agrisim.mapping import GridSpec, make_mapper
-from agrisim.metrics import MapMetrics, RunMetrics, map_metrics, run_metrics, truth_on_grid
+from agrisim.metrics import (
+    ORACLES,
+    ClairvoyantOracle,
+    MapMetrics,
+    RunMetrics,
+    map_metrics,
+    run_metrics,
+    truth_on_grid,
+)
 from agrisim.planning import LaneGraph, LanePlanner, Waypoint
 from agrisim.policies import FIXED, FIXED_PLUS, Context, Policy, Recheck, make_policy
 from agrisim.rover import RoverState
@@ -64,11 +73,12 @@ class Truth:
 
 
 def world_rngs(seed: int) -> tuple[np.random.Generator, ...]:
-    """Independent streams for layout, soil, probe noise, policy and weather.
+    """Independent streams for layout, soil, probe noise, policy, weather and positioning.
 
-    Separate streams mean every policy sees the same field and soil for a given seed.
+    Separate streams mean every policy sees the same field and soil for a given seed. Spawned
+    children do not depend on how many are spawned, so adding a stream changes no other one.
     """
-    return tuple(np.random.default_rng(s) for s in np.random.SeedSequence(seed).spawn(5))
+    return tuple(np.random.default_rng(s) for s in np.random.SeedSequence(seed).spawn(6))
 
 
 def map_now(
@@ -136,7 +146,7 @@ def run_survey(
     "ppo" with `model` = path to a trained MaskablePPO zip."""
     policy = FIXED if policy == "full_coverage" else policy
     budget = cfg.survey.probe_budget if budget is None else budget
-    rng_field, rng_soil, rng_probe, rng_policy, rng_weather = world_rngs(seed)
+    rng_field, rng_soil, rng_probe, rng_policy, rng_weather, rng_pos = world_rngs(seed)
     layout = FieldLayout.generate(cfg.field, rng_field)
     start_soil = SoilTruth.generate(cfg.soil, layout, rng_soil)
     dynamics = None
@@ -163,7 +173,10 @@ def run_survey(
                 legs, _adaptive_legs(chooser, cfg, layout, budget, again, readings, end_site)
             )
     else:
-        chooser = make_policy(policy, cfg, rng_policy, model)
+        if policy in ORACLES:  # the benchmark ceiling: reads the truth (reference only)
+            chooser = ClairvoyantOracle(cfg, truth, policy)
+        else:
+            chooser = make_policy(policy, cfg, rng_policy, model)
         legs = _adaptive_legs(chooser, cfg, layout, budget, budget, readings, graph.start_site())
 
     viz = None
@@ -191,6 +204,9 @@ def run_survey(
             t += cfg.probe.insertion_time_s
             here = states[-1]
             reading = probe.read(truth(t), here.x, here.y, t, rng_probe)
+            if cfg.rover.along_row_error_std > 0:  # logged where the rover thinks it is
+                err = float(rng_pos.normal(0.0, cfg.rover.along_row_error_std))
+                reading = dataclasses.replace(reading, x=reading.x + err)
             readings.append(reading)
             states.append(here)
             times.append(t)

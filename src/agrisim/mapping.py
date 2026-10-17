@@ -2,6 +2,7 @@
 
 import logging
 import warnings
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -107,23 +108,50 @@ class KrigingMapper(_Readings):
         super().__init__()
         self.cfg = cfg
 
-    def _krige(
-        self, style: str, x: FloatArray, y: FloatArray
-    ) -> tuple[FloatArray, FloatArray] | None:
-        """Kriging mean and variance, or None when the fallback applies."""
+    def _fit(self) -> OrdinaryKriging | None:
+        """The fitted kriging model, or None when the fallback applies."""
         xyz = self.xyz
         if len(xyz) < self.cfg.min_readings or np.ptp(xyz[:, 2]) == 0:
             return None
         try:
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
-                ok = OrdinaryKriging(
+                return OrdinaryKriging(
                     xyz[:, 0],
                     xyz[:, 1],
                     xyz[:, 2],
                     variogram_model=self.cfg.variogram_model,
                     pseudo_inv=True,
                 )
+        except (ValueError, np.linalg.LinAlgError) as exc:
+            log.warning("kriging failed (%s); using global mean", exc)
+            return None
+
+    def covariance(self) -> Callable[[FloatArray], FloatArray] | None:
+        """C(h) = sill - gamma(h) of the fitted variogram (C(0) = sill, nugget included), or None
+        before kriging is usable or for a variogram with no sill (linear, power)."""
+        ok = self._fit()
+        if ok is None or self.cfg.variogram_model in ("linear", "power"):
+            return None
+        params = np.asarray(ok.variogram_model_parameters, dtype=np.float64)
+        sill = float(params[0] + params[-1])  # partial sill + nugget
+        fn = ok.variogram_function
+
+        def cov(h: FloatArray) -> FloatArray:
+            return np.where(h > 0, sill - fn(params, h), sill)
+
+        return cov
+
+    def _krige(
+        self, style: str, x: FloatArray, y: FloatArray
+    ) -> tuple[FloatArray, FloatArray] | None:
+        """Kriging mean and variance, or None when the fallback applies."""
+        ok = self._fit()
+        if ok is None:
+            return None
+        try:
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
                 z, ss = ok.execute(style, x, y)
         except (ValueError, np.linalg.LinAlgError) as exc:
             log.warning("kriging failed (%s); using global mean", exc)

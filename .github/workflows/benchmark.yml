@@ -1,0 +1,72 @@
+name: Benchmark
+
+# agribench (benchmarks/README.md). The quick tier runs on every push and pull request; the full
+# tier runs nightly and on demand, one parallel job per task (about 10 CPU-hours in total).
+# A crash, a plant contact, an edited frozen file or a regression against
+# benchmarks/v1/baseline.json fails the job. Not yet beating every baseline, or not yet
+# saturated, fails only the last step, which may fail without blocking a merge.
+# CI never commits: update baseline.json by hand (agrisim suite --update-baseline).
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: agribench-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quick:
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+      - run: uv sync --locked
+      - name: Run agribench, quick tier (fails on a crash, a contact, edited files, a regression)
+        run: >-
+          uv run agrisim suite --tier quick --workers 4 --fresh-key "${{ github.sha }}"
+          --out runs/ci --fail-on hard
+      - name: Report
+        if: always()
+        run: cat runs/ci/suite_*/report.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: agribench-quick-${{ github.sha }}
+          path: runs/ci/
+      - name: Saturation gate (red until our entry reaches the oracle; does not block)
+        continue-on-error: true
+        run: uv run agrisim gate runs/ci/suite_*/report.json --fail-on saturation
+
+  full:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        task: [demo_b30, demo_b60, v2_b30, rain_b60, drying_b60, rough_b60, large_b60, harsh_b60]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+      - run: uv sync --locked
+      - name: Run agribench, full tier, ${{ matrix.task }}
+        run: >-
+          uv run agrisim suite --tier full --tasks ${{ matrix.task }} --workers 4
+          --fresh-key "${{ github.sha }}" --out runs/ci --fail-on hard
+      - name: Report
+        if: always()
+        run: cat runs/ci/suite_*/report.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: agribench-full-${{ matrix.task }}-${{ github.sha }}
+          path: runs/ci/
+      - name: Saturation gate (red until our entry reaches the oracle; does not block)
+        continue-on-error: true
+        run: uv run agrisim gate runs/ci/suite_*/report.json --fail-on saturation

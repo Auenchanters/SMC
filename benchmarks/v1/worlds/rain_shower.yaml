@@ -1,0 +1,19 @@
+# agribench v1 frozen world: a copy of configs/scenarios/rain_shower.yaml (2026-10-17). Never edit.
+# Scenario: a heavy shower part-way through the survey. The demo field and rover, plus weather.
+# Readings taken before the rain go out of date; the rover must decide whether to go back.
+extends: demo.yaml
+
+probe:
+  bad_contact_prob: 0.05             # PLACEHOLDER: calibrate (1 reading in 20 sits in an air gap)
+  bad_contact_drop: 0.10             # PLACEHOLDER: calibrate
+
+weather:
+  layer_depth: 0.10                  # PLACEHOLDER: calibrate (sensing depth of the probe)
+  field_capacity: 0.32               # PLACEHOLDER: calibrate (loam; depends on soil type)
+  drainage_per_h: 0.5                # PLACEHOLDER: calibrate
+  evapotranspiration_mm_per_h: 0.4   # PLACEHOLDER: calibrate (warm, sunny afternoon)
+  infiltration_cv: 0.4               # PLACEHOLDER: calibrate
+  infiltration_corr_length: 4.0      # PLACEHOLDER: calibrate
+  step_s: 60
+  rain:
+    - {start_s: 600, duration_s: 600, rate_mm_per_h: 20}   # PLACEHOLDER: a 10-minute downpour

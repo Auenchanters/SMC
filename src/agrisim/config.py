@@ -61,6 +61,9 @@ class RoverConfig(_Model):
     max_speed: PositiveFloat
     max_yaw_rate: PositiveFloat
     safety_margin: NonNegative
+    # Positioning error along the row (no RTK): each reading is logged this far (1 sd) from where
+    # the probe really went in. The lane itself is known, so there is no error across rows.
+    along_row_error_std: NonNegative = 0.0
 
     @property
     def turn_radius(self) -> float:
@@ -110,6 +113,19 @@ class SoilConfig(_Model):
         return self
 
 
+class HardSoilConfig(_Model):
+    """Dry soil is hard: the drier the spot, the more often the probe fails or stops short.
+
+    Trouble ramps up as a logistic in the true VWC, half-strength at `hard_below`.
+    """
+
+    hard_below: float  # VWC
+    width: PositiveFloat  # VWC scale of the ramp
+    fail_prob: Fraction  # failure probability in very dry soil (failure_prob in wet soil)
+    partial_prob: Fraction  # probability of a short insertion in very dry soil
+    partial_drop: NonNegative  # a short insertion reads low by partial_drop x U(0.5, 1)
+
+
 class ProbeConfig(_Model):
     footprint_radius: PositiveFloat
     noise_std: NonNegative
@@ -121,6 +137,7 @@ class ProbeConfig(_Model):
     # by up to bad_contact_drop and does not know it.
     bad_contact_prob: Fraction = 0.0
     bad_contact_drop: NonNegative = 0.0
+    hard_soil: HardSoilConfig | None = None  # None: failures do not depend on the soil
 
 
 class SurveyConfig(_Model):

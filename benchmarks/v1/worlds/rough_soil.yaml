@@ -1,0 +1,7 @@
+# agribench v1 frozen world. Never edit; see ../README.md.
+# Patchy soil: moisture changes over 1 to 5 m instead of 3 to 30 m, so even spacing misses more
+# and where to probe matters more (tests adaptivity on heterogeneous fields).
+extends: demo.yaml
+
+soil:
+  corr_length_range: [1.0, 5.0]  # PLACEHOLDER: calibrate (short-range variability)

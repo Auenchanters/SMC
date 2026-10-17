@@ -1,0 +1,23 @@
+# agribench v1 frozen world. Never edit; see ../README.md.
+# The demo field with the realism the demo leaves out (research.md flaws 8 and 9):
+# - dry, hard soil makes the probe fail or stop short (reading low) far more often, so the driest
+#   spots are the hardest to measure (MoistureMapper: low readings in dense soil; Langenscheidt
+#   et al.: 75.6% insertion success in a real chile field);
+# - no RTK: readings are logged up to ~0.3 m (1 sd) from where the probe went in along the row;
+# - a noisier, more biased probe and some bad soil contact.
+extends: demo.yaml
+
+rover:
+  along_row_error_std: 0.3        # PLACEHOLDER: calibrate (odometry between headland fixes)
+
+probe:
+  noise_std: 0.03                 # PLACEHOLDER: calibrate
+  bias: 0.02                      # PLACEHOLDER: calibrate
+  bad_contact_prob: 0.05          # PLACEHOLDER: calibrate
+  bad_contact_drop: 0.10          # PLACEHOLDER: calibrate
+  hard_soil:
+    hard_below: 0.20              # PLACEHOLDER: calibrate (VWC where insertion gets hard)
+    width: 0.02                   # PLACEHOLDER: calibrate
+    fail_prob: 0.5                # PLACEHOLDER: calibrate (failures in very dry soil)
+    partial_prob: 0.3             # PLACEHOLDER: calibrate (short insertions in very dry soil)
+    partial_drop: 0.06            # PLACEHOLDER: calibrate

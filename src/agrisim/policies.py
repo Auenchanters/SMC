@@ -25,7 +25,19 @@ BoolArray = npt.NDArray[np.bool_]
 FIXED = "fixed_spacing"
 FIXED_PLUS = "fixed_plus_recheck"  # the fixed route, then survey.recheck_probes rechecks
 RECHECK = "recheck"
-STRATEGIES = (FIXED, "random", "greedy_variance", "greedy_variance_per_cost", RECHECK, FIXED_PLUS)
+STRATEGIES = (
+    FIXED,
+    "random",
+    "greedy_variance",
+    "greedy_variance_per_cost",
+    RECHECK,
+    FIXED_PLUS,
+    "moisturemapper_a1",
+    "moisturemapper_a2",
+    "dov",
+    "mi_greedy",
+    "spatial_coverage",
+)
 LEARNED = "ppo"  # needs a trained model (agrisim train)
 
 
@@ -152,6 +164,123 @@ class Recheck:
         return int(np.argmax(np.where(ctx.visited, doubt(self.cfg, ctx), var)))
 
 
+# Published methods, re-implemented on the lane graph (research.md Section 4 and WP2). They are
+# the benchmark's competitor baselines; each one names its source.
+
+
+@dataclass(frozen=True)
+class MoistureMapper:
+    """MoistureMapper (Univ. Nevada Reno / DRI, IEEE CASE 2025, arXiv 2507.12716).
+
+    A1 = var * (1 - d / d_max); A2 = (var + 1 - d / d_max) / 2; the next site is drawn at random
+    among the top five. Their GP has signal variance 1, so the kriging variance is scaled to
+    [0, 1]; d is lane-graph distance (they used straight lines, which a rover in rows cannot
+    drive) and d_max the longest lane-graph distance in the field.
+    """
+
+    cfg: SimConfig
+    rng: np.random.Generator
+    additive: bool
+
+    def choose(self, ctx: Context) -> int:
+        var = uncertainty(self.cfg, ctx)
+        var = var / max(float(var.max()), 1e-12)
+        g = ctx.graph
+        d_max = (g.x_east - g.x_west) + float(g.lane_y[-1] - g.lane_y[0])
+        near = 1 - ctx.graph.distances(ctx.position, ctx.sites) / d_max
+        score = 0.5 * (var + near) if self.additive else var * near
+        score = np.where(ctx.visited, -np.inf, score)
+        top = np.argsort(-score, kind="stable")[: min(5, int((~ctx.visited).sum()))]
+        return int(self.rng.choice(top))
+
+
+@dataclass(frozen=True)
+class DistanceOverVariance:
+    """Distance Over Variance bid (Roberts-Elliott, Das & Cielniak, Robotics 14(6):77, 2025):
+    the site with the least lane-graph distance per unit of kriging variance. The exact bid form
+    is unverified (research.md Section 11), so treat it as DOV-style."""
+
+    cfg: SimConfig
+
+    def choose(self, ctx: Context) -> int:
+        d = np.maximum(ctx.graph.distances(ctx.position, ctx.sites), 1e-6)
+        return _best(uncertainty(self.cfg, ctx) / d, ctx.visited)
+
+
+@dataclass(frozen=True)
+class MutualInformation:
+    """Greedy mutual-information placement (Krause, Singh & Guestrin, JMLR 9, 2008): maximise
+    var(s | probed) / var(s | every other unprobed site), with the fitted variogram's covariance.
+    Before kriging is usable it spreads out like greedy_variance."""
+
+    cfg: SimConfig
+
+    def choose(self, ctx: Context) -> int:
+        mapper = KrigingMapper(self.cfg.mapping)
+        used = current_view(ctx.readings, self.cfg.weather, ctx.t, self.cfg.soil.vwc_clip)
+        for r in used:
+            mapper.update(r)
+        cov = mapper.covariance()
+        free = np.flatnonzero(~ctx.visited)
+        if cov is None or len(free) < 2:
+            return _best(uncertainty(self.cfg, ctx), ctx.visited)
+        a = mapper.xyz[:, :2]
+        u = ctx.site_xy[free]
+
+        def k(p: FloatArray, q: FloatArray) -> FloatArray:
+            return cov(np.linalg.norm(p[:, None, :] - q[None, :, :], axis=2))
+
+        k_ua = k(u, a)
+        sol = np.linalg.lstsq(k(a, a), k_ua.T, rcond=None)[0]
+        given_probed = np.maximum(cov(np.zeros(1))[0] - (k_ua * sol.T).sum(axis=1), 0.0)
+        k_uu = k(u, u)
+        prec = np.linalg.inv(k_uu + 1e-6 * float(k_uu[0, 0]) * np.eye(len(u)))
+        given_rest = 1.0 / np.maximum(np.diag(prec), 1e-12)  # Schur complement
+        return int(free[np.argmax(given_probed / given_rest)])
+
+
+class SpatialCoverage:
+    """Spatial coverage sampling (Walvoort, Brus & de Gruijter, Computers & Geosciences 2010),
+    a standard soil-survey design: k-means centres of the field, one per probe, snapped to the
+    nearest free candidate sites, then visited nearest first along the lane graph. Not adaptive."""
+
+    def __init__(self, cfg: SimConfig, rng: np.random.Generator) -> None:
+        self.cfg, self.rng = cfg, rng
+        self._targets: list[int] | None = None
+
+    def _plan(self, ctx: Context) -> list[int]:
+        f = self.cfg.field
+        gx, gy = np.meshgrid(np.arange(0.25, f.length_x, 0.5), np.arange(0.25, f.width_y, 0.5))
+        pts = np.column_stack([gx.ravel(), gy.ravel()])
+        k = min(ctx.budget, len(ctx.sites))
+        centres = pts[self.rng.choice(len(pts), k, replace=False)]
+        for _ in range(30):  # Lloyd iterations
+            label = np.linalg.norm(pts[:, None, :] - centres[None, :, :], axis=2).argmin(axis=1)
+            centres = np.array(
+                [
+                    pts[label == j].mean(axis=0) if (label == j).any() else centres[j]
+                    for j in range(k)
+                ]
+            )
+        taken = ctx.visited.copy()
+        targets = []
+        for c in centres:
+            d = np.where(taken, np.inf, np.linalg.norm(ctx.site_xy - c, axis=1))
+            j = int(np.argmin(d))
+            taken[j] = True
+            targets.append(j)
+        return targets
+
+    def choose(self, ctx: Context) -> int:
+        if self._targets is None:
+            self._targets = self._plan(ctx)
+        todo = [j for j in self._targets if not ctx.visited[j]]
+        if not todo:  # all centres probed (or lost to failures): nearest free site
+            return _best(-ctx.graph.distances(ctx.position, ctx.sites), ctx.visited)
+        d = ctx.graph.distances(ctx.position, [ctx.sites[j] for j in todo])
+        return todo[int(np.argmin(d))]
+
+
 def make_policy(
     name: str, cfg: SimConfig, rng: np.random.Generator, model: Path | None = None
 ) -> Policy:
@@ -169,4 +298,12 @@ def make_policy(
         return GreedyVariancePerCost(cfg)
     if name in (RECHECK, FIXED_PLUS):
         return Recheck(cfg)
+    if name in ("moisturemapper_a1", "moisturemapper_a2"):
+        return MoistureMapper(cfg, rng, additive=name.endswith("a2"))
+    if name == "dov":
+        return DistanceOverVariance(cfg)
+    if name == "mi_greedy":
+        return MutualInformation(cfg)
+    if name == "spatial_coverage":
+        return SpatialCoverage(cfg, rng)
     raise ValueError(f"unknown policy {name!r}; choose from {(*STRATEGIES, LEARNED)}")

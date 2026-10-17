@@ -1,0 +1,12 @@
+# agribench v1 frozen world: a copy of configs/scenarios/hot_afternoon.yaml (2026-10-17). Never edit.
+# Scenario: no rain, strong sun. The soil dries steadily while the rover works.
+extends: demo.yaml
+
+weather:
+  layer_depth: 0.10                  # PLACEHOLDER: calibrate
+  field_capacity: 0.32               # PLACEHOLDER: calibrate
+  drainage_per_h: 0.5                # PLACEHOLDER: calibrate
+  evapotranspiration_mm_per_h: 0.9   # PLACEHOLDER: calibrate (hot, dry, windy)
+  infiltration_cv: 0.4               # PLACEHOLDER: calibrate
+  infiltration_corr_length: 4.0      # PLACEHOLDER: calibrate
+  step_s: 60

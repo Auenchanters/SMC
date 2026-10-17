@@ -42,8 +42,14 @@ Python 3.13 via `uv`. numpy, scipy, shapely, pydantic v2, PyYAML, PyKrige, rerun
     uv run agrisim run --config configs/demo.yaml --seed 7
     uv run agrisim run --config configs/demo.yaml --seed 7 --rerun
     uv run agrisim bench --config configs/demo.yaml --seeds 0-49
+    uv run agrisim suite --tier quick --workers 8   # agribench, see benchmarks/README.md
 
-A task is done only when ruff, mypy, pytest and the licence gate all pass.
+A task is done only when ruff, mypy, pytest and the licence gate all pass. A change to a strategy, mapper, sensor or the simulator also runs `agrisim suite --tier quick`: no hard fail, no regression.
+
+## Benchmark (agribench)
+- `benchmarks/v1/` is frozen (`LOCK.json`). Never edit it to make a score pass; a real change to the benchmark is a new version folder and a Decision Log entry. Our entry is `benchmarks/solution.yaml`.
+- Seeds: 0-99 development; 100-149 old held-out (overused); 200-263 agribench public; 500-599 reserved for paper numbers, untouched; 1000 and above PPO training; 2^31 and above agribench fresh fields.
+- Update `benchmarks/v1/baseline.json` (`--update-baseline`) only for a real, reported improvement or an accepted trade-off, and say which in the commit message.
 
 ## Conventions
 - Layout: `src/agrisim/` (package), `tests/`, `configs/`, `scripts/`, `runs/` (gitignored outputs).

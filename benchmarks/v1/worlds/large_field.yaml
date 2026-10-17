@@ -1,0 +1,9 @@
+# agribench v1 frozen world. Never edit; see ../README.md.
+# A bigger field with wider rows: 50 x 30 m at 1.5 m rows, so a 60-probe budget is sparse and
+# driving is long (tests generalisation beyond the demo geometry, research.md flaw 13).
+extends: demo.yaml
+
+field:
+  length_x: 50.0            # PLACEHOLDER: calibrate
+  width_y: 30.0             # PLACEHOLDER: calibrate
+  row_spacing: 1.5          # PLACEHOLDER: calibrate

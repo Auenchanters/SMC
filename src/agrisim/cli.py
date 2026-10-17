@@ -1,7 +1,7 @@
 """Typer command-line interface: run, bench, train, eval (added milestone by milestone)."""
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, cast
 
 import typer
 
@@ -200,6 +200,134 @@ def bench(
     (out_dir / "summary.md").write_text(text, encoding="utf-8")
     typer.echo(text)
     typer.echo(f"wrote {out_dir}")
+
+
+def _ppo_fits(model: Path, cfg: "SimConfig") -> bool:
+    from agrisim.env import LearnedPolicy
+
+    try:
+        LearnedPolicy.load(model, cfg)
+    except (ValueError, OSError):
+        return False
+    return True
+
+
+def _commit() -> str:
+    import subprocess
+
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True, timeout=10
+        )
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    return out.stdout.strip()
+
+
+@app.command()
+def suite(
+    tier: Annotated[str, typer.Option(help="quick (every push) or full")] = "quick",
+    tasks: Annotated[str, typer.Option(help="Comma-separated tasks; default: the whole tier")] = "",
+    suite_dir: Annotated[
+        Path, typer.Option("--suite", file_okay=False, help="Frozen suite folder")
+    ] = Path("benchmarks/v1"),
+    solution: Annotated[Path, typer.Option(dir_okay=False, help="Our entry")] = Path(
+        "benchmarks/solution.yaml"
+    ),
+    workers: Annotated[int, typer.Option(min=1, help="Worker processes (1 = serial)")] = 1,
+    fresh_key: Annotated[
+        str, typer.Option(help="Key for the fresh fields (CI: the commit); default: random")
+    ] = "",
+    out: Annotated[Path, typer.Option(help="Root folder for outputs")] = Path("runs"),
+    fail_on: Annotated[
+        str, typer.Option(help="Exit 1 at: hard, sota or saturation (strictest)")
+    ] = "saturation",
+    update_baseline: Annotated[
+        bool, typer.Option("--update-baseline", help="Record this run as the new baseline")
+    ] = False,
+    write_lock: Annotated[
+        bool, typer.Option("--write-lock", help="Re-hash the frozen files, then stop")
+    ] = False,
+) -> None:
+    """Run agribench: our entry against every baseline and the oracle, on frozen worlds and on
+    fresh fields; write runs/suite_<timestamp>/report.md, report.json and rows.csv."""
+    import json
+    import secrets
+    from datetime import UTC, datetime
+
+    from pydantic import ValidationError
+
+    from agrisim import suite as sb
+    from agrisim.io import new_dir
+
+    if tier not in ("quick", "full"):
+        raise typer.BadParameter("use quick or full", param_hint="--tier")
+    tier_ = cast("sb.Tier", tier)
+    if fail_on not in sb.FAIL_ON:
+        raise typer.BadParameter(f"use one of {sorted(sb.FAIL_ON)}", param_hint="--fail-on")
+    if not (suite_dir / "suite.yaml").is_file():
+        raise typer.BadParameter(f"{suite_dir} has no suite.yaml", param_hint="--suite")
+    if write_lock:
+        typer.echo(f"wrote {sb.write_lock(suite_dir)}")
+        return
+    try:
+        spec, sol = sb.load_suite(suite_dir), sb.load_solution(solution)
+    except (ValidationError, OSError) as exc:
+        raise typer.BadParameter(str(exc)) from None
+    key = fresh_key or secrets.token_hex(8)
+    try:
+        only = [x.strip() for x in tasks.split(",") if x.strip()]
+        plan = sb.plan_jobs(spec, suite_dir, sol, tier_, key, _ppo_fits, only)
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from None
+    out_dir = new_dir(_out_root(out), f"suite_{datetime.now(UTC):%Y%m%dT%H%M%SZ}")
+    typer.echo(f"agribench v{spec.version} {tier}: {len(plan.jobs)} runs on {workers} worker(s)")
+    step = max(1, len(plan.jobs) // 20)
+
+    def progress(done: int, total: int) -> None:
+        if done % step == 0 or done == total:
+            typer.echo(f"  {done}/{total} runs", err=True)
+
+    rows = sb.run_jobs(plan.jobs, workers, progress)
+    base_path = suite_dir / "baseline.json"
+    old = json.loads(base_path.read_text(encoding="utf-8")) if base_path.is_file() else None
+    meta = {
+        "commit": _commit(),
+        "fresh_key": key,
+        "created_utc": f"{datetime.now(UTC):%Y-%m-%dT%H:%M:%SZ}",
+        "lock_problems": sb.lock_problems(suite_dir),
+    }
+    report = sb.analyse(spec, sol, tier_, plan, rows, old, meta)
+    sb.write_rows(rows, out_dir / "rows.csv")
+    (out_dir / "report.json").write_text(json.dumps(report, indent=1), encoding="utf-8")
+    text = sb.report_markdown(report)
+    (out_dir / "report.md").write_text(text, encoding="utf-8")
+    typer.echo(text)
+    if update_baseline:
+        new = sb.baseline_from(rows, spec, sol, meta, old)
+        base_path.write_text(json.dumps(new, indent=1) + "\n", encoding="utf-8")
+        typer.echo(f"wrote {base_path}")
+    typer.echo(f"wrote {out_dir}")
+    if sb.fails(report["status"], fail_on):
+        raise typer.Exit(1)
+
+
+@app.command()
+def gate(
+    report: Annotated[Path, typer.Argument(exists=True, dir_okay=False, help="report.json")],
+    fail_on: Annotated[str, typer.Option(help="hard, sota or saturation")] = "saturation",
+) -> None:
+    """Exit 1 if a finished agribench report fails at this level (for CI)."""
+    import json
+
+    from agrisim.suite import FAIL_ON, STATUS_TEXT, fails
+
+    if fail_on not in FAIL_ON:
+        raise typer.BadParameter(f"use one of {sorted(FAIL_ON)}", param_hint="--fail-on")
+    status = json.loads(report.read_text(encoding="utf-8"))["status"]
+    typer.echo(STATUS_TEXT[status])
+    if fails(status, fail_on):
+        raise typer.Exit(1)
 
 
 @app.command()

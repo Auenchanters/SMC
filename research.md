@@ -519,6 +519,13 @@ Consequences:
 
 ## 8. What to build: work packages
 
+### Status update (17 October 2026)
+- **WP2 done**: `moisturemapper_a1`, `moisturemapper_a2`, `dov`, `mi_greedy` and `spatial_coverage` are in `policies.py`.
+- **WP11 partly done, as agribench** (`benchmarks/README.md`, `agrisim suite`): paired one-sided Wilcoxon with Holm, bootstrap intervals, win rates; fresh, never-reused fields per run instead of a reserved seed range for day-to-day work (500 to 599 stays untouched for the paper); an 8-task experiment matrix; a clairvoyant oracle ceiling (Section 9.5).
+- **WP4 sensor side done**: `probe.hard_soil` (failures and short, low readings rise in dry soil). The mapper and policy side (censored observations) is still open.
+- **WP10 positioning error done**: `rover.along_row_error_std`. Probe drift, blocked lanes and the space-time kernel are still open.
+- The first agribench scores are in the ExecPlan Outcomes (M12).
+
 ### 8.0 Order and dependencies [P]
 1. WP2 (literature baselines) and WP11-lite (paired statistics, fresh seed range): cheap, and they make every later result comparable.
 2. WP5 (direction-dependent variogram) and WP6 (lateral reach): cheap, and they quantify the structural limit from Section 7.
@@ -878,6 +885,7 @@ Run from the repo root: `uv run python <path>/stripe_check.py 30`, then again wi
 
 ```python
 """How much of the map error is the drip stripe that lane-centre probes cannot see?"""
+
 import sys
 from pathlib import Path
 
@@ -909,12 +917,16 @@ if __name__ == "__main__":
             m1 = map_metrics(
                 r.truth_grid, r.mean + st - cfg.probe.bias, r.var, cfg.mapping.dry_threshold
             )
-            base.append(m0.rmse); oracle.append(m1.rmse)
-            rec0.append(m0.dry_recall); rec1.append(m1.dry_recall)
+            base.append(m0.rmse)
+            oracle.append(m1.rmse)
+            rec0.append(m0.dry_recall)
+            rec1.append(m1.dry_recall)
         b, o = np.array(base), np.array(oracle)
-        print(f"{policy:16s} budget {budget}: RMSE {b.mean():.4f} -> {o.mean():.4f} "
-              f"({100*(1-(o**2).mean()/(b**2).mean()):.0f}% of MSE), "
-              f"better on {(o<b).sum()}/50; dry recall {np.nanmean(rec0):.3f} -> {np.nanmean(rec1):.3f}")
+        print(
+            f"{policy:16s} budget {budget}: RMSE {b.mean():.4f} -> {o.mean():.4f} "
+            f"({100 * (1 - (o**2).mean() / (b**2).mean()):.0f}% of MSE), "
+            f"better on {(o < b).sum()}/50; dry recall {np.nanmean(rec0):.3f} -> {np.nanmean(rec1):.3f}"
+        )
 ```
 
 ## Appendix C. Glossary (for new team members)

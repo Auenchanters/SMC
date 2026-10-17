@@ -1,0 +1,48 @@
+# agribench v1: the frozen benchmark (protocol: ../README.md).
+# Changing this file or worlds/ is changing the benchmark: LOCK.json must be rewritten
+# (agrisim suite --write-lock), and anything beyond a fix deserves a new version folder,
+# because scores across versions are not comparable.
+version: 1
+
+# Normalised score per task metric: 0 = random probing, 100 = the clairvoyant oracle (best of
+# the oracles on that metric). Saturated = the lower end of its 95% bootstrap interval reaches
+# this, on fresh fields. Scores above 100 mean the benchmark needs a harder ceiling (v2).
+saturation_target: 90.0
+alpha: 0.05                  # one-sided Wilcoxon signed-rank, Holm-corrected
+regression_tolerance: 2.0    # normalised points a task metric may drop before it can regress
+bootstrap: 2000
+
+floor: random
+oracles: [oracle_rmse, oracle_dry]
+baselines:                   # every published method we re-implemented, plus our own
+  - fixed_spacing            # lawnmower: the standard IPP baseline
+  - random
+  - greedy_variance          # Pulido Fentanes et al. 2020; MoistureMapper's benchmark
+  - greedy_variance_per_cost
+  - recheck
+  - fixed_plus_recheck
+  - moisturemapper_a1        # CASE 2025
+  - moisturemapper_a2
+  - dov                      # Roberts-Elliott et al. 2025 (DOV-style)
+  - mi_greedy                # Krause, Singh & Guestrin 2008
+  - spatial_coverage         # Walvoort, Brus & de Gruijter 2010
+  - ppo                      # ours, learned (models/ppo_v1); skipped where the field differs
+ppo_model: ../../models/ppo_v1/model.zip
+
+metrics:                     # gated; bias, ubRMSE and coverage are reported only
+  rmse: lower                # map error (VWC)
+  crps: lower                # map + uncertainty, a proper score (cannot be gamed by a wide band)
+  dry_f1: higher             # the farmer's decision: which cells are below the dry threshold
+
+public_seeds: {quick: "200-215", full: "200-263"}   # fixed, for the regression ratchet
+fresh_seeds: {quick: 16, full: 64}                  # per task, from the run's key (CI: commit)
+
+tasks:
+  - {name: demo_b30,   world: worlds/demo.yaml,          budget: 30, deadline_s: 1500, quick: true}
+  - {name: demo_b60,   world: worlds/demo.yaml,          budget: 60, deadline_s: 2400}
+  - {name: v2_b30,     world: worlds/rover_v2.yaml,      budget: 30, deadline_s: 2400, quick: true}
+  - {name: rain_b60,   world: worlds/rain_shower.yaml,   budget: 60, deadline_s: 3000, quick: true}
+  - {name: drying_b60, world: worlds/hot_afternoon.yaml, budget: 60, deadline_s: 2400}
+  - {name: rough_b60,  world: worlds/rough_soil.yaml,    budget: 60, deadline_s: 2400}
+  - {name: large_b60,  world: worlds/large_field.yaml,   budget: 60, deadline_s: 3600}
+  - {name: harsh_b60,  world: worlds/harsh.yaml,         budget: 60, deadline_s: 2400, quick: true}

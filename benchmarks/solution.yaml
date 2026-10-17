@@ -1,0 +1,5 @@
+# Our entry in agribench: the strategy (and optional mapper settings) scored as "candidate".
+# Change this file to submit a new solution; the benchmark itself (v1/) stays frozen.
+# mapping may set: method, variogram_model, min_readings (never the scoring threshold or grid).
+strategy: greedy_variance
+mapping: {}
