@@ -1,6 +1,6 @@
 # Handover: agrisim (Layer A)
 
-You are taking over a finished first version of the soil-moisture survey simulator and the first rover hardware design. This page tells you how to set it up, how to test it end to end, what results to expect, and what is still open. Read [README.md](README.md) first for what the project does, or watch the 3-minute demo: [docs/media/agrisim-demo.mp4](docs/media/agrisim-demo.mp4). The quickest way to see what the project does is the 3D replay: `uv run agrisim run --config configs/demo.yaml --seed 7 --view`.
+You are taking over a finished first version of the soil-moisture survey simulator and the first rover hardware design. This page tells you how to set it up, how to test it end to end, what results to expect, and what is still open. Read [README.md](README.md) first for what the project does, or watch the two narrated videos: the [explainer](docs/media/agrisim-explainer.mp4) and the [live demo](docs/media/agrisim-demo.mp4). The quickest way to see what the project does is the 3D replay: `uv run agrisim run --config configs/demo.yaml --seed 7 --view`.
 
 State (17 Oct 2026; first handover 14 Oct):
 - ExecPlan milestones M0 to M9, M11 (weather, probe misreads, rechecks) and M12 (agribench, the benchmark) are done, plus the 3D replay and rover v2. M10 (photoreal replay) has phases 1 to 3 done; phase 4 (plants) is open. 131 tests pass.
@@ -24,7 +24,7 @@ Hard rules. Each one has broken something or is a team decision, so do not work 
 7. **Generated files: do not edit them by hand.**
    - `hardware/rover-v*/drawings/*.svg`, `hardware/rover-v*/anatomy/*.html` and `hardware/rover-v2/CALCULATIONS.md` come from each folder's `model.mjs`. Rebuild them, then commit; CI fails if they are stale.
    - `docs/img/*` (except `architecture.svg`) and `docs/media/survey.mp4` come from `scripts/make_media.py`.
-   - `docs/media/agrisim-demo.mp4` and `docs/img/viewer3d*.jpg` come from `scripts/demo_video/`.
+   - `docs/media/agrisim-explainer.*`, `docs/media/agrisim-demo.*` and `docs/img/viewer3d*.jpg` come from `scripts/demo_video/`.
    - `src/agrisim/viewer3d/rover-model.mjs` is a byte-for-byte copy of `hardware/rover-v2/model.mjs` (the 3D rover is built from it). After changing the model, copy it; a test fails until you do.
    - `src/agrisim/viewer3d/vendor/` is three.js 0.186.1 exactly as published (MIT); addons are in `vendor/jsm/` with three.js's own folder layout. Do not edit it; to upgrade, replace the files and update its README.txt and the Decision Log.
    - `src/agrisim/viewer3d/assets/` holds CC0 assets (sky photo, and later textures and models). Each one is listed with its source and licence in `assets/LICENSES.md`; add new ones there.
@@ -154,7 +154,7 @@ Needs Node.js 22 or later. Install the Anatomy kit once at the pinned commit, as
 
 ### G. Demo video (optional, about 12 minutes)
 
-Follow [scripts/demo_video/README.md](scripts/demo_video/README.md). Expected: `docs/media/agrisim-demo.mp4` of about 3 min 10 s. The terminal numbers match B1 and B6, and the bench numbers match a 10-seed run.
+Follow [scripts/demo_video/README.md](scripts/demo_video/README.md). Expected: `docs/media/agrisim-explainer.mp4` (about 3 min 20 s) and `docs/media/agrisim-demo.mp4` (about 2 min 20 s), each with a `.srt` and a `.jpg` beside it. The terminal numbers in the demo are a real `agrisim run --policy planned_survey` on seed 7 and a real 10-seed `agrisim bench`.
 
 Report problems as GitHub issues with the command, the seed and the config file attached. Because runs are deterministic, the seed alone reproduces the bug.
 
@@ -185,7 +185,7 @@ Report problems as GitHub issues with the command, the seed and the config file 
 - Images and video in the README: regenerate them with `uv run python scripts/make_media.py --model models/ppo_v1/model.zip` (needs `ffmpeg` on PATH for the MP4).
 - The trained model: `models/ppo_v1/model.zip` (MaskablePPO, 200k steps, seed 0, budget 30, 6 envs), plus its held-out evaluation summary.
 - All run outputs go to `runs/`, which git ignores. Nothing there is needed to reproduce anything.
-- The demo video: [docs/media/agrisim-demo.mp4](docs/media/agrisim-demo.mp4), made by [scripts/demo_video/](scripts/demo_video/).
+- The videos: [docs/media/agrisim-explainer.mp4](docs/media/agrisim-explainer.mp4) and [docs/media/agrisim-demo.mp4](docs/media/agrisim-demo.mp4), made by [scripts/demo_video/](scripts/demo_video/).
 - Rover hardware: [hardware/rover-v2/](hardware/rover-v2/) (current) and [hardware/rover-v1/](hardware/rover-v1/) (superseded). In each, `model.mjs` is the single source of truth for every dimension, the probe force and timing, and the bill of materials. The drawings, v2's CALCULATIONS.md and both folders' figures are generated from it.
 - CI: [.github/workflows/ci.yml](.github/workflows/ci.yml). The `test` job runs the quality gates on Windows and Ubuntu. The `hardware` job rebuilds and audits the rover figures and fails if the committed ones are stale.
 

@@ -1,11 +1,14 @@
 // What a reading leaves in the field: the probe's hole and a wire survey flag beside it, coloured
 // by the moisture measured (grey: the probe failed). Plus the next-stop ring, the dust while the
-// probe goes in, and the route driven so far. Everything sits on the ground.
+// probe goes in, a ripple in the reading's colour when the value comes in, the ring around the
+// selected reading, and the route driven so far. Everything sits on the ground.
 import * as THREE from "three";
 import { DIM } from "../rover-model.mjs";
 import { at } from "./data.js";
 
 const FLAG_SIDE = 0.235; // m beside the probe hole: just outside the rover's tyres (track/2 + tyre/2 = 0.198)
+const RIPPLE_MS = 1400;
+const still = matchMedia("(prefers-reduced-motion: reduce)");
 
 export function buildMarkers(view, D) {
   const { scene } = view;
@@ -49,14 +52,21 @@ export function buildMarkers(view, D) {
     scene.add(group);
     return { group, flag, head, dot };
   });
-  const nextRing = new THREE.Mesh(new THREE.RingGeometry(0.13, 0.18, 40).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x8fe3a8, transparent: true, opacity: 0.9, depthWrite: false }));
+  const nextRing = new THREE.Mesh(new THREE.RingGeometry(0.13, 0.18, 40).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9, depthWrite: false }));
   const dust = new THREE.Mesh(new THREE.RingGeometry(0.02, 0.06, 32).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x7a5a3e, transparent: true, depthWrite: false }));
   const P = D.path;
   const trail = new THREE.Line(
     new THREE.BufferGeometry().setFromPoints(P.x.map((x, i) => at(x, P.y[i], g(x, P.y[i]) + 0.02))),
     new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5 }),
   );
-  scene.add(nextRing, dust, trail);
+  const ripple = new THREE.Mesh(new THREE.RingGeometry(0.17, 0.19, 48).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false }));
+  const selRing = new THREE.Mesh(new THREE.RingGeometry(0.2, 0.245, 48).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95, depthWrite: false }));
+  ripple.visible = selRing.visible = false;
+  scene.add(nextRing, dust, trail, ripple, selRing);
+  let rippleAt = -1;
+  let rippleStop = null;
+  let lastK = 0;
+  let selected = null;
 
   return {
     pins,
@@ -69,7 +79,30 @@ export function buildMarkers(view, D) {
         fn(s.v, pins[s.i].dot.material.color);
       }
     },
+    select(i) {
+      selected = i;
+    },
     update({ t, now, state, k, here, markScale }) {
+      // A ripple when the next reading comes in during play (not when jumping around).
+      if (k === lastK + 1 && !still.matches) {
+        rippleStop = D.stops[k - 1];
+        rippleAt = now;
+        ripple.material.color.copy(rippleStop.v == null ? new THREE.Color(0x8a8f94) : pins[rippleStop.i].dot.material.color);
+        ripple.position.copy(at(rippleStop.x, rippleStop.y, g(rippleStop.x, rippleStop.y) + 0.04));
+      }
+      lastK = k;
+      const rf = rippleAt < 0 ? 1 : (now - rippleAt) / RIPPLE_MS;
+      ripple.visible = rf < 1;
+      if (ripple.visible) {
+        ripple.scale.setScalar((1 + 2.2 * (1 - (1 - rf) ** 3)) * Math.min(markScale, 2)); // out to about 0.6 m up close
+        ripple.material.opacity = 0.85 * (1 - rf) ** 2;
+      }
+      const sel = selected == null ? null : D.stops[selected];
+      selRing.visible = !!sel && sel.reveal <= t;
+      if (selRing.visible) {
+        selRing.position.copy(at(sel.x, sel.y, g(sel.x, sel.y) + 0.045));
+        selRing.scale.setScalar(markScale);
+      }
       const far = Math.min(1, Math.max(0, (markScale - 1.3) / 1.2)); // 0 close up, 1 from far away
       pins.forEach((p, i) => {
         p.group.visible = D.stops[i].reveal <= t;
@@ -83,7 +116,7 @@ export function buildMarkers(view, D) {
       nextRing.visible = !!next;
       if (next) {
         nextRing.position.copy(at(next.x, next.y, g(next.x, next.y) + 0.03));
-        nextRing.scale.setScalar(1 + 0.12 * Math.sin(now / 250));
+        nextRing.scale.setScalar(still.matches ? 1 : 1 + 0.12 * Math.sin(now / 250)); // pulses while it is the robot's goal
       }
       dust.visible = !!state && state.phase === "inserting";
       if (dust.visible) {

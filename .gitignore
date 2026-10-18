@@ -10,5 +10,7 @@ dist/
 build/
 *.egg-info/
 
-# Anatomy skill (MIT, github.com/wheresryan22/anatomy); install per hardware/rover-v1/README.md
-.claude/skills/anatomy/
+# Third-party agent skills, installed for this project only and never committed:
+# anatomy (MIT, github.com/wheresryan22/anatomy), install per hardware/rover-v1/README.md;
+# brag, genjutsu, dembrandt-skills, awwwards-mcp (all MIT), install per scripts/demo_video/README.md
+.claude/skills/

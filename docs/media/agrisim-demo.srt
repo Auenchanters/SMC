@@ -1,0 +1,211 @@
+1
+00:00:00,350 --> 00:00:03,400
+Here is agrisim running live on a Windows laptop,
+
+2
+00:00:03,400 --> 00:00:06,387
+from one command to a field map you can explore.
+
+3
+00:00:07,483 --> 00:00:11,589
+One command runs a whole survey: our strategy, planned survey,
+
+4
+00:00:11,589 --> 00:00:12,517
+on seed seven.
+
+5
+00:00:12,517 --> 00:00:14,106
+It prints the map error,
+
+6
+00:00:14,106 --> 00:00:17,947
+how well the map finds the dry cells, the distance driven,
+
+7
+00:00:17,947 --> 00:00:19,536
+and zero plant contacts.
+
+8
+00:00:19,536 --> 00:00:22,715
+The same seed gives the same numbers every time.
+
+9
+00:00:23,817 --> 00:00:24,582
+Add --view,
+
+10
+00:00:24,582 --> 00:00:28,551
+and the same survey opens as a 3D replay in your browser.
+
+11
+00:00:28,551 --> 00:00:32,798
+The intro panel says what you are looking at, in plain words.
+
+12
+00:00:33,884 --> 00:00:36,995
+The robot drives only in the lanes. When it stops,
+
+13
+00:00:36,995 --> 00:00:40,854
+the six bars at the top right follow the probe: lower, insert,
+
+14
+00:00:40,854 --> 00:00:41,352
+measure,
+
+15
+00:00:41,352 --> 00:00:43,779
+pull out through the brushes, blow dry,
+
+16
+00:00:43,779 --> 00:00:45,148
+and check it is clean.
+
+17
+00:00:46,250 --> 00:00:47,649
+When the value comes in,
+
+18
+00:00:47,649 --> 00:00:50,449
+a ripple in the reading's colour marks the spot,
+
+19
+00:00:50,449 --> 00:00:51,324
+a flag goes up,
+
+20
+00:00:51,324 --> 00:00:53,482
+and the map fades to its new picture.
+
+21
+00:00:54,584 --> 00:00:56,129
+Press D for the drone view,
+
+22
+00:00:56,129 --> 00:00:59,448
+a camera that circles high above the rover while it works.
+
+23
+00:01:00,550 --> 00:01:03,384
+The time bar shows the whole mission at once.
+
+24
+00:01:03,384 --> 00:01:04,896
+Every tick is a reading,
+
+25
+00:01:04,896 --> 00:01:06,345
+coloured like its flag.
+
+26
+00:01:06,345 --> 00:01:08,361
+Point at it to preview a moment,
+
+27
+00:01:08,361 --> 00:01:11,259
+or jump from stop to stop with the arrow keys.
+
+28
+00:01:12,350 --> 00:01:13,015
+From above,
+
+29
+00:01:13,015 --> 00:01:15,013
+the ground shows the robot's map.
+
+30
+00:01:15,013 --> 00:01:17,434
+Switch to the real moisture to judge it,
+
+31
+00:01:17,434 --> 00:01:18,766
+then to the map error,
+
+32
+00:01:18,766 --> 00:01:20,158
+and to the uncertainty,
+
+33
+00:01:20,158 --> 00:01:22,398
+which is lowest next to each reading.
+
+34
+00:01:23,484 --> 00:01:27,613
+The field from above shows the route and every reading. Click one,
+
+35
+00:01:27,613 --> 00:01:29,740
+and the replay jumps to that stop,
+
+36
+00:01:29,740 --> 00:01:32,493
+with the same reading ringed in the 3D view.
+
+37
+00:01:32,493 --> 00:01:35,371
+The map error chart falls as readings come in,
+
+38
+00:01:35,371 --> 00:01:37,436
+and plants touched stays at zero.
+
+39
+00:01:38,483 --> 00:01:40,349
+This survey has a rain shower.
+
+40
+00:01:40,349 --> 00:01:42,215
+The time bar shows it in blue,
+
+41
+00:01:42,215 --> 00:01:44,143
+and a note says when it starts.
+
+42
+00:01:44,143 --> 00:01:46,818
+Rain makes earlier readings go out of date,
+
+43
+00:01:46,818 --> 00:01:51,731
+so planned survey drives on rather than probe soil the rain is about to change.
+
+44
+00:01:52,817 --> 00:01:54,815
+The same replay works on a phone,
+
+45
+00:01:54,815 --> 00:01:57,480
+with one panel at a time above the controls:
+
+46
+00:01:57,480 --> 00:01:58,813
+what is happening now,
+
+47
+00:01:58,813 --> 00:02:00,085
+the field from above,
+
+48
+00:02:00,085 --> 00:02:01,478
+and the ground colours.
+
+49
+00:02:02,583 --> 00:02:06,076
+And agrisim bench compares strategies on the same fields,
+
+50
+00:02:06,076 --> 00:02:09,324
+with ninety five percent intervals, from one command.
+
+51
+00:02:12,817 --> 00:02:14,063
+Try it yourself.
+
+52
+00:02:14,063 --> 00:02:15,699
+Install with uv sync,
+
+53
+00:02:15,699 --> 00:02:18,193
+then run one survey with --view.

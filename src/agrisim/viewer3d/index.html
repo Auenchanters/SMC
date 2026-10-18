@@ -4,150 +4,139 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Soil survey replay</title>
+<meta name="description" content="3D replay of one simulated soil-moisture survey: a rover probes a tomato field and maps where it is too dry.">
+<link rel="stylesheet" href="./viewer.css">
 <script type="importmap">{ "imports": { "three": "./vendor/three.module.js", "three/addons/": "./vendor/jsm/" } }</script>
-<style>
-:root {
-  --panel: rgba(16, 20, 24, 0.84); --line: rgba(255, 255, 255, 0.12); --text: #eef2f4; --dim: #a7b3bb;
-  --accent: #8fe3a8; --warn: #ffb36b; --bad: #ff7b72; --radius: 12px;
-  font: 15px/1.45 "Segoe UI", system-ui, -apple-system, sans-serif; color: var(--text);
-}
-* { box-sizing: border-box; }
-html, body { margin: 0; height: 100%; overflow: hidden; background: #9fb8c8; }
-#view, #view canvas { position: fixed; inset: 0; display: block; width: 100%; height: 100%; }
-.panel { position: fixed; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); backdrop-filter: blur(8px); padding: 14px 16px; }
-h1 { font-size: 18px; margin: 0 0 6px; } h2 { font-size: 13px; margin: 0 0 8px; color: var(--dim); font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
-p { margin: 0 0 8px; } .dim { color: var(--dim); }
-button { font: inherit; color: var(--text); background: rgba(255, 255, 255, 0.08); border: 1px solid var(--line); border-radius: 8px; padding: 6px 11px; cursor: pointer; }
-button:hover { background: rgba(255, 255, 255, 0.16); }
-button[aria-pressed="true"] { background: var(--accent); color: #0d1a12; border-color: var(--accent); font-weight: 600; }
-button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-
-#intro { left: 16px; top: 16px; width: 380px; }
-#intro .row { display: flex; gap: 8px; margin-top: 10px; }
-#introSmall { left: 16px; top: 16px; display: none; }
-
-#now { right: 16px; top: 16px; width: 330px; }
-#status { font-size: 19px; font-weight: 650; line-height: 1.3; }
-#substatus { color: var(--dim); margin-top: 2px; min-height: 1.4em; }
-#weather { color: var(--dim); margin-top: 2px; }
-#weather:empty { display: none; }
-#reading { margin-top: 8px; font-size: 16px; font-weight: 600; min-height: 1.4em; }
-.stats { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
-.stats span:nth-child(even) { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
-
-#layers { left: 16px; bottom: 92px; width: 380px; }
-#layerButtons { display: flex; flex-wrap: wrap; gap: 6px; }
-#layerText { margin: 10px 0 8px; min-height: 2.9em; }
-#legendBar { height: 12px; border-radius: 6px; border: 1px solid var(--line); }
-#legendTicks { position: relative; height: 34px; font-size: 12px; color: var(--dim); }
-#legendTicks span { position: absolute; top: 3px; transform: translateX(-50%); white-space: nowrap; text-align: center; }
-#legendTicks span.mark { color: var(--warn); }
-
-#play { left: 16px; right: 16px; bottom: 16px; display: flex; align-items: center; gap: 12px; padding: 10px 14px; }
-#playBtn { width: 92px; font-weight: 600; }
-#time { flex: 1; accent-color: var(--accent); min-width: 120px; }
-#clock { font-variant-numeric: tabular-nums; color: var(--dim); white-space: nowrap; }
-#speeds { display: flex; gap: 4px; }
-#speeds button { padding: 6px 8px; }
-.sep { width: 1px; align-self: stretch; background: var(--line); }
-#cams { display: flex; gap: 4px; }
-label.slow { display: flex; gap: 6px; align-items: center; color: var(--dim); white-space: nowrap; }
-select { font: inherit; color: var(--text); background: rgba(255, 255, 255, 0.08); border: 1px solid var(--line); border-radius: 8px; padding: 5px 6px; }
-select option { background: #1b2329; }
-
-.tag { position: fixed; transform: translate(-50%, -100%); padding: 3px 8px; border-radius: 6px; background: rgba(16, 20, 24, 0.8); border: 1px solid var(--line); font-size: 13px; pointer-events: none; white-space: nowrap; }
-.tag.next { border-color: var(--accent); color: var(--accent); }
-#tip { position: fixed; display: none; pointer-events: none; max-width: 260px; padding: 8px 10px; border-radius: 8px; background: rgba(16, 20, 24, 0.94); border: 1px solid var(--line); font-size: 13px; }
-
-#help { position: fixed; inset: 0; display: none; place-items: center; background: rgba(0, 0, 0, 0.45); }
-#help .panel { position: relative; width: min(720px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; }
-#help dl { display: grid; grid-template-columns: 150px 1fr; gap: 8px 14px; margin: 10px 0 14px; }
-#help dt { font-weight: 650; } #help dd { margin: 0; color: var(--dim); }
-kbd { font: 12px Consolas, monospace; border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; background: rgba(255, 255, 255, 0.06); }
-
-#loading { position: fixed; inset: 0; display: grid; place-items: center; background: #1b2329; color: var(--text); font-size: 18px; text-align: center; padding: 20px; }
-@media (max-width: 900px) {
-  #intro, #layers { width: calc(100vw - 32px); } #now { display: none; } #speeds, #cams .lbl { display: none; }
-}
-</style>
 </head>
-<body>
+<body data-sheet="now">
 <div id="view"></div>
 
-<section class="panel" id="intro" aria-label="What is this">
-  <h1>Soil-moisture survey: 3D replay</h1>
-  <p>A small robot drives between rows of tomato plants without touching them. At each <b>stop</b> it pushes a <b>probe</b> into the soil and measures how much water is there.</p>
-  <p>From a few dozen measurements it draws a <b>moisture map of the whole field</b>, so a farmer can see which parts are too dry.</p>
-  <p class="dim" id="runInfo"></p>
-  <div class="row"><button id="helpBtn">How to read this</button><button id="hideIntro">Hide</button></div>
-</section>
-<button class="panel" id="introSmall">What is this?</button>
+<aside class="col" id="left">
+  <section class="panel" id="intro" aria-labelledby="introTitle">
+    <p class="eyebrow">3D replay of one simulated survey</p>
+    <h1 id="introTitle">Soil-moisture survey</h1>
+    <p>A small robot drives between rows of tomato plants without touching them. At each <b>stop</b> it pushes a <b>probe</b> into the soil and measures how much water is there.</p>
+    <p>From a few dozen measurements it draws a <b>moisture map of the whole field</b>, so a farmer can see which parts are too dry.</p>
+    <p id="runInfo"></p>
+    <div class="row"><button id="helpBtn">How to read this</button><button id="hideIntro" class="quiet">Hide</button></div>
+  </section>
+  <button class="panel" id="introSmall" hidden>What is this?</button>
 
-<section class="panel" id="now" aria-live="polite" aria-label="What is happening now">
-  <h2>Right now</h2>
-  <div id="status">Loading…</div>
-  <div id="substatus"></div>
-  <div id="reading"></div>
-  <div id="weather"></div>
-  <div class="stats">
-    <span>Readings taken</span><span id="sReadings">0</span>
-    <span>Distance driven</span><span id="sDistance">0 m</span>
-    <span>Plants touched</span><span id="sContacts">0</span>
-    <span title="Average difference between the robot's map and the real moisture">Map is off by (average)</span><span id="sError">no map yet</span>
-  </div>
-</section>
+  <section class="panel" id="layers" aria-labelledby="layersTitle">
+    <h2 id="layersTitle">Colour the ground by</h2>
+    <div id="layerButtons" role="group" aria-labelledby="layersTitle"></div>
+    <p id="layerText"></p>
+    <div id="legendBar" aria-hidden="true"></div>
+    <div id="legendTicks"></div>
+  </section>
+</aside>
 
-<section class="panel" id="layers" aria-label="Ground colour">
-  <h2>Colour the ground by</h2>
-  <div id="layerButtons" role="group"></div>
-  <p id="layerText"></p>
-  <div id="legendBar"></div>
-  <div id="legendTicks"></div>
-</section>
+<aside class="col" id="right">
+  <section class="panel" id="mission" aria-labelledby="missionTitle">
+    <h2 id="missionTitle">Right now</h2>
+    <ol id="phases" aria-hidden="true"><li></li><li></li><li></li><li></li><li></li><li></li></ol>
+    <div id="status">Loading…</div>
+    <div id="substatus"></div>
+    <div id="reading"></div>
+    <div id="weather"></div>
+    <dl class="stats">
+      <dt>Readings taken</dt><dd id="sReadings">0</dd>
+      <dd class="meter" aria-hidden="true"><span id="sReadingsBar"></span></dd>
+      <dt>Distance driven</dt><dd id="sDistance">0 m</dd>
+      <dt>Plants touched</dt><dd id="sContacts">0</dd>
+      <dt title="Average difference between the robot's map and the real moisture">Map is off by (average)</dt><dd id="sError">no map yet</dd>
+    </dl>
+    <figure id="trend">
+      <figcaption><span>Map error after each reading</span><span id="trendNow" class="num"></span></figcaption>
+      <svg id="trendSvg" role="img" aria-label="Map error after each reading"></svg>
+    </figure>
+  </section>
+
+  <section class="panel" id="minimap" aria-labelledby="mapTitle">
+    <h2 id="mapTitle">Field from above <span>click a mark to go there</span></h2>
+    <canvas id="mapCanvas" tabindex="0" role="img" aria-label="Top view of the field with every reading so far. Click a reading to jump to that stop."></canvas>
+  </section>
+</aside>
+
+<nav id="sheetTabs" aria-label="Panels">
+  <button data-sheet="now" aria-pressed="true">Now</button>
+  <button data-sheet="ground" aria-pressed="false">Ground</button>
+  <button data-sheet="map" aria-pressed="false">Map</button>
+  <button data-sheet="none" aria-pressed="false">Hide</button>
+</nav>
 
 <section class="panel" id="play" aria-label="Playback">
-  <button id="playBtn">❚❚ Pause</button>
-  <input id="time" type="range" min="0" max="1" step="0.1" value="0" aria-label="Mission time">
-  <span id="clock">0:00 / 0:00</span>
+  <button id="playBtn"></button>
+  <div class="group">
+    <button class="icon" id="prevStop" title="Previous stop (←)" aria-label="Previous stop"><svg viewBox="0 0 16 16"><path d="M3 2h2v12H3zM14 2v12L6 8z"/></svg></button>
+    <button class="icon" id="nextStop" title="Next stop (→)" aria-label="Next stop"><svg viewBox="0 0 16 16"><path d="M11 2h2v12h-2zM2 2v12l8-6z"/></svg></button>
+  </div>
+  <div id="timeline">
+    <div id="tlTrack" aria-hidden="true"><div id="tlFill"></div></div>
+    <input id="time" type="range" min="0" max="1" step="0.1" value="0" aria-label="Mission time">
+  </div>
+  <span id="clock" class="num">0:00 / 0:00</span>
   <div class="sep"></div>
-  <div id="speeds" role="group" aria-label="Speed"></div>
-  <label class="slow"><input id="slow" type="checkbox" checked> Slow down at stops</label>
+  <div id="speeds" class="group" role="group" aria-label="Speed"></div>
+  <label class="check"><input id="slow" type="checkbox" checked> Slow at stops</label>
   <div class="sep"></div>
-  <div id="cams" role="group" aria-label="Camera"></div>
-  <div class="sep"></div>
-  <label class="slow" title="Lower it if the replay stutters">Graphics
-    <select id="quality" aria-label="Graphics quality">
-      <option value="auto">Auto</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option>
-    </select>
-  </label>
+  <div id="cams" class="group" role="group" aria-label="Camera"></div>
+  <button class="icon" id="helpBtn2" title="How to read this (?)" aria-label="How to read this"><svg viewBox="0 0 16 16"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm.9 11.2H7.1v-1.7h1.8zm1.6-5.4c-.3.5-.8.9-1.3 1.2-.4.3-.5.5-.5 1v.3H7.1v-.4c0-.9.3-1.4 1-1.9.5-.3.8-.6.8-1.1 0-.5-.4-.8-.9-.8-.6 0-1 .4-1 1H5.3c0-1.6 1.2-2.6 2.8-2.6 1.6 0 2.6.9 2.6 2.1 0 .4-.1.8-.2 1.2z"/></svg></button>
 </section>
 
+<div id="toasts" role="status" aria-live="polite"></div>
 <div class="tag" id="tagRobot">Robot</div>
 <div class="tag next" id="tagNext">Next stop</div>
-<div id="tip"></div>
+<div id="tip" role="tooltip"></div>
 
-<div id="help" role="dialog" aria-modal="true" aria-label="How to read this">
-  <section class="panel">
-    <h1>How to read this</h1>
-    <dl>
-      <dt>The robot</dt><dd>A 4-wheel rover about 57 cm long. Each side's two wheels hang from a rocker beam, so all four stay on the ground over clods and ruts. It only drives along the paths between plant rows and turns around at the ends of the field, so it never touches a plant. The tower in the open bay between the wheels raises and lowers the soil probe.</dd>
-      <dt>A stop</dt><dd>The robot parks, lowers the probe, pushes its three metal rods 6 cm into the soil, measures for a moment, pulls it out through brushes that wipe it clean, blows it dry with air, and checks it is clean before driving on.</dd>
-      <dt>Round marks</dt><dd>Every place the robot measured gets a round mark on the ground, coloured by the moisture it measured. Point at a mark to see its value. A grey mark means the probe failed at that spot.</dd>
-      <dt>Moisture, in %</dt><dd>How much of the soil's volume is water. 25% means a quarter of the soil volume is water. Below <span id="helpDry"></span> counts as too dry here.</dd>
-      <dt>Robot's map</dt><dd>The robot's best guess for every spot in the field, filled in between its marks. It gets better with every reading.</dd>
-      <dt>Real moisture</dt><dd>The true moisture, which exists only because this is a simulation. The robot never sees it. Compare the two to judge the map.</dd>
-      <dt>Map error</dt><dd>How far the robot's map is from the truth at each spot. "Map is off by" is the average of that, in % points.</dd>
-      <dt>Uncertainty</dt><dd>How unsure the robot is about each spot: high far from any mark, low near one. Smart strategies drive to where it is high.</dd>
-      <dt>Plants touched</dt><dd>How many times the robot's body overlapped a plant's leaves. The goal is always 0.</dd>
-    </dl>
-    <h2>Controls</h2>
-    <p><b>Mouse:</b> drag to turn the view, right-drag to slide it, scroll to zoom. <b>Keys:</b> <kbd>Space</kbd> play or pause, <kbd>←</kbd> <kbd>→</kbd> previous or next stop, <kbd>1</kbd>–<kbd>5</kbd> ground colours, <kbd>F</kbd> follow the robot, <kbd>O</kbd> overhead view.</p>
-    <p class="dim">The soil and probe numbers are placeholders until they are calibrated with real field data, so treat the values as an example, not a measurement.</p>
-    <button id="closeHelp">Close</button>
-  </section>
+<dialog id="help" aria-labelledby="helpTitle">
+  <button class="quiet close" id="closeHelp" aria-label="Close">Close</button>
+  <h1 id="helpTitle">How to read this</h1>
+  <dl>
+    <dt>The robot</dt><dd>A 4-wheel rover about 57 cm long. Each side's two wheels hang from a rocker beam, so all four stay on the ground over clods and ruts. It only drives along the paths between plant rows and turns around at the ends of the field, so it never touches a plant. The tower in the open bay between the wheels raises and lowers the soil probe.</dd>
+    <dt>A stop</dt><dd>The robot parks, lowers the probe, pushes its three metal rods 6 cm into the soil, measures for a moment, pulls it out through brushes that wipe it clean, blows it dry with air, and checks it is clean before driving on. The six bars at the top of "Right now" follow those steps.</dd>
+    <dt>Flags and dots</dt><dd>Every place the robot measured gets a flag, coloured by the moisture it measured. From far away the flag becomes a dot. Point at one to see its value; click it to select it. A grey mark means the probe failed at that spot.</dd>
+    <dt>Moisture, in %</dt><dd>How much of the soil's volume is water. 25% means a quarter of the soil volume is water. Below <span id="helpDry"></span> counts as too dry here.</dd>
+    <dt>Robot's map</dt><dd>The robot's best guess for every spot in the field, filled in between its marks. It gets better with every reading.</dd>
+    <dt>Real moisture</dt><dd>The true moisture, which exists only because this is a simulation. The robot never sees it. Compare the two to judge the map.</dd>
+    <dt>Map error</dt><dd>How far the robot's map is from the truth at each spot. "Map is off by" is the average of that, in % points; the small chart shows it after every reading.</dd>
+    <dt>Uncertainty</dt><dd>How unsure the robot is about each spot: high far from any mark, low near one.</dd>
+    <dt>Time bar</dt><dd>Each tick is a reading, coloured like its flag. Blue stretches are rain. A red line would be a plant touched.</dd>
+    <dt>Plants touched</dt><dd>How many times the robot's body overlapped a plant's leaves. The goal is always 0.</dd>
+  </dl>
+  <h2>Controls</h2>
+  <p class="dim">Mouse: drag to turn the view, right-drag to slide it, scroll to zoom.</p>
+  <ul class="keys">
+    <li><kbd>Space</kbd> play or pause</li>
+    <li><kbd>←</kbd><kbd>→</kbd> previous or next stop</li>
+    <li><kbd>1</kbd>–<kbd>5</kbd> ground colours</li>
+    <li><kbd>F</kbd> follow the robot</li>
+    <li><kbd>D</kbd> drone view</li>
+    <li><kbd>O</kbd> whole field from above</li>
+    <li><kbd>Esc</kbd> close, or clear the selection</li>
+    <li><kbd>?</kbd> this help</li>
+  </ul>
+  <h2>Graphics</h2>
+  <label class="setting"><select id="quality" aria-describedby="qualityHint">
+      <option value="auto">Auto</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option>
+    </select><span class="dim" id="qualityHint">Auto watches the frame rate and steps down if the replay stutters. The choice is remembered.</span></label>
+  <p class="dim">The soil and probe numbers are placeholders until they are calibrated with real field data, so treat the values as an example, not a measurement.</p>
+</dialog>
+
+<div id="loading">
+  <div class="box">
+    <p class="eyebrow">Soil-moisture survey</p>
+    <h1>Loading the field</h1>
+    <ol id="loadSteps">
+      <li data-step="data">Reading the survey</li>
+      <li data-step="sky">Lighting the sky</li>
+      <li data-step="field">Shaping the ground and planting the rows</li>
+      <li data-step="rover">Building the rover</li>
+      <li data-step="first">Drawing the first frame</li>
+    </ol>
+    <div class="error" id="loadError" hidden></div>
+  </div>
 </div>
-
-<div id="loading">Loading the field…</div>
 <script type="module" src="./app.js"></script>
 </body>
 </html>

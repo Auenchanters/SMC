@@ -96,7 +96,10 @@ def run(
     budget: Annotated[int | None, typer.Option(help="Probe budget (default: config)")] = None,
     policy: Annotated[
         str,
-        typer.Option(help="fixed_spacing, random, greedy_variance, greedy_variance_per_cost, ppo"),
+        typer.Option(
+            help="planned_survey (our agribench entry), fixed_spacing, spatial_coverage, "
+            "greedy_variance, random, ppo, or any other agribench strategy"
+        ),
     ] = "fixed_spacing",
     model: Annotated[
         Path | None, typer.Option(exists=True, dir_okay=False, help="model.zip for --policy ppo")

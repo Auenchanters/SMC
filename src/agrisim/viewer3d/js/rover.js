@@ -11,9 +11,11 @@ const WHEEL_R = DIM.wheel.r * MM;
 const HALF_BASE = (DIM.wheel.base / 2) * MM;
 const HALF_TRACK = (DIM.wheel.track / 2) * MM;
 const mat = (color, metalness, roughness, extra = {}) => new THREE.MeshStandardMaterial({ color, metalness, roughness, ...extra });
+// Painted and moulded panels get a thin clear coat, so the sky reads in them as on the real thing.
+const coat = (color, metalness, roughness, clearcoat, clearcoatRoughness) => new THREE.MeshPhysicalMaterial({ color, metalness, roughness, clearcoat, clearcoatRoughness });
 const M = {
-  body: mat(0x2c3136, 0.25, 0.55), dark: mat(0x1e2124, 0.3, 0.5), alu: mat(0xc3c9cf, 0.85, 0.38), blue: mat(0x2f62a8, 0.6, 0.38),
-  chrome: mat(0xe6e9eb, 1, 0.14), brass: mat(0xb38f55, 1, 0.35), orange: mat(0xe07b22, 0.2, 0.5), white: mat(0xeceae4, 0.05, 0.5),
+  body: coat(0x2c3136, 0.25, 0.5, 0.35, 0.4), dark: mat(0x1e2124, 0.3, 0.5), alu: mat(0xc3c9cf, 0.85, 0.34), blue: coat(0x2f62a8, 0.55, 0.34, 0.3, 0.25),
+  chrome: mat(0xe6e9eb, 1, 0.14), brass: mat(0xb38f55, 1, 0.35), orange: coat(0xe07b22, 0.15, 0.45, 0.4, 0.3), white: coat(0xeceae4, 0.05, 0.42, 0.6, 0.28),
   yellow: mat(0xf0c22e, 0.1, 0.5), red: mat(0xd42a20, 0.1, 0.4), black: mat(0x151617, 0.2, 0.45), rim: mat(0xaab0b6, 0.8, 0.35, { side: THREE.DoubleSide }),
 };
 function partMaterial(name) {

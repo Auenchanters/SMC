@@ -1,0 +1,5 @@
+Explainer (agrisim-explainer.mp4):
+A rover that maps where a tomato field is too dry, driving only between the rows. On fresh fields nobody had seen, our strategy scores 75.8 out of 100 on agribench, the best of 12 real strategies, with zero plants touched in 15,232 surveys. Simulated so far, open source, and it runs on a laptop: github.com/Auenchanters/SMC
+
+Live demo (agrisim-demo.mp4):
+One command runs a soil-moisture survey; add --view and it replays in 3D in your browser. Watch the probe cycle, every reading on one time bar, and the robot's map against the real moisture it never sees.

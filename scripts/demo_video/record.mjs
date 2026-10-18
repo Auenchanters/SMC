@@ -1,13 +1,15 @@
-// Demo video, step 2: drive each part of the app in headless Chrome and screencast it.
-// Needs Node 22+, Chrome or Edge, `prepare.py` already run, the Rerun web viewer serving
-// runs/demo_video/seed7.rrd on port 9090 and `agrisim view` serving runs/demo_video on port
-// 8766 (see README.md). Run from the repository root:
-//   node scripts/demo_video/record.mjs            all segments
-//   node scripts/demo_video/record.mjs fig1 fig2  only these
+// Videos, step 2: drive each part of the app in headless Chrome and capture it frame by frame.
+// Needs Node 22+, Chrome or Edge and `prepare.py` already run (see README.md). The 3D replay is
+// served by a small static server started here. Run from the repository root:
+//   node scripts/demo_video/record.mjs explainer   every segment of the explainer video
+//   node scripts/demo_video/record.mjs demo        every segment of the live demo video
+//   node scripts/demo_video/record.mjs d-view      only this segment
+// Each segment is driven beat by beat (narration.json): a beat lasts as long as its voice.
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createServer } from "node:http";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { dirname, extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -16,18 +18,6 @@ const url = (path) => pathToFileURL(path).href;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const fwd = (p) => p.split("\\").join("/");
 
-// Caption pill for pages this script does not own (Rerun, the rover figures).
-const capJs = (n, title, sub, css) => `(() => {
-  let c = document.getElementById("__cap");
-  if (!c) { c = document.createElement("div"); c.id = "__cap"; document.body.appendChild(c); }
-  c.style.cssText = "position:fixed;z-index:2147483647;max-width:640px;padding:9px 16px;border-radius:10px;background:rgba(18,22,27,.94);border:1px solid #263040;color:#e6edf3;font:600 19px/1.35 'Segoe UI',sans-serif;pointer-events:none;${css}";
-  c.innerHTML = '<span style="color:#7ee0a1;margin-right:9px">${n}</span>${title}<div style="font-weight:400;color:#8b98a5;font-size:15px;margin-top:2px">${sub}</div>';
-})()`;
-
-const slide = (page, secs) => async (a) => { await a.go(url(join(WORK, page))); await a.start(); await sleep(secs * 1000); await a.stop(); };
-const RERUN_TOP = "left:300px;top:6px";
-const SIDE = "left:14px;top:240px;max-width:284px";
-const TOP = "left:50%;top:16px;transform:translateX(-50%)";
 const FRAME_MS = 1000 / 30;
 // Replaces the page's clock: time moves only when the recorder calls __vt.step(ms).
 // With timers, setTimeout runs on the same clock (for pages that wait before acting).
@@ -50,76 +40,306 @@ const virtualClock = (timers) => `(() => {
     window.clearTimeout = (id) => { const i = due.findIndex((t) => t.id === id); if (i >= 0) due.splice(i, 1); };
   }
 })();`;
-const FIG = { width: 1280, height: 720, scale: 1.25 };
-const figure = (name) => url(join(REPO, "hardware", "rover-v1", "anatomy", `${name}.html`));
+// [name, CSS width, CSS height, touch device], from Responsively App's device list.
+const DEVICES = [
+  ["iphone-12-pro", 390, 844, true],
+  ["pixel-7", 412, 915, true],
+  ["ipad-air", 820, 1180, true],
+  ["ipad-air-landscape", 1180, 820, true],
+  ["macbook-pro", 1440, 900, false],
+  ["desktop-1080p", 1920, 1080, false],
+];
 const scrollToCard = "(() => { const c = document.querySelector('.iso-plate') ?? document.querySelector('svg'); window.scrollTo(0, c.getBoundingClientRect().top + scrollY - 12); const r = document.querySelector('.iso-stage svg').getBoundingClientRect(); return [r.x, r.y, r.width, r.height]; })()";
 
-const SEGMENTS = {
-  title: { run: slide("title.html", 6) },
-  term: {
-    async run(a) { await a.go(url(join(WORK, "term.html"))); await a.start(); await a.until("window.done === true", 300000); await sleep(300); await a.stop(); },
+// ---- the explainer and the live demo -------------------------------------------------------
+const HD = { width: 1920, height: 1080 };
+const VIEWER = join(REPO, "src", "agrisim", "viewer3d");
+const SCRIPT = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), "narration.json"), "utf-8"));
+const beatsFile = () => JSON.parse(readFileSync(join(WORK, "beats.json"), "utf-8"));
+// The viewer's files at /, and runs/demo_video/ at /work/ (its scenes: ?scene=/work/<run>/scene.json).
+function serveViewer() {
+  const TYPES = { ".html": "text/html", ".js": "text/javascript", ".mjs": "text/javascript", ".json": "application/json", ".css": "text/css", ".jpg": "image/jpeg", ".png": "image/png" };
+  const server = createServer((req, res) => {
+    const path = decodeURIComponent(new URL(req.url, "http://x").pathname);
+    const [root, rest] = path.startsWith("/work/") ? [WORK, path.slice(6)] : [VIEWER, path.slice(1) || "index.html"];
+    const file = normalize(join(root, rest));
+    if (!file.startsWith(root) || !existsSync(file)) {
+      res.writeHead(404).end();
+      return;
+    }
+    res.writeHead(200, { "Content-Type": TYPES[extname(file)] ?? "application/octet-stream", "Cache-Control": "no-cache" });
+    res.end(readFileSync(file));
+  });
+  return new Promise((ok) => server.listen(0, "127.0.0.1", () => ok({ url: `http://127.0.0.1:${server.address().port}/`, close: () => server.close() })));
+}
+const viewerUrl = (srv, run, quality = "high") => `${srv.url}?paused&quality=${quality}&scene=/work/${run}/scene.json`;
+const loaded = `window.viewer && !document.getElementById("loading")`;
+// Explainer footage: no panels, a large title over a dark scrim at the bottom left.
+const cleanHud = `(() => { const s = document.createElement("style"); s.textContent = "#left,#right,#play,#sheetTabs,.tag,#toasts,#tip{display:none!important}"; document.head.appendChild(s); })()`;
+const titleCard = (title, sub = "") => `(() => {
+  let c = document.getElementById("__card");
+  if (!c) {
+    c = document.createElement("div"); c.id = "__card"; document.body.appendChild(c);
+    const g = document.createElement("div");
+    g.style.cssText = "position:fixed;left:0;right:0;bottom:0;height:52%;background:linear-gradient(rgba(8,11,13,0),rgba(8,11,13,.82));pointer-events:none;z-index:2147483646";
+    document.body.appendChild(g);
+  }
+  c.style.cssText = "position:fixed;z-index:2147483647;left:112px;bottom:104px;max-width:1300px;color:#eef2f4;pointer-events:none";
+  const t = document.createElement("div");
+  t.style.cssText = "font:650 76px/1.05 'Segoe UI',sans-serif;letter-spacing:-.02em";
+  t.textContent = ${JSON.stringify(title)};
+  c.replaceChildren(t);
+  if (${JSON.stringify(sub)}) {
+    const s = document.createElement("div");
+    s.style.cssText = "font:400 32px/1.35 'Segoe UI',sans-serif;color:#d3dbe0;margin-top:14px;max-width:1150px";
+    s.textContent = ${JSON.stringify(sub)};
+    c.appendChild(s);
+  }
+})()`;
+// Demo captions: a lower third above the playback bar, clear of the panels and the toasts.
+const lowerThird = (title, sub = "", bottom = 128) => `(() => {
+  let c = document.getElementById("__cap");
+  if (!c) { c = document.createElement("div"); c.id = "__cap"; document.body.appendChild(c); }
+  c.style.cssText = "position:fixed;z-index:2147483647;left:50%;bottom:${bottom}px;transform:translateX(-50%);max-width:960px;width:max-content;padding:14px 24px;border-radius:12px;background:#15191e;border:1px solid #3d4852;color:#eef2f4;font:600 27px/1.3 'Segoe UI',sans-serif;text-align:center;pointer-events:none;box-shadow:0 10px 30px rgba(0,0,0,.35)";
+  const t = document.createElement("div");
+  t.textContent = ${JSON.stringify(title)};
+  c.replaceChildren(t);
+  if (${JSON.stringify(sub)}) {
+    const s = document.createElement("div");
+    s.style.cssText = "font-weight:400;font-size:20px;color:#aab5bd;margin-top:4px";
+    s.textContent = ${JSON.stringify(sub)};
+    c.appendChild(s);
+  }
+})()`;
+// Caption for a centred figure: in the empty margin on its left.
+const sideCard = (title, sub = "") => `(() => {
+  const c = document.createElement("div");
+  c.style.cssText = "position:fixed;z-index:2147483647;left:56px;top:50%;transform:translateY(-50%);width:330px;color:#eef2f4;pointer-events:none;zoom:${1 / 1.45}";
+  const t = document.createElement("div");
+  t.style.cssText = "font:650 52px/1.08 'Segoe UI',sans-serif;letter-spacing:-.02em";
+  t.textContent = ${JSON.stringify(title)};
+  const s = document.createElement("div");
+  s.style.cssText = "font:400 26px/1.35 'Segoe UI',sans-serif;color:#aab5bd;margin-top:14px";
+  s.textContent = ${JSON.stringify(sub)};
+  c.append(t, s);
+  document.body.appendChild(c);
+})()`;
+const slideSeg = (id) => ({
+  ...HD,
+  virtual: "timers",
+  async run(a) {
+    await a.go(`${url(join(WORK, "explainer.html"))}?scene=${id}`);
+    await a.until("window.ready === true");
+    await a.wait(100); // fonts settle
+    await a.eval("window.__start()");
+    await a.start();
+    await a.beat(id);
+    await a.stop();
   },
-  outputs: { run: slide("outputs.html", 8) },
-  rerun: {
-    virtual: true, // renders slowly in headless Chrome: step a virtual clock instead
-    async run(a) {
-      await a.go("http://127.0.0.1:9090/?url=rerun%2Bhttp%3A%2F%2Flocalhost%3A9876%2Fproxy");
-      await a.wait(8000); // let the viewer load the whole recording
-      await a.eval(capJs("8", "The same survey in the Rerun viewer (agrisim run --rerun)", "a guide panel explains every view · the maps update after every reading", RERUN_TOP));
-      await a.start();
-      await a.wait(1200);
-      await a.click(290, 886); // time cursor to the start; the viewer keeps playing at 30x
-      await a.wait(9000);
-      await a.eval(capJs("8", "Map error falls as readings come in", "average map error over time, bottom left · playback at 30x simulated time", RERUN_TOP));
-      await a.wait(12000);
-      await a.eval(capJs("8", "Click or drag the time bar to jump to any moment", "every frame, map and number is kept in recording.rrd", RERUN_TOP));
-      await a.click(1200, 886);
-      await a.wait(2500);
-      await a.click(760, 886);
-      await a.wait(4000);
-      await a.stop();
-    },
+});
+const termSeg = (id) => ({
+  ...HD,
+  virtual: "timers",
+  async run(a) {
+    await a.go(url(join(WORK, `term_${id}.html`)));
+    await a.start();
+    await a.beat(id, () => a.waitUntil("window.done === true", 900000));
+    await a.stop();
   },
-  view3d: {
-    virtual: true, // too heavy to render live in headless Chrome: step a virtual clock instead
-    async run(a) {
+});
+const viewerSeg = (run) => ({ ...HD, virtual: "timers", gpu: true, viewer: run });
+const SLIDES = ["e-problem", "e-gaps", "e-research", "e-built", "e-decision", "e-results", "e-compare", "e-honest", "e-outro", "d-title", "d-end"];
+const VIDEO_SEGMENTS = {
+  ...Object.fromEntries(SLIDES.map((id) => [id, slideSeg(id)])),
+  "d-run": termSeg("d-run"),
+  "d-bench": termSeg("d-bench"),
+  "e-hook": {
+    ...viewerSeg("view_demo"),
+    async run(a, srv) {
       const V = "window.viewer";
-      await a.go("http://127.0.0.1:8766/?paused&quality=high");
-      await a.until(`${V} && !document.getElementById("loading")`, 120000);
-      const first = await a.eval(`${V}.stops[2].start`);
-      await a.eval(`${V}.setSpeed(20); ${V}.setTime(${first} - 7)`);
-      await a.wait(1500);
+      await a.go(viewerUrl(srv, "view_demo"));
+      await a.until(loaded, 180000);
+      await a.eval(cleanHud);
+      await a.eval(`${V}.setTime(${V}.stops[44].start - 3); ${V}.setSpeed(20); ${V}.setCam("drone")`);
+      await a.wait(2500); // the drone flight settles
+      await a.eval(`${V}.setPlaying(true)`);
+      await a.eval(titleCard(a.b("e-hook").title));
       await a.start();
-      await a.wait(3500); // the intro panel explains the page
-      await a.eval(`document.getElementById("hideIntro").click(); ${V}.setPlaying(true)`);
-      await a.eval(capJs("9", "The same survey as a 3D replay: agrisim run --view", "the robot drives between the rows, parks, and pushes its probe into the soil; the panel on the right says what it is doing", TOP));
-      await a.wait(9000);
-      await a.eval(capJs("9", "Each reading becomes a coloured mark, and the map fills in", "orange = too dry, blue = wet · the robot's map gets better with every reading", TOP));
-      await a.eval(`${V}.setCam("overhead"); ${V}.setTime(${V}.stops[30].start - 4); ${V}.setSpeed(60)`);
-      await a.wait(7000);
-      await a.eval(capJs("9", "Compare with the real moisture, which the robot never sees", "buttons on the left change what the ground colour shows", TOP));
-      await a.eval(`${V}.setLayer(1)`);
-      await a.wait(3500);
-      await a.eval(`${V}.setLayer(2)`);
-      await a.wait(3000);
-      await a.eval(`${V}.setLayer(0); ${V}.setTime(${V}.T_END - 2)`);
-      await a.eval(capJs("9", "Survey complete: 60 stops (1 probe failed), 0 plants touched", "the whole replay plays in the browser; drag to look around, Space to pause", TOP));
-      await a.wait(4500);
+      await a.beat("e-hook", async () => {
+        await a.wait(a.b("e-hook").dur * 300);
+        await a.eval(`${V}.setCam("overhead")`); // rise to the whole field and its map
+      });
       await a.stop();
     },
   },
+  "e-safe": {
+    ...viewerSeg("view_demo"),
+    async run(a, srv) {
+      const V = "window.viewer";
+      await a.go(viewerUrl(srv, "view_demo"));
+      await a.until(loaded, 180000);
+      await a.eval(cleanHud);
+      await a.eval(`${V}.setLayer(4); ${V}.setTime(${V}.stops[6].start - 14); ${V}.setSpeed(5); ${V}.setCam("follow")`);
+      await a.wait(1600);
+      await a.eval(`${V}.setPlaying(true)`);
+      const b = a.b("e-safe");
+      await a.eval(titleCard(b.title, b.sub));
+      await a.start();
+      await a.beat("e-safe");
+      await a.stop();
+    },
+  },
+  "e-map": {
+    ...viewerSeg("view_demo"),
+    async run(a, srv) {
+      const V = "window.viewer";
+      await a.go(viewerUrl(srv, "view_demo"));
+      await a.until(loaded, 180000);
+      await a.eval(cleanHud);
+      await a.eval(`${V}.setTime(${V}.stops[20].start); ${V}.setSpeed(60); ${V}.setCam("overhead")`);
+      await a.wait(1800);
+      await a.eval(`${V}.setPlaying(true)`);
+      const b = a.b("e-map");
+      await a.eval(titleCard(b.title));
+      await a.start();
+      await a.beat("e-map", async () => {
+        await a.wait(b.dur * 550);
+        await a.eval(`${V}.setLayer(1)`);
+        await a.eval(titleCard("And the real moisture", "which the robot never sees"));
+      });
+      await a.stop();
+    },
+  },
+  "e-rover": {
+    ...HD,
+    virtual: "timers", // smooth however slow the SVG renders
+    async run(a) {
+      await a.go(url(join(REPO, "hardware", "rover-v2", "anatomy", "rover-anatomy.html")));
+      // Fill the frame's height with the figure; the caption goes in the margin beside it.
+      await a.eval(`(() => { document.documentElement.style.zoom = "1.45"; const c = document.querySelector(".iso-plate") ?? document.querySelector("svg"); scrollTo(0, 0); scrollTo(0, c.getBoundingClientRect().top - 18); })()`);
+      await a.move(1880, 1060, 10);
+      const b = a.b("e-rover");
+      await a.eval(sideCard(b.title, b.sub));
+      await a.jsKey(".iso-stage", " ");
+      await a.start();
+      await a.beat("e-rover");
+      await a.stop();
+    },
+  },
+  "d-view": {
+    ...viewerSeg("view_demo"),
+    async run(a, srv) {
+      const V = "window.viewer";
+      const cap = (id) => { const b = a.b(id); return a.eval(lowerThird(b.title, b.sub)); };
+      await a.go(viewerUrl(srv, "view_demo", "medium"));
+      await a.start(); // the loading screen is part of the demo
+      await a.beat("d-open", async () => {
+        await a.waitUntil(loaded, 180000);
+        await cap("d-open");
+      });
+      await a.eval(`document.getElementById("hideIntro").click(); ${V}.setTime(${V}.stops[3].start - 9); ${V}.setSpeed(20); ${V}.setPlaying(true)`);
+      await a.beat("d-probe", () => cap("d-probe"));
+      await a.beat("d-reading", () => cap("d-reading"));
+      await a.beat("d-drone", async () => {
+        await cap("d-drone");
+        await a.press("d");
+      });
+      await a.beat("d-timeline", async () => {
+        await cap("d-timeline");
+        const [x, y, w] = await a.eval(`(() => { const r = document.getElementById("time").getBoundingClientRect(); return [r.left, r.top + r.height / 2, r.width]; })()`);
+        await a.move(x + w * 0.3, y, 900);
+        await a.move(x + w * 0.62, y, 2200);
+        await a.wait(600);
+        await a.move(x + w * 0.5, y - 260, 500);
+        await a.press("ArrowRight");
+        await a.wait(1400);
+        await a.press("ArrowRight");
+      });
+      await a.beat("d-layers", async () => {
+        await cap("d-layers");
+        await a.press("o");
+        const step = (a.b("d-layers").dur * 1000) / 5;
+        await a.wait(step);
+        for (const n of [2, 3, 4]) {
+          await a.clickSel(`#layerButtons button:nth-child(${n})`);
+          await a.wait(step - 400);
+        }
+        await a.clickSel("#layerButtons button:nth-child(1)");
+      });
+      await a.beat("d-minimap", async () => {
+        await cap("d-minimap");
+        await a.eval(`${V}.setPlaying(false)`);
+        const k = await a.eval(`${V}.stops.filter((s) => s.reveal <= ${V}.t).length`);
+        const [x, y] = await a.eval(`${V}.mapPoint(${Math.max(0, Math.floor(k * 0.35))})`);
+        await a.click(x, y);
+        await a.press("f");
+        await a.eval(`${V}.setPlaying(true)`);
+      });
+      await a.stop();
+    },
+  },
+  "d-rain": {
+    ...viewerSeg("view_rain"),
+    async run(a, srv) {
+      const V = "window.viewer";
+      await a.go(viewerUrl(srv, "view_rain", "medium"));
+      await a.until(loaded, 180000);
+      const rain = await a.eval(`fetch("/work/view_rain/scene.json").then((r) => r.json()).then((s) => s.rain[0].start_s)`);
+      await a.eval(`document.getElementById("hideIntro").click(); ${V}.setTime(${rain} - 50); ${V}.setSpeed(20); ${V}.setCam("drone")`);
+      await a.wait(2000);
+      await a.eval(`${V}.setPlaying(true)`);
+      const b = a.b("d-rain");
+      await a.eval(lowerThird(b.title, b.sub));
+      await a.start();
+      await a.beat("d-rain");
+      await a.stop();
+    },
+  },
+  "d-phone": {
+    width: 390,
+    height: 844,
+    scale: 1.25,
+    mobile: true,
+    virtual: "timers",
+    gpu: true,
+    viewer: "view_demo",
+    async run(a, srv) {
+      const V = "window.viewer";
+      await a.go(viewerUrl(srv, "view_demo", "medium"));
+      await a.until(loaded, 180000);
+      await a.eval(`${V}.setTime(${V}.stops[9].start - 6); ${V}.setSpeed(20); ${V}.setPlaying(true)`);
+      await a.wait(1200);
+      await a.start();
+      await a.beat("d-phone", async () => {
+        const step = (a.b("d-phone").dur * 1000) / 4;
+        await a.wait(step);
+        await a.clickSel('#sheetTabs [data-sheet="map"]');
+        await a.wait(step);
+        await a.clickSel('#sheetTabs [data-sheet="ground"]');
+        await a.wait(step);
+        await a.clickSel('#sheetTabs [data-sheet="now"]');
+      });
+      await a.stop();
+    },
+  },
+};
+
+const SEGMENTS = {
+  ...VIDEO_SEGMENTS,
   // README screenshots of the 3D replay (no video): docs/img/viewer3d*.jpg
   stills: {
-    virtual: true,
+    virtual: "timers",
     video: false,
-    async run(a) {
+    gpu: true,
+    viewer: "view_demo",
+    async run(a, srv) {
       const V = "window.viewer";
-      await a.go("http://127.0.0.1:8766/?paused&quality=high");
-      await a.until(`${V} && !document.getElementById("loading")`, 120000);
+      await a.go(viewerUrl(srv, "view_demo"));
+      await a.until(loaded, 180000);
       await a.eval(`document.getElementById("hideIntro").click(); ${V}.setTime(${V}.stops[4].start + 3.2)`);
       await a.wait(1500);
       await a.shot(join(REPO, "docs", "img", "viewer3d.jpg"));
-      await a.eval(`${V}.setCam("overhead"); ${V}.setTime(${V}.stops[32].start + 3.2)`);
+      await a.eval(`${V}.setCam("overhead"); ${V}.setTime(${V}.stops[32].start + 3.2); ${V}.select(20)`);
       await a.wait(2500);
       await a.shot(join(REPO, "docs", "img", "viewer3d-field.jpg"));
     },
@@ -197,50 +417,37 @@ const SEGMENTS = {
       }
     },
   },
-  fig1: {
-    ...FIG,
-    virtual: "timers", // smooth however slow the SVG renders
+  // The replay at the viewport sizes of Responsively App's device presets (phones, tablet,
+  // laptop, desktop), the way a responsive review there would look at it (no video):
+  // runs/devices/<device>-<view>.jpg. Needs `agrisim view <run> --no-browser --port 8766`.
+  devices: {
+    virtual: "timers",
+    video: false,
     async run(a) {
-      await a.go(figure("rover-anatomy"));
-      const [x, y, w, h] = await a.eval(scrollToCard);
-      await a.move(x + w * 0.5, y + h * 0.3, 10);
-      await a.eval(capJs("10", "AgriRover v1: the rover in detail", "4WD RC chassis with the probe module on top. Hover over the figure to move the probe by hand.", SIDE));
-      await a.wait(400);
-      await a.start();
-      await a.wait(800);
-      await a.move(x + w * 0.52, y + h * 0.74, 3200);
-      await a.wait(700);
-      await a.move(x + w * 0.5, y + h * 0.28, 2200);
-      await a.wait(500);
-      await a.move(150, 650, 500);
-      await a.eval(capJs("11", "Space: one full probe cycle, then a leaf scan (3x speed)", "lower until the ground sensor sees soil · insert 60 mm · read · pull up through the brush seal · air blast · air check · camera arm slides under the leaves", SIDE));
-      await a.jsKey(".iso-stage", " ");
-      await a.wait(14500);
-      await a.eval(capJs("12", "A: slide the under-leaf camera arm out by hand", "351 mm reach from the centre line; a brush at the beam mouth wipes the camera window on every retraction", SIDE));
-      await a.jsKey(".iso-stage", "a");
-      await a.wait(3000);
-      await a.jsKey(".iso-stage", "a");
-      await a.wait(2600);
-      await a.stop();
+      const V = "window.viewer";
+      const dir = join(REPO, "runs", "devices");
+      mkdirSync(dir, { recursive: true });
+      for (const [name, w, h, mobile] of DEVICES) {
+        await a.viewport(w, h, mobile);
+        await a.go("http://127.0.0.1:8766/?paused&quality=low");
+        await a.until(`${V} && !document.getElementById("loading")`, 120000);
+        await a.eval(`${V}.setTime(${V}.stops[12].start + 9)`);
+        await a.wait(1200);
+        await a.shot(join(dir, `${name}-1-stop.jpg`));
+        await a.eval(`${V}.setCam("overhead"); ${V}.setLayer(2); ${V}.select(8)`);
+        await a.wait(1800);
+        await a.shot(join(dir, `${name}-2-field.jpg`));
+        if (mobile) {
+          await a.eval(`${V}.setSheet("map"); ${V}.setLayer(0)`);
+          await a.wait(300);
+          await a.shot(join(dir, `${name}-3-map.jpg`));
+        }
+        await a.eval(`${V}.openHelp(true)`);
+        await a.wait(300);
+        await a.shot(join(dir, `${name}-4-help.jpg`));
+      }
     },
   },
-  fig2: {
-    ...FIG,
-    virtual: "timers", // smooth however slow the SVG renders
-    async run(a) {
-      await a.go(figure("probe-cleaning"));
-      await a.eval(scrollToCard);
-      await a.move(150, 650, 10);
-      await a.eval(capJs("13", "Fig 2: the self-cleaning probe cartridge, cut in half", "Soil stuck to the rods would bias the next reading, so every cycle ends with cleaning (1.5x speed)", SIDE));
-      await a.jsKey(".iso-stage", " ");
-      await a.start();
-      await a.wait(9500);
-      await a.eval(capJs("13", "Brushes scrape the rods on the way up", "the scraped soil falls back where it came from; then six nozzles blow the rods dry and the probe must read clean air within 0.02 m³/m³", SIDE));
-      await a.wait(10500);
-      await a.stop();
-    },
-  },
-  end: { run: slide("end.html", 8) },
 };
 
 const CHROMES = [
@@ -253,6 +460,10 @@ const CHROMES = [
 
 async function record(name, segment) {
   const W = segment.width ?? 1600, H = segment.height ?? 900;
+  const srv = segment.viewer ? await serveViewer() : null;
+  const BEATS = existsSync(join(WORK, "beats.json")) ? beatsFile() : {};
+  const beatsAt = [];
+  let recStart = 0;
   const outDir = join(WORK, `seg_${name}`);
   rmSync(outDir, { recursive: true, force: true });
   mkdirSync(outDir, { recursive: true });
@@ -289,13 +500,15 @@ async function record(name, segment) {
   });
   await send("Page.enable");
   await send("Runtime.enable");
-  await send("Emulation.setDeviceMetricsOverride", { width: W, height: H, deviceScaleFactor: segment.scale ?? 1, mobile: false });
+  await send("Emulation.setDeviceMetricsOverride", { width: W, height: H, deviceScaleFactor: segment.scale ?? 1, mobile: !!segment.mobile });
+  if (segment.mobile) await send("Emulation.setTouchEmulationEnabled", { enabled: true });
   if (segment.virtual) await send("Page.addScriptToEvaluateOnNewDocument", { source: virtualClock(segment.virtual === "timers") });
   let vclock = 0; // seconds of virtual time (virtual segments only)
 
   let mouse = [W / 2, H / 2];
   let t1 = 0;
   const a = {
+    async viewport(w, h, mobile = false) { await send("Emulation.setDeviceMetricsOverride", { width: w, height: h, deviceScaleFactor: 1, mobile }); await send("Emulation.setTouchEmulationEnabled", { enabled: mobile }); },
     async go(target) { await send("Page.navigate", { url: target }); await sleep(300); await a.until("document.readyState === 'complete'"); },
     async eval(js) { const r = await send("Runtime.evaluate", { expression: js, awaitPromise: true, returnByValue: true }); return r.result?.value; },
     async until(js, timeout = 60000) {
@@ -334,6 +547,38 @@ async function record(name, segment) {
       mouse = [x, y];
     },
     async click(x, y) { await a.move(x, y, 400); for (const type of ["mousePressed", "mouseReleased"]) await send("Input.dispatchMouseEvent", { type, x, y, button: "left", clickCount: 1 }); },
+    async clickSel(sel) {
+      const [x, y] = await a.eval(`(() => { const r = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()`);
+      await a.click(x, y);
+    },
+    // A real key press (down and up), as the viewer's keyboard shortcuts receive it.
+    async press(key) {
+      const code = key.length === 1 ? `Key${key.toUpperCase()}` : key;
+      const vk = { ArrowRight: 39, ArrowLeft: 37 }[key] ?? key.toUpperCase().charCodeAt(0);
+      for (const type of ["keyDown", "keyUp"]) await send("Input.dispatchKeyEvent", { type, key, code, windowsVirtualKeyCode: vk, ...(type === "keyDown" && key.length === 1 ? { text: key } : {}) });
+    },
+    // Capture frames until the page says it is ready (for waits that belong in the video).
+    async waitUntil(js, timeout = 60000) {
+      const t0 = Date.now();
+      while (!(await a.eval(js))) {
+        if (Date.now() - t0 > timeout) throw new Error(`timeout: ${js}`);
+        await a.wait(FRAME_MS);
+      }
+    },
+    b(id) {
+      if (!BEATS[id]) throw new Error(`no beat ${id}: run prepare.py`);
+      return BEATS[id];
+    },
+    // One narrated beat: note when it starts, do its actions, then hold until its voice is over.
+    async beat(id, actions) {
+      const now = () => (segment.virtual ? vclock : Date.now() / 1000);
+      const t0 = now();
+      beatsAt.push({ id, at: +(t0 - recStart).toFixed(3) });
+      await actions?.();
+      const left = a.b(id).dur - (now() - t0);
+      if (left > 0) await a.wait(left * 1000);
+    },
+
     async drag(x0, y0, x1, y1, ms = 800) {
       await a.move(x0, y0, 300);
       await send("Input.dispatchMouseEvent", { type: "mousePressed", x: x0, y: y0, button: "left", clickCount: 1 });
@@ -357,6 +602,7 @@ async function record(name, segment) {
     async start() {
       if (!segment.virtual) await send("Page.startScreencast", { format: "jpeg", quality: 92, everyNthFrame: 1 });
       recording = true;
+      recStart = segment.virtual ? vclock : Date.now() / 1000;
     },
     async stop() {
       recording = false;
@@ -365,8 +611,9 @@ async function record(name, segment) {
     },
   };
   try {
-    await segment.run(a);
+    await segment.run(a, srv);
   } finally {
+    srv?.close();
     ws.close();
     chrome.kill();
     await sleep(500);
@@ -386,10 +633,15 @@ async function record(name, segment) {
   });
   lines.push(`file '${fwd(frames.at(-1).file)}'`);
   writeFileSync(join(outDir, "frames.ffconcat"), lines.join("\n") + "\n");
+  writeFileSync(join(outDir, "beats.json"), JSON.stringify(beatsAt));
   console.log(`${name}: ${frames.length} frames over ${(t1 - frames[0].t).toFixed(1)} s`);
 }
 
-const names = process.argv.slice(2).length ? process.argv.slice(2) : Object.keys(SEGMENTS).filter((n) => !["stills", "lookdev", "weather", "perf"].includes(n));
+// A video's segments, in order: each beat's `seg` (default: the beat's own id).
+const segmentsOf = (video) => [...new Set(SCRIPT[video].map((b) => b.seg ?? b.id))];
+const args = process.argv.slice(2);
+if (!args.length) throw new Error(`name a video (${Object.keys(SCRIPT).filter((k) => k !== "_").join(", ")}) or segments (${Object.keys(SEGMENTS).join(", ")})`);
+const names = args.flatMap((n) => (SCRIPT[n] && n !== "_" ? segmentsOf(n) : [n]));
 for (const name of names) {
   if (!SEGMENTS[name]) throw new Error(`unknown segment ${name}; choose from ${Object.keys(SEGMENTS).join(", ")}`);
   await record(name, SEGMENTS[name]);

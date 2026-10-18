@@ -1,6 +1,7 @@
-:root { --bg: #0b0d10; --panel: #12161b; --line: #263040; --text: #e6edf3; --dim: #8b98a5; --accent: #7ee0a1; --warn: #ffb86b; }
+:root { --bg: #0d1114; --panel: #15191e; --line: #2b333b; --text: #eef2f4; --dim: #aab5bd; --accent: #6fd49a; --warn: #f5b04f; }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 16px/1.45 "Segoe UI", system-ui, sans-serif; overflow: hidden; }
-.cap { position: fixed; z-index: 99; left: 40px; top: 22px; max-width: 1520px; padding: 10px 18px; border-radius: 10px; background: rgba(18, 22, 27, 0.92); border: 1px solid var(--line); font-size: 21px; font-weight: 600; letter-spacing: 0.1px; transition: opacity 0.35s; }
-.cap small { display: block; font-weight: 400; color: var(--dim); font-size: 16px; margin-top: 2px; }
+.cap { position: fixed; z-index: 99; left: 48px; top: 30px; max-width: 1800px; padding: 0; font: 650 34px/1.2 "Segoe UI", sans-serif; letter-spacing: -0.01em; transition: opacity 0.35s; }
+.cap small { display: block; font: 400 22px/1.35 "Segoe UI", sans-serif; color: var(--dim); margin-top: 6px; letter-spacing: 0; }
 .step { color: var(--accent); margin-right: 10px; }
+.step:empty { display: none; }

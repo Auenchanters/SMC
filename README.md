@@ -21,7 +21,7 @@ agrisim is a pure-Python simulator of a planted tomato field. A small differenti
 
 <sub>Real simulator output, seed 7. Higher-quality video: [docs/media/survey.mp4](docs/media/survey.mp4). Soil parameters are placeholders until calibrated.</sub>
 
-**Demo video (3 min 9 s):** [docs/media/agrisim-demo.mp4](docs/media/agrisim-demo.mp4) shows the CLI, a run's outputs, the Rerun viewer, the 3D replay and the rover hardware figures.
+**Two narrated videos:** [the explainer](docs/media/agrisim-explainer.mp4) covers the problem, the gaps in existing products, how agrisim works, the agribench results and what is left. [The live demo](docs/media/agrisim-demo.mp4) runs the CLI and drives the 3D replay by hand. Subtitles are in the files and beside them (`.srt`).
 
 </div>
 
@@ -329,10 +329,13 @@ Everything is driven by one YAML file ([configs/demo.yaml](configs/demo.yaml)). 
 ## 3D replay
 
 Add `--view` to any run to replay it in 3D in your browser:
-- The rover, built from the hardware design's dimensions, drives between staked tomato rows, parks, and pushes its probe into the soil.
-- Every reading leaves a coloured mark, and the moisture map fills in on the ground.
-- A panel says in plain words what is happening.
-- Buttons switch the ground colour between the robot's map, the real moisture, the map error and the uncertainty.
+- The rover, built from the hardware design's dimensions, drives between staked tomato rows, parks, and pushes its probe into the soil. Follow it, watch from a drone circling above it (`D`), or see the whole field (`O`).
+- **Right now** says in plain words what is happening. Six bars follow the probe cycle, the latest reading shows its value and colour, and a small chart shows the map error after every reading.
+- Every reading lands as a ripple and a coloured flag, and the moisture map fades to its new picture.
+- **The time bar** shows the whole mission: a tick per reading in its colour, rain in blue, and a red line for any plant touched. Point at it to preview a moment; `←` `→` jump between stops.
+- **The field from above** shows the route and every reading. Click one to jump there; it is ringed in the 3D view too.
+- Buttons switch the ground colour between the robot's map, the real moisture, the map error and the uncertainty. Short notes appear when rain starts, a probe fails or the rover checks a spot again.
+- It works on a laptop, a tablet and a phone (one panel at a time), by keyboard, and with reduced motion.
 
 It works offline (three.js is bundled) and needs no install beyond `uv sync`.
 
@@ -342,7 +345,7 @@ uv run agrisim run --config configs/demo.yaml --seed 7 --view
 
 | | |
 |:---:|:---:|
-| ![3D replay, following the robot](docs/img/viewer3d.jpg) **Following the robot.** It has parked and is pushing the probe into the soil. | ![3D replay, whole field](docs/img/viewer3d-field.jpg) **The whole field.** Orange = too dry, blue = wet; each round mark is a reading. |
+| ![3D replay, following the robot](docs/img/viewer3d.jpg) **Following the robot.** It has parked and is pushing the probe into the soil. | ![3D replay, whole field](docs/img/viewer3d-field.jpg) **The whole field.** Orange = too dry, blue = wet; each round mark is a reading, and the selected one is ringed in both views. |
 
 Reopen a run later with `uv run agrisim view runs\<folder>`. Press `?` in the page for a guide.
 
@@ -534,6 +537,8 @@ It re-runs seed 7 and writes:
 - `hero.png`, `maps.png` and `strategies.png`.
 
 It draws `results.png` from the newest `runs/eval_*/results.csv`, or from a file you pass with `--results <file>`. Without `--model`, the PPO panel is skipped. It takes about 8 minutes, mostly frame rendering. [architecture.svg](docs/img/architecture.svg) is edited by hand.
+
+The two videos and the 3D replay screenshots (`viewer3d*.jpg`) are made by [scripts/demo_video/](scripts/demo_video/README.md): a local voice, real commands, and the replay driven with real input in headless Chrome.
 
 ## Optional: NVIDIA GPU
 

@@ -1,5 +1,6 @@
 // What the ground colour shows: the robot's map, the real moisture, the map error, the
-// uncertainty, or nothing. Paints the overlay texture and the legend.
+// uncertainty, or nothing. Paints the overlay texture and the legend. When a new reading
+// arrives the map fades from the old picture to the new one, so you can see what changed.
 import * as THREE from "three";
 import { pct } from "./data.js";
 
@@ -19,11 +20,16 @@ export function ramp(stops, v, out) {
   return out.copy(stops[n - 1][2]);
 }
 export const moistureColour = (v, out) => ramp(MOIST, v, out);
+const tmpSwatch = new THREE.Color();
+/** CSS colour of a reading (grey: the probe failed). */
+export const swatch = (v) => (v == null ? "#8a8f94" : `#${moistureColour(v, tmpSwatch).getHexString()}`);
+const FADE_MS = 650;
+const still = matchMedia("(prefers-reduced-motion: reduce)");
 
 export function createLayers(D, field) {
   const { S, DRY } = D;
   const milli = (v) => (v == null ? null : v / 1000);
-  const moistTicks = () => [[0.05, "5% dry"], [DRY, `${pct(DRY)} too dry below`, true], [0.3, "30%"], [0.45, "45% wet"]];
+  const moistTicks = () => [[0.05, "5% dry"], [DRY, `${pct(DRY)} dry line`, true], [0.3, "30%"], [0.45, "45% wet"]];
   const LAYERS = [
     { label: "Robot's map", stops: MOIST, alpha: 0.62, value: (i, k) => milli(S.estimate[k][i]), ticks: moistTicks,
       text: "What the robot thinks the soil moisture is everywhere, worked out from its marks so far. Watch it sharpen with every reading." },
@@ -42,31 +48,47 @@ export function createLayers(D, field) {
   let layer = 0;
   let shownKey = "";
 
-  function paint(k) {
-    const key = `${layer}/${k}`;
-    if (key === shownKey) return;
-    shownKey = key;
+  const from = new Float32Array(cells * 4);
+  const to = new Float32Array(cells * 4);
+  let fadeStart = -1;
+  /** Fill `to` with the picture for layer `layer` after k readings. */
+  function target(k) {
     const L = LAYERS[layer];
-    const data = field.tintData;
-    if (!L.stops) {
-      for (let i = 3; i < data.length; i += 4) data[i] = 0; // plain soil: no colour
-      field.tintTex.needsUpdate = true;
-      return;
-    }
+    to.fill(0);
+    if (!L.stops) return; // plain soil: no colour
     for (let i = 0; i < cells; i++) {
       const v = L.value(i, k);
-      const o = i * 4;
-      if (v == null) {
-        data[o + 3] = 0;
-        continue;
-      }
+      if (v == null) continue;
       ramp(L.stops, v, tmp);
-      data[o] = tmp.r * 255;
-      data[o + 1] = tmp.g * 255;
-      data[o + 2] = tmp.b * 255;
-      data[o + 3] = L.alpha * 255;
+      const o = i * 4;
+      to[o] = tmp.r * 255;
+      to[o + 1] = tmp.g * 255;
+      to[o + 2] = tmp.b * 255;
+      to[o + 3] = L.alpha * 255;
     }
+  }
+  function paint(k, now = performance.now()) {
+    const data = field.tintData;
+    const key = `${layer}/${k}`;
+    if (key !== shownKey) {
+      // Fade only for the next reading during play; anything else (a jump, a new layer) snaps.
+      const fade = !still.matches && shownKey === `${layer}/${k - 1}`;
+      shownKey = key;
+      for (let i = 0; i < from.length; i++) from[i] = data[i];
+      target(k);
+      fadeStart = fade ? now : -1;
+      if (!fade) {
+        data.set(to);
+        field.tintTex.needsUpdate = true;
+        return;
+      }
+    }
+    if (fadeStart < 0) return;
+    const f = Math.min(1, (now - fadeStart) / FADE_MS);
+    const e = 1 - (1 - f) ** 3;
+    for (let i = 0; i < data.length; i++) data[i] = from[i] + (to[i] - from[i]) * e;
     field.tintTex.needsUpdate = true;
+    if (f >= 1) fadeStart = -1;
   }
   function showInfo() {
     const L = LAYERS[layer];
@@ -87,6 +109,7 @@ export function createLayers(D, field) {
     paint,
     set(i, k) {
       layer = i;
+      shownKey = "";
       showInfo();
       paint(k);
     },

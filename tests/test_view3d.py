@@ -45,6 +45,9 @@ def test_server_serves_viewer_and_scene(cfg: SimConfig, tmp_path: Path) -> None:
                 assert r.headers["Content-Type"] == "text/javascript"  # module scripts need it
         with urllib.request.urlopen(base + "/run/scene.json") as r:
             assert len(json.loads(r.read())["probes"]) == 5
+            assert r.headers["Cache-Control"] == "no-cache"  # never replay a cached older run
+        with urllib.request.urlopen(base + "/viewer.css") as r:
+            assert r.headers["Content-Type"] == "text/css"
     finally:
         server.shutdown()
         server.server_close()

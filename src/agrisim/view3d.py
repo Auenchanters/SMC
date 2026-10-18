@@ -140,6 +140,12 @@ class _Handler(SimpleHTTPRequestHandler):
         }
         super().__init__(*args, directory=str(VIEWER), **kwargs)
 
+    def end_headers(self) -> None:
+        # /run/scene.json is the same URL for every run: without this the browser can replay a
+        # cached older survey, or mix new viewer files with old ones.
+        self.send_header("Cache-Control", "no-cache")
+        super().end_headers()
+
     def translate_path(self, path: str) -> str:
         if path.split("?")[0] == "/run/" + SCENE:
             return str(self.run_dir / SCENE)
