@@ -75,7 +75,7 @@ Every world number is a placeholder, as in `configs/demo.yaml`. The two realism 
 | `greedy_variance_per_cost` | ours | variance per second of driving and probing |
 | `recheck`, `fixed_plus_recheck` | ours (M11) | revisit doubtful readings |
 | `moisturemapper_a1`, `moisturemapper_a2` | MoistureMapper, IEEE CASE 2025, arXiv 2507.12716 | A1 = σ²(1 − d/d_max), A2 = (σ² + 1 − d/d_max)/2, next site random among the top five; σ² scaled to [0, 1] as their unit-variance GP; d along the lane graph, not straight lines |
-| `dov` | Roberts-Elliott, Das and Cielniak, Robotics 14(6):77, 2025 | distance over variance; the exact bid form is unverified, so "DOV-style" |
+| `dov` | Roberts-Elliott, Das and Cielniak, Robotics 14(6):77, 2025 | their best-map variant, DOVTD, checked against the paper and their code: about 64 sampling cells with one task each; tasks only in the 3 cells with the highest mean kriging variance (one per robot of their 3-robot trials), at each one's highest-variance free site; tasks under 0.75 × the median variance dropped; the lowest bid, distance / variance, wins. Lane-graph distance, not straight lines |
 | `mi_greedy` | Krause, Singh and Guestrin, JMLR 9, 2008 | greedy mutual information, σ²(s given probed) / σ²(s given all other unprobed sites), with the fitted variogram's covariance |
 | `spatial_coverage` | Walvoort, Brus and de Gruijter, Computers & Geosciences 2010 | k-means centres snapped to sites, visited nearest first; the standard soil-survey design |
 | `ppo` | ours (M8), `models/ppo_v1` | run only where the model fits the field |
@@ -133,12 +133,57 @@ uv run agrisim suite --write-lock
 - **Positioning error is independent per reading.** Real GNSS error is correlated in time.
 - **Fresh fields from the commit SHA** can be computed once a commit exists, but tuning to them needs another commit, which changes them.
 - **Compute time is reported, not gated.** A strategy that is too slow for the rover's computer would still pass. `mi_greedy` is the slowest: 40 ms per probe on the demo field and 121 ms on the large one (fourth review), mostly one matrix inversion that grows with the cube of the number of sites.
-- **`dov` is set up wrongly.** Roberts-Elliott et al. place the distance-over-variance bid only on a shortlist of the most uncertain sites; ours bids on every site, so the nearest site always wins and the rover crawls along one lane (about 29 m for 30 probes). That is why it scores far below random, and beating it means nothing. Fixing it changes a v1 baseline, so it is a decision for the team (Decision Log).
+- **`dov` changed within v1** (18 October 2026, commit `6690e33`). Until then it bid distance over variance on every site, so the nearest site always won and the rover crawled along one lane (about 29 m for 30 probes, scores −109 to −116). It now follows the paper (§5). Our entry's scores, `baseline.json` and the frozen worlds are unchanged, but `dov`'s own scores, and any gate against it, from runs before that commit cannot be compared with later ones. It is still a one-rover reading of a multi-robot method: they create one task per robot per round, so one rover's bid would have nothing to choose, so it bids on the 3 tasks of their 3-robot trials (Decision Log).
 - **No zone-level irrigation metric yet** (WP9, water regret). `dry_f1` is cell-level.
 
 ## 9. Results
 
 Only from `agrisim suite` runs, latest first.
+
+### DOV set up as its paper describes (18 October 2026, commit `6690e33`)
+
+`dov` now follows Roberts-Elliott et al. (§5, §8). Nothing else changed: our entry, the worlds, the lock and `baseline.json` are as at `b78b3b0`, and on the 64 public fields of every task our entry's scores are identical (the regression gate reports a change of 0.0 everywhere). `baseline.json` was not updated.
+
+Full tier, fresh key = the commit SHA `6690e33d5e677e227c93025646d5248b69c247c8`: 15,232 surveys, 0 crashes, 0 plant contacts, 53 min on 8 workers.
+
+**Status: below state of the art.** Overall **75.2** [95% CI 70.6, 80.7]. Earlier fields: 78.5, 75.8 and 73.9.
+
+| strategy | score |
+|---|---|
+| oracle_rmse (reference) | 97.9 |
+| **our entry** | **75.2** |
+| oracle_dry (reference) | 68.4 |
+| spatial coverage | 59.7 |
+| fixed_plus_recheck | 54.4 |
+| lawnmower | 52.6 |
+| MoistureMapper A2 | 49.8 |
+| MoistureMapper A1 | 49.4 |
+| **`dov`** (was −109) | **47.8** |
+| greedy_variance | 30.9 |
+| mi_greedy | 29.1 |
+| recheck | 28.9 |
+| greedy_variance_per_cost | 18.8 |
+
+Our entry beats every baseline on 7 of 24 task metrics: `dry_f1` on every task but `harsh_b60`. It beats every baseline on no `rmse` or `crps`. It saturates 1 of 24: `crps` on `demo_b60`.
+
+`dov` does not decide any gate on its own. Our entry beats it on `dry_f1` in the 7 tasks it wins. Where `dov` is not beaten (`rmse` and `crps` on `demo_b30`, `v2_b30`, `rain_b60` and `harsh_b60`, and `dry_f1` on `harsh_b60`), at least one other baseline is not beaten either, so the gate count would be the same without `dov`. Lost from the previous run: `harsh_b60` dry F1, against 11 baselines on these fresh fields. The fields changed, not the strategy: on the public fields that score is unchanged.
+
+`dov` per task (normalised, fresh fields): RMSE 34 to 55, CRPS 53 to 122 (its best is `v2_b30`, 122 against our 111), dry F1 −1 to 48. It drives about 1,200 m for 60 probes (2,000 m on the large field) and ignores the deadline, so it takes only 43 to 54 of 60 probes in time (25.5 of 30 on `demo_b30`, 30 of 30 on `v2_b30`). It takes 0.7 to 2.5 s of compute per survey.
+
+Our entry per task (normalised score with 95% CI, fresh fields; **bold** = beats every baseline):
+
+| task | rmse | crps | dry_f1 | probes by deadline | mission |
+|---|---|---|---|---|---|
+| demo_b30 | 54.7 [44.5, 64.0] | 102 [84.4, 126] | **72.8** [50.5, 97.0] | 30 of 30 | 16 min |
+| demo_b60 | 72.0 [65.4, 79.0] | 106 [94.9, 120] (saturated) | **97.9** [85.7, 114] | 60 of 60 | 30 min |
+| v2_b30 | 46.0 [34.2, 57.2] | 111 [80.9, 167] | **68.6** [51.6, 87.5] | 30 of 30 | 26 min |
+| rain_b60 | 49.5 [38.9, 60.7] | 74.0 [56.0, 99.1] | **63.2** [41.3, 86.2] | 60 of 60 | 44 min |
+| drying_b60 | 62.9 [55.5, 70.0] | 95.1 [83.1, 109] | **96.0** [82.2, 111] | 60 of 60 | 30 min |
+| rough_b60 | 48.5 [36.9, 59.0] | 80.6 [59.6, 106] | **71.7** [50.5, 96.5] | 60 of 60 | 30 min |
+| large_b60 | 66.3 [60.2, 72.8] | 99.8 [88.4, 115] | **78.8** [64.4, 93.6] | 60 of 60 | 44 min |
+| harsh_b60 | 63.5 [53.2, 73.6] | 109 [89.4, 135] | 56.9 [39.3, 79.3] | 60 of 60 | 30 min |
+
+The map's ubRMSE is within the SMAP requirement (0.04) on all 8 tasks. RMSE reaches 0.03 on `demo_b60`, `rain_b60` and `drying_b60`.
 
 ### Repeat-probe fix (18 October 2026, commit `b78b3b0`)
 
@@ -164,7 +209,7 @@ Full tier, fresh key = the commit SHA `b78b3b020f1c4e6b45c757f36ef35c81c08b160c`
 | recheck | 28.0 |
 | mi_greedy | 22.8 |
 | greedy_variance_per_cost | 13.7 |
-| `dov` (set up wrongly, §8) | −109 |
+| `dov` (set up wrongly then, §8) | −109 |
 
 Our entry beats every baseline on 8 of 24 task metrics: `dry_f1` on all 8 tasks, including `harsh_b60` for the first time. It beats every baseline on no `rmse` or `crps`. It saturates 1 of 24: `crps` on `harsh_b60`.
 

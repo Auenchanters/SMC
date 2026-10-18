@@ -15,7 +15,7 @@
 
 agrisim is a pure-Python simulator of a planted tomato field. A small differential-drive rover follows the lanes between plant rows. It stops to push a moisture probe into the soil, and turns a few dozen noisy readings into a **full-field moisture map plus an uncertainty map**. **agribench** pits our probing strategy against re-implemented published methods and a clairvoyant oracle, on fresh fields nobody has seen. The same world is also a **Gymnasium environment** for training a rover to decide *where* to probe.
 
-> **On fresh fields nobody had seen, our strategy `planned_survey` scores 78.5 out of 100** (0 = random probing, 100 = a clairvoyant oracle). That is the highest overall score of the 12 real strategies, ahead of re-implementations of spatial-coverage sampling (Walvoort et al. 2010) at 58.2, MoistureMapper (CASE 2025) at 47.7 and greedy mutual information (Krause et al. 2008) at 22.8. Two earlier runs on other fresh fields gave 73.9 and 75.8. It finds dry zones significantly better than every baseline on all 8 tasks; on map error it ties the best simple design. There were **zero plant contacts in 15,232 benchmark surveys**. Our own benchmark still rates us "below state of the art", because we do not yet win every metric, and we say so.
+> **On fresh fields nobody had seen, our strategy `planned_survey` scores 75.2 out of 100** (0 = random probing, 100 = a clairvoyant oracle). That is the highest overall score of the 12 real strategies, ahead of re-implementations of spatial-coverage sampling (Walvoort et al. 2010) at 59.7, MoistureMapper (CASE 2025) at 49.8, DOV (Roberts-Elliott et al. 2025) at 47.8 and greedy mutual information (Krause et al. 2008) at 29.1. Three earlier runs on other fresh fields gave 73.9, 75.8 and 78.5. It finds dry zones significantly better than every baseline on 7 of 8 tasks; on map error it ties the best simple design. There were **zero plant contacts in 15,232 benchmark surveys**. Our own benchmark still rates us "below state of the art", because we do not yet win every metric, and we say so.
 
 ![A full-coverage survey: the rover (red) drives every lane, each probe updates the map, the hidden truth is on the right](docs/img/survey.gif)
 
@@ -108,23 +108,24 @@ Benchmarks have the same gap. The 2024 survey of informative path planning (Popo
 
 **On measured results.** Inside agribench we re-implemented the competitors' methods and ran them on the same fields, with the same probe, mapper, budget and deadline. Our entry has the highest overall score of all of them. That is a ranking by overall score; field-by-field significant wins over every baseline at once are rarer, as the next paragraph shows.
 
-agribench scores run from 0 (random) to 100 (oracle). Each run used its own fresh fields. The latest run includes the fix for repeat probes in the harsh world (below):
+agribench scores run from 0 (random) to 100 (oracle). Each run used its own fresh fields. The latest run is the first with DOV set up as its paper describes (below):
 
-| Strategy | Source | Latest run | Two earlier runs |
+| Strategy | Source | Latest run | Three earlier runs |
 |---|---|---|---|
-| **planned_survey (our entry)** | this project | **78.5** [95% CI 72.8, 83.3] | **75.8**, **73.9** |
-| spatial_coverage | Walvoort, Brus and de Gruijter, Computers & Geosciences 2010 | 58.2 | 60.7, 58.0 |
-| fixed_spacing (lawnmower) | the standard baseline | 52.3 | 53.8, 55.1 |
-| moisturemapper_a2 | MoistureMapper, IEEE CASE 2025 | 47.7 | 48.3, 45.3 |
-| moisturemapper_a1 | MoistureMapper, IEEE CASE 2025 | 45.2 | 44.7, 48.8 |
-| greedy_variance | Pulido Fentanes et al., JFR 2020 | 30.3 | 37.8, 32.1 |
-| mi_greedy | Krause, Singh and Guestrin, JMLR 2008 | 22.8 | 30.6, 25.8 |
+| **planned_survey (our entry)** | this project | **75.2** [95% CI 70.6, 80.7] | **78.5**, **75.8**, **73.9** |
+| spatial_coverage | Walvoort, Brus and de Gruijter, Computers & Geosciences 2010 | 59.7 | 58.2, 60.7, 58.0 |
+| fixed_spacing (lawnmower) | the standard baseline | 52.6 | 52.3, 53.8, 55.1 |
+| moisturemapper_a2 | MoistureMapper, IEEE CASE 2025 | 49.8 | 47.7, 48.3, 45.3 |
+| moisturemapper_a1 | MoistureMapper, IEEE CASE 2025 | 49.4 | 45.2, 44.7, 48.8 |
+| dov | Roberts-Elliott, Das and Cielniak, Robotics 2025 | 47.8 | not comparable (set up wrongly then) |
+| greedy_variance | Pulido Fentanes et al., JFR 2020 | 30.9 | 30.3, 37.8, 32.1 |
+| mi_greedy | Krause, Singh and Guestrin, JMLR 2008 | 29.1 | 22.8, 30.6, 25.8 |
 
-On the farmer's decision (dry-zone F1), our entry beats **every** baseline in all 8 tasks in the latest run (5 and 7 of 8 in the two earlier runs). These are statistically significant wins, field by field, with one-sided Wilcoxon tests and Holm correction. On map error (RMSE) and on map plus uncertainty (CRPS) it does not beat every baseline in any task: there it ties the best of them.
+On the farmer's decision (dry-zone F1), our entry beats **every** baseline in 7 of 8 tasks in the latest run (8, 5 and 7 of 8 in the three earlier runs). These are statistically significant wins, field by field, with one-sided Wilcoxon tests and Holm correction. On map error (RMSE) and on map plus uncertainty (CRPS) it does not beat every baseline in any task: there it ties the best of them.
 
-<sub>Honest scope of this claim: these are our re-implementations, run in our simulator, not the original authors' robots in their fields. Every world number is a placeholder until calibrated. DOV (Roberts-Elliott et al. 2025) is left out of this table on purpose: the paper places its distance-over-variance bid only on a shortlist of the most uncertain sites, while our version bids on every site, so the nearest site always wins and the rover crawls along one lane. Beating it means nothing until it is fixed.</sub>
+<sub>Honest scope of this claim: these are our re-implementations, run in our simulator, not the original authors' robots in their fields. Every world number is a placeholder until calibrated. DOV (Roberts-Elliott et al. 2025) is a multi-robot method run here by one rover: it bids on the 3 tasks that their 3-robot trials create each round, checked against their paper and code ([benchmarks/README.md §5](benchmarks/README.md)). Until 18 October 2026 our version bid on every site, so the rover crawled along one lane and scored −109 to −116; scores from those runs are not comparable.</sub>
 
-**In plain terms:** on map error our entry is as good as the best simple design (spatial coverage), not better. It is better at finding the dry zones: on all 8 tasks in the latest run, and on 5 to 7 in earlier ones. Unlike the simple designs, it plans to a deadline and waits out rain.
+**In plain terms:** on map error our entry is as good as the best simple design (spatial coverage), not better. It is better at finding the dry zones: on 7 of 8 tasks in the latest run, and on 5 to 8 in earlier ones. Unlike the simple designs, it plans to a deadline and waits out rain.
 
 ## Results
 
@@ -141,42 +142,43 @@ agribench (`agrisim suite`) has 8 frozen tasks:
 
 Each task has a deadline, so driving costs probes. Gates are decided on **fresh fields nobody has seen**, so nobody can tune to them: CI draws them from a hash of the commit, and a local run from a random key. Scores are compared field by field against the competition. The benchmark is designed to stay red until our entry is genuinely near the oracle. Protocol, rules and sources: [benchmarks/README.md](benchmarks/README.md).
 
-Latest full run (18 October 2026, commit `b78b3b0`, fields drawn from that commit): 15,232 surveys, 0 crashes, 0 plant contacts, 43 minutes on 8 workers.
+Latest full run (18 October 2026, commit `6690e33`, fields drawn from that commit): 15,232 surveys, 0 crashes, 0 plant contacts, 53 minutes on 8 workers.
 
 | Rank | Strategy | Score |
 |---|---|---|
-| ref. | oracle_rmse (knows the truth) | 97.0 |
-| **1** | **planned_survey (our entry)** | **78.5** [95% CI 72.8, 83.3] |
-| ref. | oracle_dry (knows the truth) | 66.8 |
-| 2 | spatial_coverage | 58.2 |
-| 3 | fixed_spacing | 52.3 |
-| 4 | fixed_plus_recheck (ours) | 52.0 |
-| 5 | moisturemapper_a2 | 47.7 |
-| 6 | moisturemapper_a1 | 45.2 |
-| 7 | greedy_variance (our first entry) | 30.3 |
-| 8 | recheck (ours) | 28.0 |
-| 9 | mi_greedy | 22.8 |
-| 10 | greedy_variance_per_cost (ours) | 13.7 |
-| 11 | random | 0.0 |
-| 12 | dov (set up wrongly, see above) | −109 |
+| ref. | oracle_rmse (knows the truth) | 97.9 |
+| **1** | **planned_survey (our entry)** | **75.2** [95% CI 70.6, 80.7] |
+| ref. | oracle_dry (knows the truth) | 68.4 |
+| 2 | spatial_coverage | 59.7 |
+| 3 | fixed_plus_recheck (ours) | 54.4 |
+| 4 | fixed_spacing | 52.6 |
+| 5 | moisturemapper_a2 | 49.8 |
+| 6 | moisturemapper_a1 | 49.4 |
+| 7 | dov | 47.8 |
+| 8 | greedy_variance (our first entry) | 30.9 |
+| 9 | mi_greedy | 29.1 |
+| 10 | recheck (ours) | 28.9 |
+| 11 | greedy_variance_per_cost (ours) | 18.8 |
+| 12 | random | 0.0 |
 
 Our entry per task (normalised score with 95% CI, 64 fresh fields per task). **Bold** means it beats every baseline:
 
 | Task | Map error (RMSE) | Map + uncertainty (CRPS) | Dry-zone F1 | Probes by deadline | Mission |
 |---|---|---|---|---|---|
-| demo_b30 | 57.0 [45.2, 68.6] | 106 [85.7, 138] | **78.5** [60.1, 96.4] | 30 of 30 | 17 min |
-| demo_b60 | 67.4 [56.5, 83.5] | 115 [89.9, 166] | **105** [87.3, 126] | 60 of 60 | 31 min |
-| v2_b30 | 47.8 [34.1, 58.9] | 87.2 [63.2, 109] | **62.6** [41.5, 83.6] | 30 of 30 | 27 min |
-| rain_b60 | 47.7 [39.7, 54.6] | 70.0 [57.5, 82.0] | **90.7** [70.6, 112] | 60 of 60 | 44 min |
-| drying_b60 | 64.8 [58.8, 70.6] | 95.5 [86.1, 107] | **94.6** [84.0, 107] | 60 of 60 | 30 min |
-| rough_b60 | 46.6 [36.6, 57.2] | 76.3 [59.3, 98.9] | **60.6** [43.7, 79.7] | 60 of 60 | 30 min |
-| large_b60 | 55.8 [43.0, 66.3] | 98.7 [76.1, 124] | **81.7** [61.7, 104] | 60 of 60 | 43 min |
-| harsh_b60 | 73.4 [55.3, 92.4] | 141 [102, 227] | **94.6** [71.4, 121] | 60 of 60 | 30 min |
+| demo_b30 | 54.7 [44.5, 64.0] | 102 [84.4, 126] | **72.8** [50.5, 97.0] | 30 of 30 | 16 min |
+| demo_b60 | 72.0 [65.4, 79.0] | 106 [94.9, 120] | **97.9** [85.7, 114] | 60 of 60 | 30 min |
+| v2_b30 | 46.0 [34.2, 57.2] | 111 [80.9, 167] | **68.6** [51.6, 87.5] | 30 of 30 | 26 min |
+| rain_b60 | 49.5 [38.9, 60.7] | 74.0 [56.0, 99.1] | **63.2** [41.3, 86.2] | 60 of 60 | 44 min |
+| drying_b60 | 62.9 [55.5, 70.0] | 95.1 [83.1, 109] | **96.0** [82.2, 111] | 60 of 60 | 30 min |
+| rough_b60 | 48.5 [36.9, 59.0] | 80.6 [59.6, 106] | **71.7** [50.5, 96.5] | 60 of 60 | 30 min |
+| large_b60 | 66.3 [60.2, 72.8] | 99.8 [88.4, 115] | **78.8** [64.4, 93.6] | 60 of 60 | 44 min |
+| harsh_b60 | 63.5 [53.2, 73.6] | 109 [89.4, 135] | 56.9 [39.3, 79.3] | 60 of 60 | 30 min |
 
 What this says:
-- **Dry zones: won on every task.** The last fifth of the budget, aimed at cells whose dry/not-dry call is in doubt, is what lifts dry-zone F1 above every baseline. The coverage route alone ties spatial coverage.
-- **The harsh world is won since a bug fix.** With positions logged 0.3 m off along the row, the planner used to decide which sites it had visited from the logged positions, so it went back to sites it had already probed. It now uses where the rover stood (commit `b78b3b0`). On the fixed public fields, harsh dry-zone F1 rose from 0.242 to 0.288, and map error did not change. Every other task gave exactly the same results as before.
-- **The overall result holds on new fields.** Three full runs on three different sets of fresh fields scored 73.9, 75.8 and 78.5. Our entry had the highest overall score each time. Single per-task wins near the threshold come and go between runs, which is why the gates never reuse fields.
+- **Dry zones: won on 7 of 8 tasks.** The last fifth of the budget, aimed at cells whose dry/not-dry call is in doubt, is what lifts dry-zone F1 above every baseline. The coverage route alone ties spatial coverage.
+- **The harsh world comes and goes.** With positions logged 0.3 m off along the row, the planner used to decide which sites it had visited from the logged positions, so it went back to sites it had already probed. It now uses where the rover stood (commit `b78b3b0`). On the fixed public fields, harsh dry-zone F1 rose from 0.242 to 0.288, and map error did not change. That won harsh dry-zone F1 in the previous run; on this run's fresh fields it is not won, against DOV or against 10 other baselines.
+- **DOV is now a real competitor, and it decides no gate on its own.** Set up as its paper describes, it scores 47.8, next to MoistureMapper. It maps well (CRPS 122 on `v2_b30`, above our 111) but drives about 1,200 m for 60 probes and ignores the deadline, so it takes only 43 to 54 of them in time. Wherever our entry does not beat DOV, it also does not beat some other baseline, so the gate count would be the same without it.
+- **The overall result holds on new fields.** Four full runs on four different sets of fresh fields scored 73.9, 75.8, 78.5 and 75.2. Our entry had the highest overall score each time. Single per-task wins near the threshold come and go between runs, which is why the gates never reuse fields.
 - **Map error ties the best simple design.** On RMSE and CRPS our entry beats no baseline significantly in any task. On soil that does not change, the evidence says this is close to the honest limit of the v1 fields (see [Where we can improve](#where-we-can-improve)).
 - **Every probe is taken before the deadline on every task.** In the rain task the rover waits out the shower instead of probing soil the rain is about to change.
 - **Against global accuracy levels**, the map's unbiased RMSE (ubRMSE) is within the SMAP satellite mission requirement (0.04) on all 8 tasks. RMSE reaches the factory-calibrated probe class (0.03) on `demo_b60`, `rain_b60` and `drying_b60`.
@@ -479,7 +481,7 @@ uv run pytest -q
 .\scripts\check_licenses.ps1
 ```
 
-There are 134 tests. They take about 2 minutes and need no network. They cover:
+There are 135 tests. They take about 2 minutes and need no network. They cover:
 - geometry validation;
 - field determinism;
 - the soil generator's correlation structure, checked against the exponential covariance;
@@ -494,7 +496,8 @@ There are 134 tests. They take about 2 minutes and need no network. They cover:
 - serial and parallel bench giving identical results;
 - clean CLI errors for bad configs, policies and benchmark reports;
 - Gymnasium's `check_env`;
-- an end-to-end train-and-eval smoke test.
+- an end-to-end train-and-eval smoke test;
+- the DOV baseline no longer crawling along one lane (it must drive far and beat random).
 
 For agribench they cover:
 - CRPS against its definition;
