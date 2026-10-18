@@ -176,6 +176,18 @@ def test_planned_survey_waits_out_the_rain() -> None:
     assert sum(r.t >= over for r in res.readings) >= 40  # spatial coverage: 15 of 60
 
 
+def test_dov_bids_only_on_the_most_uncertain_cells(cfg: SimConfig) -> None:
+    from agrisim.sim import run_survey
+
+    # Bidding on every site, the nearest one always won: it crawled along one lane (about 29 m
+    # for 30 probes) and mapped worse than random.
+    dov = [run_survey(cfg, s, "dov", budget=30) for s in range(3)]
+    rand = [run_survey(cfg, s, "random", budget=30) for s in range(3)]
+    assert min(r.run_metrics.path_length_m for r in dov) > 300  # 621 to 649 m
+    for d, r in zip(dov, rand, strict=True):  # 0.025 to 0.035 against 0.033 to 0.047
+        assert d.map_metrics.rmse < r.map_metrics.rmse
+
+
 def test_misclassification_gain_peaks_at_the_edge_of_a_dry_patch(cfg: SimConfig) -> None:
     from agrisim.policies import Context, acquisition
     from agrisim.sensor import ProbeReading

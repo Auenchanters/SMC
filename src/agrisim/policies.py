@@ -201,17 +201,52 @@ class MoistureMapper:
         return int(self.rng.choice(top))
 
 
-@dataclass(frozen=True)
 class DistanceOverVariance:
-    """Distance Over Variance bid (Roberts-Elliott, Das & Cielniak, Robotics 14(6):77, 2025):
-    the site with the least lane-graph distance per unit of kriging variance. The exact bid form
-    is unverified (research.md Section 11), so treat it as DOV-style."""
+    """Distance Over Variance with task dropping, their best map (DOVTD; Roberts-Elliott, Das &
+    Cielniak, Robotics 14(6):77, 2025, Sections 3.1-3.2, checked against their coordinator code).
 
-    cfg: SimConfig
+    The field is split into about 64 square cells from the north-west corner (their Eq. 1), and
+    each cell gets at most one task. Tasks go to the cells with the highest mean kriging
+    variance, at each one's highest-variance free site. A task under 0.75 x the median variance
+    is dropped and its cell spent (their code; the paper says the median). The rover takes the
+    task with the lowest bid, distance / variance. They create one task per robot each round;
+    for one rover that would leave the bid nothing to choose, so it bids on the 3 tasks of
+    their 3-robot trials. Distance runs along the lane graph (they used straight lines, which a
+    rover in rows cannot drive). Before any reading it probes where it stands, as they do.
+    """
+
+    SHORTLIST = 3  # tasks per round in their 3-robot trials
+    CELLS = 64  # sampling-grid cells in their trials
+
+    def __init__(self, cfg: SimConfig) -> None:
+        self.cfg = cfg
+        self._spent: set[int] = set()  # cells that have had their task
 
     def choose(self, ctx: Context) -> int:
-        d = np.maximum(ctx.graph.distances(ctx.position, ctx.sites), 1e-6)
-        return _best(uncertainty(self.cfg, ctx) / d, ctx.visited)
+        d = ctx.graph.distances(ctx.position, ctx.sites)
+        if not ctx.readings:
+            return _best(-d, ctx.visited)
+        f = self.cfg.field
+        s = math.sqrt(f.length_x * f.width_y / self.CELLS)
+        nx = math.ceil(f.length_x / s)
+        x, y = ctx.site_xy[:, 0], ctx.site_xy[:, 1]
+        cell = ((f.width_y - y) // s * nx + np.minimum(x // s, nx - 1)).astype(np.int64)
+        free = ~ctx.visited & ~np.isin(cell, list(self._spent))
+        if not free.any():  # every cell has had its task: start another pass
+            self._spent.clear()
+            free = ~ctx.visited
+        var = uncertainty(self.cfg, ctx)
+        mean = np.bincount(cell, var) / np.maximum(np.bincount(cell), 1)
+        open_cells = np.unique(cell[free])
+        top = open_cells[np.argsort(-mean[open_cells], kind="stable")[: self.SHORTLIST]]
+        tasks = np.array([_best(np.where(cell == c, var, -np.inf), ~free) for c in top])
+        keep = var[tasks] >= 0.75 * float(np.median(var[var > 0]))
+        self._spent.update(int(c) for c in top[~keep])
+        if keep.any():  # all dropped: bid on them anyway (their robots would idle instead)
+            tasks, top = tasks[keep], top[keep]
+        k = int(np.argmin(d[tasks] / np.maximum(var[tasks], 1e-12)))
+        self._spent.add(int(top[k]))
+        return int(tasks[k])
 
 
 @dataclass(frozen=True)
