@@ -328,8 +328,13 @@ def gate(
 
     if fail_on not in FAIL_ON:
         raise typer.BadParameter(f"use one of {sorted(FAIL_ON)}", param_hint="--fail-on")
-    status = json.loads(report.read_text(encoding="utf-8"))["status"]
-    typer.echo(STATUS_TEXT[status])
+    try:
+        status = json.loads(report.read_text(encoding="utf-8"))["status"]
+        text = STATUS_TEXT[status]
+    except (ValueError, TypeError, KeyError):  # bad JSON or not UTF-8, wrong shape, unknown status
+        msg = f"{report} is not an agrisim suite report.json (no known status)"
+        raise typer.BadParameter(msg, param_hint="REPORT") from None
+    typer.echo(text)
     if fails(status, fail_on):
         raise typer.Exit(1)
 

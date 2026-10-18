@@ -226,3 +226,38 @@ def test_19_busy_port_is_refused(tmp_path: Path) -> None:
         first.server_close()
     with socket.socket() as s:  # and the port is free again afterwards
         s.bind(("127.0.0.1", port))
+
+
+def test_review4_position_error_does_not_cause_repeat_probes() -> None:
+    # Visited sites came from the logged positions, which carry the positioning error, so with
+    # 0.3 m along the row spatial coverage and our entry probed the same site again.
+    exact = SimConfig.model_validate(demo())
+    noisy = SimConfig.model_validate(demo(rover__along_row_error_std=0.3))
+    a = run_survey(exact, 3, "spatial_coverage", budget=40)
+    b = run_survey(noisy, 3, "spatial_coverage", budget=40)
+    assert [r.x for r in a.readings] != [r.x for r in b.readings]  # the error is applied
+    assert [r.y for r in a.readings] == [r.y for r in b.readings]  # to the same probe sites
+    assert b.run_metrics.path_length_m == a.run_metrics.path_length_m
+
+
+def test_review4_small_field_with_more_sites_than_grid_points() -> None:
+    # k-means drew its first centres from the field's 0.5 m grid without replacement, so a budget
+    # above the number of grid points (50 here, against 142 sites) crashed both strategies.
+    cfg = SimConfig.model_validate(
+        demo(
+            field__length_x=5.0,
+            field__width_y=2.4,
+            field__headland=1.5,
+            survey__candidate_spacing=0.05,
+        )
+    )
+    for strategy in ("spatial_coverage", "planned_survey"):
+        assert len(run_survey(cfg, 0, strategy, budget=60).readings) == 60
+
+
+def test_review4_gate_reports_a_broken_report_cleanly(tmp_path: Path) -> None:
+    for i, text in enumerate((b'{"status": "fine"', b"[1, 2]", b'{"status": "nope"}', b"\xff")):
+        report = tmp_path / f"report{i}.json"
+        report.write_bytes(text)
+        code, out = cli("gate", str(report))
+        assert code == 2 and "not an agrisim suite report" in out, out

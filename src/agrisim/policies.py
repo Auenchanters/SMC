@@ -252,7 +252,7 @@ def coverage_sites(cfg: SimConfig, ctx: Context, k: int, rng: np.random.Generato
     f = cfg.field
     gx, gy = np.meshgrid(np.arange(0.25, f.length_x, 0.5), np.arange(0.25, f.width_y, 0.5))
     pts = np.column_stack([gx.ravel(), gy.ravel()])
-    k = min(k, int((~ctx.visited).sum()))
+    k = min(k, int((~ctx.visited).sum()), len(pts))  # a small field can have fewer grid points
     centres = pts[rng.choice(len(pts), k, replace=False)]
     for _ in range(30):  # Lloyd iterations
         label = np.linalg.norm(pts[:, None, :] - centres[None, :, :], axis=2).argmin(axis=1)
