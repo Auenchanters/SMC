@@ -132,12 +132,54 @@ uv run agrisim suite --write-lock
 - **The oracle is greedy and uses a GP surrogate**, so it is not an upper bound in the strict sense. If our entry passes it, raise the ceiling (non-myopic oracle) in v2.
 - **Positioning error is independent per reading.** Real GNSS error is correlated in time.
 - **Fresh fields from the commit SHA** can be computed once a commit exists, but tuning to them needs another commit, which changes them.
-- **Compute time is reported, not gated.** A strategy that is too slow for the rover's computer would still pass.
+- **Compute time is reported, not gated.** A strategy that is too slow for the rover's computer would still pass. `mi_greedy` is the slowest: 40 ms per probe on the demo field and 121 ms on the large one (fourth review), mostly one matrix inversion that grows with the cube of the number of sites.
+- **`dov` is set up wrongly.** Roberts-Elliott et al. place the distance-over-variance bid only on a shortlist of the most uncertain sites; ours bids on every site, so the nearest site always wins and the rover crawls along one lane (about 29 m for 30 probes). That is why it scores far below random, and beating it means nothing. Fixing it changes a v1 baseline, so it is a decision for the team (Decision Log).
 - **No zone-level irrigation metric yet** (WP9, water regret). `dry_f1` is cell-level.
 
 ## 9. Results
 
 Only from `agrisim suite` runs, latest first.
+
+### Repeat-probe fix (18 October 2026, commit `b78b3b0`)
+
+The fourth review found that, with positioning error on (`harsh`, 0.3 m along the row), the adaptive strategies decided which sites they had visited from the logged reading positions. A reading logged more than half a site spacing off marked the wrong site, so `planned_survey` and `spatial_coverage` went back to sites they had already probed. Visited now comes from where the rover stood, which the rover knows; no strategy sees anything new.
+
+Without positioning error the two are identical. The new `baseline.json` (recorded from this run) matches the old one on every public field of every task except `harsh_b60`. There, our entry's dry F1 on the 64 public fields rose from 0.242 to 0.288 on average, while RMSE and CRPS are unchanged on average. `baseline.json` was updated for that real improvement.
+
+Full tier, fresh key = the commit SHA `b78b3b020f1c4e6b45c757f36ef35c81c08b160c`: 15,232 surveys, 0 crashes, 0 plant contacts, 43 min on 8 workers.
+
+**Status: below state of the art.** Overall **78.5** [95% CI 72.8, 83.3]. Earlier fields, before the fix: 75.8 and 73.9.
+
+| strategy | score |
+|---|---|
+| oracle_rmse (reference) | 97.0 |
+| **our entry** | **78.5** |
+| oracle_dry (reference) | 66.8 |
+| spatial coverage | 58.2 |
+| lawnmower | 52.3 |
+| fixed_plus_recheck | 52.0 |
+| MoistureMapper A2 | 47.7 |
+| MoistureMapper A1 | 45.2 |
+| greedy_variance | 30.3 |
+| recheck | 28.0 |
+| mi_greedy | 22.8 |
+| greedy_variance_per_cost | 13.7 |
+| `dov` (set up wrongly, §8) | −109 |
+
+Our entry beats every baseline on 8 of 24 task metrics: `dry_f1` on all 8 tasks, including `harsh_b60` for the first time. It beats every baseline on no `rmse` or `crps`. It saturates 1 of 24: `crps` on `harsh_b60`.
+
+| task | rmse | crps | dry_f1 | probes by deadline | mission |
+|---|---|---|---|---|---|
+| demo_b30 | 57.0 [45.2, 68.6] | 106 [85.7, 138] | **78.5** [60.1, 96.4] | 30 of 30 | 17 min |
+| demo_b60 | 67.4 [56.5, 83.5] | 115 [89.9, 166] | **105** [87.3, 126] | 60 of 60 | 31 min |
+| v2_b30 | 47.8 [34.1, 58.9] | 87.2 [63.2, 109] | **62.6** [41.5, 83.6] | 30 of 30 | 27 min |
+| rain_b60 | 47.7 [39.7, 54.6] | 70.0 [57.5, 82.0] | **90.7** [70.6, 112] | 60 of 60 | 44 min |
+| drying_b60 | 64.8 [58.8, 70.6] | 95.5 [86.1, 107] | **94.6** [84.0, 107] | 60 of 60 | 30 min |
+| rough_b60 | 46.6 [36.6, 57.2] | 76.3 [59.3, 98.9] | **60.6** [43.7, 79.7] | 60 of 60 | 30 min |
+| large_b60 | 55.8 [43.0, 66.3] | 98.7 [76.1, 124] | **81.7** [61.7, 104] | 60 of 60 | 43 min |
+| harsh_b60 | 73.4 [55.3, 92.4] | 141 [102, 227] (saturated) | **94.6** [71.4, 121] | 60 of 60 | 30 min |
+
+The map's ubRMSE is within the SMAP requirement (0.04) on all 8 tasks. RMSE reaches 0.03 on `demo_b60`, `rain_b60` and `drying_b60`. The honest summary is unchanged: as good as the best simple design on map error, better on dry zones, and it handles deadlines and rain.
 
 ### Re-run from a fresh GitHub clone (17 October 2026, commit `a158688`)
 
