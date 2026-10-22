@@ -1,0 +1,13 @@
+Item,Category,Quantity,Estimated Unit Cost (USD),Total Cost (USD),Purpose
+Raspberry Pi 5 (8GB),Computing,1,80.00,80.00,Main onboard computer for navigation and data logging
+Official RPi 5 Power Supply,Power,1,15.00,15.00,Stable power delivery to avoid boot loops
+Active Cooler,Cooling,1,5.00,5.00,Prevent thermal throttling during AI inference
+Capacitive Soil Moisture Sensor v1.2,Sensors,3,4.00,12.00,Non-corrosive moisture probing (TDR-like)
+L298N Motor Driver,Actuators,1,7.00,7.00,Drive control for differential wheels
+Gear Motors (12V DC),Actuators,2,10.00,20.00,Locomotion for the rover chassis
+Rover Chassis Kit (Aluminum),Hardware,1,45.00,45.00,Physical frame and wheel mounts
+LiPo Battery (11.1V 2200mAh),Power,1,25.00,25.00,High-current power for motors
+LiPo Balance Charger,Power,1,20.00,20.00,Safe battery charging
+Jumper Wires & Breadboard,Electronics,1,10.00,10.00,Prototyping circuitry
+MicroSD Card (64GB Class 10),Storage,1,12.00,12.00,OS and data logging
+TOTAL,,, ,266.00,
