@@ -11,9 +11,10 @@ echo [2/3] Pulling Base Model...
 ollama pull qwen2.5:3b
 echo.
 echo [3/3] Creating Specialized AI Doctors...
-ollama create smc-brain -f models/Modelfile-final
-ollama create smc-edge-doctor -f models/Modelfile-edge-doctor
-ollama create smc-edge-specialist -f models/Modelfile-smc-final
+rem The Modelfiles live in the repository root, not in models\ (models\ holds the trained PPO policy).
+ollama create smc-brain -f Modelfile-final
+ollama create smc-edge-doctor -f Modelfile-edge-doctor
+ollama create smc-edge-specialist -f Modelfile-edge-specialist
 echo.
 echo ====================================================
 echo   SETUP COMPLETE!
