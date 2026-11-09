@@ -87,7 +87,7 @@ def map_now(
 ) -> tuple[FloatArray, FloatArray]:
     """The rover's map at time t from the readings so far (see weather.current_view)."""
     mapper = make_mapper(cfg.mapping)
-    for r in current_view(readings, cfg.weather, t, cfg.soil.vwc_clip):
+    for r in current_view(readings, cfg.weather, t, cfg.soil.vwc_clip, keep_failed=True):
         mapper.update(r)
     return mapper.estimate(grid)
 

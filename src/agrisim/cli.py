@@ -108,6 +108,10 @@ def run(
     view: Annotated[
         bool, typer.Option("--view", help="Replay the survey in 3D in your browser afterwards")
     ] = False,
+    scene: Annotated[
+        bool,
+        typer.Option("--scene", help="Write scene.json for the 3D replay, without serving it"),
+    ] = False,
 ) -> None:
     """Run one survey and write runs/<UTC timestamp>_seed<seed>/."""
     from agrisim.io import new_dir, run_dir_name, save_run
@@ -144,10 +148,11 @@ def run(
     typer.echo(f"lane coverage  {r.lane_coverage:.3f}")
     typer.echo(f"plant contacts {r.plant_contacts}")
     typer.echo("Note: soil and probe parameters are placeholders until calibrated.")
-    if view:
+    if scene or view:
         from agrisim.view3d import write_scene
 
         write_scene(result, out_dir)
+    if view:
         _serve(out_dir, True, 0)
 
 

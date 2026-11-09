@@ -1,0 +1,15 @@
+# Welcome to your AgriRover Mission Package
+    
+## Mission Overview
+- Strategy: spatial_coverage
+- Budget: 52 probes
+- Config: configs/demo.yaml
+
+## Contents
+- **executive_report.md**: The AI-generated agronomist debrief. Open this first.
+- **scene.json**: 3D Scene data. Load this into the AgriSim Viewer to see the rover's path.
+- **metrics.json**: Raw performance data.
+- **probes.csv**: Precise coordinates and readings of every probe.
+
+## How to view in 3D
+Run: `uv run python src/agrisim/cli.py view --scene C:\Users\Lenovo\Downloads\SMC-main\SMC-main\mission_packages\Mission_20261031T163618Z_seed42_2/scene.json`

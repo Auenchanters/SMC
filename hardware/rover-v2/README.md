@@ -1,6 +1,6 @@
 # AgriRover v2 hardware
 
-The redesigned rover: a rocker-differential chassis on hub-motor wheels, with an open tool bay between the axles for the soil probe, a LiFePO4 battery with a designed BMS, and probe cleaning that never needs a person. Why each choice was made, from the physics: [DESIGN.md](DESIGN.md). Every computed number: [CALCULATIONS.md](CALCULATIONS.md). It replaces [v1](../rover-v1/), which is kept for reference.
+The redesigned rover: a rocker-differential chassis on hub-motor wheels, with an open tool bay between the axles for the soil probe, a LiFePO4 battery with a designed BMS, and probe cleaning that never needs a person. Why each choice was made, from the physics: [DESIGN.md](DESIGN.md). Every computed number: [CALCULATIONS.md](CALCULATIONS.md). What the software needs the robot to deliver, what is still undesigned, and the order to build and bench-test it: [BUILD_BRIEF.md](BUILD_BRIEF.md) — read that first if nothing is built yet. It replaces [v1](../rover-v1/), which is kept for reference.
 
 | | |
 |---|---|

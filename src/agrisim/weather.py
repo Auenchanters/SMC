@@ -103,9 +103,16 @@ def current_view(
     cfg: WeatherConfig | None,
     now: float,
     clip: tuple[float, float],
+    *,
+    keep_failed: bool = False,
 ) -> list[ProbeReading]:
-    """The readings as the rover uses them at time `now`: failed ones dropped, each one replaced by
-    a newer valid reading within SUPERSEDE_RADIUS, the rest brought forward to `now`."""
+    """The readings as the rover uses them at time `now`: each valid one replaced by a newer valid
+    reading within SUPERSEDE_RADIUS, the rest brought forward to `now`.
+
+    Failed readings are dropped unless `keep_failed`, which mappers need: a failed insertion is
+    a censored sample ("drier than the threshold"), not an absence of information. Anything that
+    counts probes must leave the flag off.
+    """
     valid = [r for r in readings if r.valid and r.value is not None]
     out = []
     for i, r in enumerate(valid):
@@ -114,4 +121,6 @@ def current_view(
         if cfg is not None and r.value is not None:
             r = dataclasses.replace(r, value=bring_forward(cfg, r.value, r.t, now, clip))
         out.append(r)
+    if keep_failed:
+        out.extend(r for r in readings if not r.valid)
     return out

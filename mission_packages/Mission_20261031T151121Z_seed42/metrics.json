@@ -1,0 +1,48 @@
+{
+  "seed": 42,
+  "policy": "moisture_seeker",
+  "map": {
+    "rmse": 0.039546098616177895,
+    "mae": 0.03100740104237898,
+    "r2": 0.36443906173628426,
+    "dry_precision": null,
+    "dry_recall": 0.0,
+    "dry_f1": null,
+    "calibration_95": 0.9745833333333334,
+    "truth_dry_fraction": 0.042916666666666665
+  },
+  "run": {
+    "probes_used": 30,
+    "valid_probes": 30,
+    "path_length_m": 708.3080913757489,
+    "mission_time_s": 1843.5999999999985,
+    "lane_coverage": 0.42326512455516013,
+    "plant_contacts": 0
+  },
+  "soil": {
+    "corr_length_m": 15.622251058699746,
+    "anomalies": [
+      {
+        "kind": "dry",
+        "x": 28.779571813443226,
+        "y": 8.492730426239143,
+        "radius": 1.151189148961475,
+        "amplitude": -0.08
+      },
+      {
+        "kind": "dry",
+        "x": 11.429645444578778,
+        "y": 1.0063028846840227,
+        "radius": 1.0946791432278187,
+        "amplitude": -0.08
+      },
+      {
+        "kind": "dry",
+        "x": 24.34021778705062,
+        "y": 18.262190855565898,
+        "radius": 1.1340995538515806,
+        "amplitude": -0.08
+      }
+    ]
+  }
+}

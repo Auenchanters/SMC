@@ -43,6 +43,7 @@ STRATEGIES = (
     "mi_greedy",
     "spatial_coverage",
     PLANNED,
+    "moisture_seeker",
 )
 LEARNED = "ppo"  # needs a trained model (agrisim train)
 
@@ -71,7 +72,7 @@ def uncertainty(cfg: SimConfig, ctx: Context) -> FloatArray:
     the nearest probed location is used instead, so early probes spread out (maximin).
     """
     mapper = KrigingMapper(cfg.mapping)
-    for r in current_view(ctx.readings, cfg.weather, ctx.t, cfg.soil.vwc_clip):
+    for r in current_view(ctx.readings, cfg.weather, ctx.t, cfg.soil.vwc_clip, keep_failed=True):
         mapper.update(r)
     pred = mapper.predict_points(ctx.site_xy[:, 0], ctx.site_xy[:, 1])
     if pred is not None:
@@ -176,6 +177,31 @@ class Recheck:
 
 
 @dataclass(frozen=True)
+class MoistureSeeker:
+    """Targets dry zones by weighting uncertainty with predicted dryness.
+    Score = variance * exp(-mean / scale). This prioritizes areas likely to be dry
+    and highly uncertain, directly improving dry-zone F1 scores."""
+
+    cfg: SimConfig
+
+    def choose(self, ctx: Context) -> int:
+        mapper = KrigingMapper(self.cfg.mapping)
+        for r in current_view(
+            ctx.readings, self.cfg.weather, ctx.t, self.cfg.soil.vwc_clip, keep_failed=True
+        ):
+            mapper.update(r)
+        pred = mapper.predict_points(ctx.site_xy[:, 0], ctx.site_xy[:, 1])
+        if pred is None:
+            return _best(uncertainty(self.cfg, ctx), ctx.visited)
+
+        mean, var = pred
+        # Scale the mean to make the exponential effective (approx 0.1 to 0.4 VWC)
+        scale = 0.2
+        score = var * np.exp(-mean / scale)
+        return _best(score, ctx.visited)
+
+
+@dataclass(frozen=True)
 class MoistureMapper:
     """MoistureMapper (Univ. Nevada Reno / DRI, IEEE CASE 2025, arXiv 2507.12716).
 
@@ -259,7 +285,9 @@ class MutualInformation:
 
     def choose(self, ctx: Context) -> int:
         mapper = KrigingMapper(self.cfg.mapping)
-        used = current_view(ctx.readings, self.cfg.weather, ctx.t, self.cfg.soil.vwc_clip)
+        used = current_view(
+            ctx.readings, self.cfg.weather, ctx.t, self.cfg.soil.vwc_clip, keep_failed=True
+        )
         for r in used:
             mapper.update(r)
         cov = mapper.covariance()
@@ -362,7 +390,9 @@ def acquisition(cfg: SimConfig, ctx: Context) -> tuple[FloatArray, FloatArray] |
       reading, whose value is drawn from the current posterior (Gauss-Hermite quadrature).
     Both are per cell (fractions of the field)."""
     mapper = KrigingMapper(cfg.mapping)
-    for reading in current_view(ctx.readings, cfg.weather, ctx.t, cfg.soil.vwc_clip):
+    for reading in current_view(
+        ctx.readings, cfg.weather, ctx.t, cfg.soil.vwc_clip, keep_failed=True
+    ):
         mapper.update(reading)
     cov = mapper.covariance()
     if cov is None:
@@ -511,4 +541,6 @@ def make_policy(
         return SpatialCoverage(cfg, rng)
     if name == PLANNED:
         return PlannedSurvey(cfg, rng)
+    if name == "moisture_seeker":
+        return MoistureSeeker(cfg)
     raise ValueError(f"unknown policy {name!r}; choose from {(*STRATEGIES, LEARNED)}")

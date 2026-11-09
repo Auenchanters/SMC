@@ -173,12 +173,28 @@ class WeatherConfig(_Model):
     rain: tuple[RainEvent, ...] = ()
 
 
+class CensoredConfig(_Model):
+    """Read a failed insertion as a censored sample: "drier than `threshold`".
+
+    A probe that will not go in says something about the soil even though it returns no value,
+    and in hard soil it is the dry spots that fail (research.md WP4). The mapper places such a
+    reading at the truncated-normal mean of the soil moisture below `threshold`, given the
+    readings so far.
+    """
+
+    threshold: float = Field(gt=0.0)  # VWC at which insertion gets hard (`hard_soil.hard_below`)
+    min_readings: PositiveInt = 3  # valid readings needed before the prior mean and sd are used
+    sigma_floor: PositiveFloat = 0.01  # VWC; keeps the truncated-normal formula finite
+
+
 class MappingConfig(_Model):
     method: Literal["ordinary_kriging", "idw", "global_mean"]
     variogram_model: Literal["linear", "power", "gaussian", "spherical", "exponential"]
     output_resolution: PositiveFloat
     dry_threshold: float
     min_readings: PositiveInt = 5
+    # None (the default) keeps every earlier run byte-identical: failed probes are ignored.
+    censored: CensoredConfig | None = None
 
 
 class SimConfig(_Model):

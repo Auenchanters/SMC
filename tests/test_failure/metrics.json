@@ -1,0 +1,1 @@
+{"map": {"rmse": 0.02, "dry_f1": 0.9, "dry_recall": 0.8, "calibration_95": 0.99, "truth_dry_fraction": 0.05}, "run": {"mission_time_s": 1200, "path_length_m": 150, "plant_contacts": 2}, "policy": "moisture_seeker"}

@@ -1,6 +1,7 @@
 """Map reconstruction from probe readings. Mappers never see the ground truth."""
 
 import logging
+import math
 import warnings
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -10,7 +11,7 @@ import numpy as np
 import numpy.typing as npt
 from pykrige.ok import OrdinaryKriging
 
-from agrisim.config import FieldConfig, MappingConfig
+from agrisim.config import CensoredConfig, FieldConfig, MappingConfig
 from agrisim.sensor import ProbeReading
 
 FloatArray = npt.NDArray[np.float64]
@@ -48,14 +49,40 @@ class Mapper(Protocol):
 
 
 class _Readings:
-    """Keeps the valid readings; invalid (failed) probes are ignored."""
+    """Keeps the valid readings; failed probes are ignored unless censoring is enabled."""
 
-    def __init__(self) -> None:
+    def __init__(self, censored: CensoredConfig | None = None) -> None:
         self._xyz: list[tuple[float, float, float]] = []
+        self._censored = censored
 
     def update(self, reading: ProbeReading) -> None:
         if reading.valid and reading.value is not None:
             self._xyz.append((reading.x, reading.y, reading.value))
+        elif self._censored is not None:
+            self._xyz.append((reading.x, reading.y, self._censored_value()))
+
+    def _censored_value(self) -> float:
+        """E[theta | theta < threshold] for a normal prior fitted to the readings so far.
+
+        A failed insertion is evidence of dry, hard soil, so the reading is placed at the
+        truncated-normal mean below the threshold (research.md WP4). With too few readings to
+        fit a prior, the threshold less one sigma is used instead.
+        """
+        c = self._censored
+        if c is None:  # pragma: no cover - callers check first
+            raise ValueError("censoring is not enabled")
+        z = np.array([value for _, _, value in self._xyz], dtype=np.float64)
+        if len(z) < c.min_readings:
+            return float(c.threshold - c.sigma_floor)
+        mu = float(z.mean())
+        sd = max(float(z.std(ddof=1)), c.sigma_floor)
+        alpha = (c.threshold - mu) / sd
+        pdf = math.exp(-0.5 * alpha * alpha) / math.sqrt(2.0 * math.pi)
+        cdf = 0.5 * (1.0 + math.erf(alpha / math.sqrt(2.0)))
+        if cdf < 1e-9:  # "drier than the threshold" is all but impossible a priori
+            return float(min(mu, math.nextafter(c.threshold, 0.0)))
+        # Strictly below the threshold: the reading says "drier than this", never equal to it.
+        return float(min(mu - sd * pdf / cdf, math.nextafter(c.threshold, 0.0)))
 
     @property
     def xyz(self) -> FloatArray:
@@ -105,7 +132,7 @@ class KrigingMapper(_Readings):
     """
 
     def __init__(self, cfg: MappingConfig) -> None:
-        super().__init__()
+        super().__init__(cfg.censored)
         self.cfg = cfg
 
     def _fit(self) -> OrdinaryKriging | None:

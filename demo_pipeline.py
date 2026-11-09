@@ -1,64 +1,92 @@
-import subprocess
+"""One-command demo: survey, AI debrief, then the report and the 3D replay.
+
+The simulator runs with `--scene` (write scene.json and exit) rather than `--view`, because
+`--view` serves a web page until Ctrl+C and would never return to this script.
+"""
+
 import os
+import re
+import subprocess
+import sys
 from pathlib import Path
-import webbrowser
-import time
 
 # CONFIGURATION
-RUN_DIR = "runs/demo_pitch_run"
 CONFIG_FILE = "configs/demo.yaml"
-MODEL_NAME = "qwen2.5:1.5b" # Change to qwen2.5:7b if you have it
+MODEL_NAME = "qwen2.5:1.5b"  # Change to qwen2.5:7b if you have it
+ADVISOR = "scripts/agri_advisor.py"
+CLI = "src/agrisim/cli.py"
 
-def run_cmd(cmd, description):
+
+def run_cmd(cmd: list[str], description: str) -> str | None:
+    """Run a command to completion and return its stdout, or None if it failed."""
     print(f"\n[Step] {description}...")
-    process = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+    process = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8")
     if process.returncode != 0:
-        print(f"Error during {description}: {process.stderr}")
-        return False
+        print(f"Error during {description}:\n{process.stderr}")
+        return None
+    if process.stdout:
+        print(process.stdout)
     print(f"Done: {description}")
-    return True
+    return process.stdout
 
-def main():
-    print("====================================================")
+
+def main() -> int:
+    print("================================================")
     print("🌱 AGRISIM: AI-DRIVEN MISSION PROTOTYPE DEMO")
-    print("====================================================\n")
+    print("================================================\n")
 
-    # 1. Run Simulation
-    # We use a fixed seed for a consistent demo
-    sim_cmd = f"uv run agrisim run --config {CONFIG_FILE} --seed 7 --view"
-    if not run_cmd(sim_cmd, "Simulating Rover Mission"):
-        return
+    # 1. Run the simulation (fixed seed for a consistent demo)
+    output = run_cmd(
+        [
+            "uv",
+            "run",
+            "python",
+            CLI,
+            "run",
+            "--config",
+            CONFIG_FILE,
+            "--seed",
+            "7",
+            "--scene",
+        ],
+        "Simulating Rover Mission",
+    )
+    if output is None:
+        return 1
+    match = re.search(r"run folder\s+([^\r\n]+)", output)
+    if not match:
+        print("Could not determine the run folder from the simulator output.")
+        return 1
+    run_dir = Path(match.group(1).strip()).resolve()
+    print(f"Mission Data Saved to: {run_dir}")
 
-    # Find the run folder that was just created
-    runs_dir = Path("runs")
-    latest_run = sorted(runs_dir.glob("2026*"), key=os.path.getmtime)[-1]
-    print(f"Mission Data Saved to: {latest_run}")
+    # 2. Run AI analysis
+    if (
+        run_cmd(
+            ["uv", "run", "python", ADVISOR, str(run_dir), "--model", MODEL_NAME],
+            "Generating AI Agronomist Debrief",
+        )
+        is None
+    ):
+        return 1
 
-    # 2. Run AI Analysis
-    # This uses the script we just built
-    analysis_cmd = f"uv run python scripts/agri_advisor.py {latest_run} --model {MODEL_NAME}"
-    if not run_cmd(analysis_cmd, "Generating AI Agronomist Debrief"):
-        return
-
-    # 3. Open the Results
-    print("\n====================================================")
+    print("\n================================================")
     print("🚀 DEMO COMPLETE")
-    print("====================================================")
-    
-    # Open the AI Report
-    report_path = latest_run / "debrief.md"
-    if report_path.exists():
-        print(f"Opening AI Report: {report_path}")
-        # This opens the file in the default text editor/browser
-        os.startfile(report_path) 
+    print("================================================")
 
-    # Open the 3D Replay (usually starts a local server)
-    print("Opening 3D Mission Replay in browser...")
-    # We assume agrisim view was triggered or we can trigger it now
-    view_cmd = f"uv run agrisim view {latest_run}"
-    subprocess.Popen(view_cmd, shell=True)
-    
-    print("\nPRO TIP: Show the 'debrief.md' first, then the 3D Replay to prove the AI is correct.")
+    report_path = run_dir / "debrief.md"
+    if report_path.is_file():
+        print(f"Opening AI Report: {report_path}")
+        if sys.platform == "win32":
+            os.startfile(report_path)
+
+    # 3. Start the 3D replay in the background; it serves until the user stops it.
+    print("Starting 3D Mission Replay...")
+    subprocess.Popen(["uv", "run", "python", CLI, "view", str(run_dir)])
+
+    print("\nPRO TIP: Show the debrief first, then the 3D replay to show the AI is correct.")
+    return 0
+
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

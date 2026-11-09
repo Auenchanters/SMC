@@ -45,6 +45,7 @@ agrisim is a pure-Python simulator of a planted tomato field. A small differenti
 - [What a run produces](#what-a-run-produces)
 - [Testing](#testing)
 - [Regenerating the images and video](#regenerating-the-images-and-video)
+- [AI mission debrief (local extension)](#ai-mission-debrief-local-extension)
 - [Optional: NVIDIA GPU](#optional-nvidia-gpu)
 - [Project structure](#project-structure)
 - [Handover](#handover)
@@ -287,7 +288,7 @@ Our known weaknesses, with evidence. The full list, with severity and fixes, is 
 
 ## Future scope
 
-The detailed plan, with evidence and "done when" criteria for each item, is in **[docs/FUTURE_SCOPE.md](docs/FUTURE_SCOPE.md)**. In short:
+The research plan, with evidence and "done when" criteria for each item, is in **[docs/FUTURE_SCOPE.md](docs/FUTURE_SCOPE.md)**. The software needed to take this from a simulator to a system that surveys a real farm (data store, real-reading ingest, probe calibration, rover link, LLM service, sync, irrigation plan) is ordered in **[docs/PRODUCTION_PLAN.md](docs/PRODUCTION_PLAN.md)**. In short:
 
 1. **Win the remaining gates:** censored readings for hard soil, row-aware mapping, lookahead under a time budget.
 2. **Ground the simulator in real data:** calibrate on the public Cook Agronomy Farm network, then on one drip-irrigated tomato plot of our own, then add a real-data track to agribench.
@@ -313,7 +314,7 @@ Per mission, from one config file and one integer seed:
    - a trained PPO policy.
 4. **Drive there safely.** Paths use only lane and headland centrelines ([planning.py](src/agrisim/planning.py)). The rover turns in place in headlands, follows lanes with pure pursuit, and **reverses** instead of making a U-turn inside a lane ([control.py](src/agrisim/control.py)). Every pose is checked against every nearby canopy ([safety.py](src/agrisim/safety.py)).
 5. **Probe.** The reading is the footprint average plus bias, Gaussian noise and quantisation. Probes sometimes fail, more often in hard dry soil when that is switched on ([sensor.py](src/agrisim/sensor.py)).
-6. **Map.** Ordinary kriging with a fitted variogram gives a mean map and a variance map. With too few readings it falls back to the field average; it never crashes ([mapping.py](src/agrisim/mapping.py)).
+6. **Map.** Ordinary kriging with a fitted variogram gives a mean map and a variance map. With too few readings it falls back to the field average; it never crashes ([mapping.py](src/agrisim/mapping.py)). An optional `mapping.censored` block reads a failed insertion as a censored sample, "drier than this threshold", instead of dropping it ([example](configs/scenarios/censored_hard_soil.yaml)); it is off by default, so no earlier result changes.
 7. **Score.** The metrics are ([metrics.py](src/agrisim/metrics.py)):
    - RMSE, MAE and R²;
    - CRPS;
@@ -545,6 +546,21 @@ It re-runs seed 7 and writes:
 It draws `results.png` from the newest `runs/eval_*/results.csv`, or from a file you pass with `--results <file>`. Without `--model`, the PPO panel is skipped. It takes about 8 minutes, mostly frame rendering. [architecture.svg](docs/img/architecture.svg) is edited by hand.
 
 The two videos and the 3D replay screenshots (`viewer3d*.jpg`) are made by [scripts/demo_video/](scripts/demo_video/README.md): a local voice, real commands, and the replay driven with real input in headless Chrome.
+
+## AI mission debrief (local extension)
+
+This working copy adds an AI layer on top of the simulator. Nothing in `src/agrisim` imports it, so the core results and gates above are unaffected.
+
+```powershell
+uv run python scripts/mission_manager.py --config configs/demo.yaml --budget 60 --strategy moisture_seeker --model smc-brain
+uv run streamlit run app.py
+```
+
+It needs a local Ollama serving one of the `smc-*` models (the `Modelfile*` files in the repository root build them; `ollama list` shows what is pulled), reached through the OpenAI-compatible endpoint at `http://localhost:11434/v1`.
+
+The division of work matters. `metrics.json` decides the verdict (SUCCESS, PARTIAL or FAIL) and supplies every number; `scripts/agri_advisor.py` checks the model's prose against it; only the narrative is generated. A report that claims a plant contact when `plant_contacts` is 0, or invents a duration, is rewritten once and then flagged at the end of the file rather than trusted.
+
+Each mission writes `mission_packages/Mission_<run>/` with the debrief, `metrics.json`, `probes.csv`, `scene.json` and `START_HERE.txt`. Replay it with `uv run agrisim view <package folder>`; add `--scene` to `agrisim run` to write `scene.json` without starting the viewer.
 
 ## Optional: NVIDIA GPU
 

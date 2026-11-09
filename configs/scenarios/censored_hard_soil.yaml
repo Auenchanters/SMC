@@ -1,0 +1,10 @@
+# The harsh agribench world with failed insertions mapped as censored samples:
+# "the soil here is drier than 0.20 VWC" instead of "no information".
+# Compare with benchmarks/v1/worlds/harsh.yaml (same fields, censoring off).
+extends: ../../benchmarks/v1/worlds/harsh.yaml
+
+mapping:
+  censored:
+    threshold: 0.20        # PLACEHOLDER: calibrate (should equal probe.hard_soil.hard_below)
+    min_readings: 3        # valid readings needed before the prior mean and sd are used
+    sigma_floor: 0.01      # PLACEHOLDER: calibrate (VWC)

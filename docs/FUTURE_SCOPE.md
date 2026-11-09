@@ -2,6 +2,8 @@
 
 What agrisim can become, in the order we would build it. Each item says why it matters (with the evidence), what to build, and how we would know it worked. The README gives the summary; this file is the detail.
 
+This file assumes the benchmark is the vehicle. If the goal is different — **put the robot on a real farm, store what it measures, and hand the farmer a plan** — the prerequisite software (store, ingest, calibration, rover link, LLM service) is sequenced in [PRODUCTION_PLAN.md](PRODUCTION_PLAN.md), and its phases 0 to 3 must exist before most items below can be measured on real data.
+
 Sources:
 - [research.md](../research.md): competitors, papers, our known flaws and work packages WP1 to WP12, with every claim tagged [V] verified, [S] simulated, [P] proposal.
 - [benchmarks/README.md](../benchmarks/README.md): agribench and its results.

@@ -14,3 +14,8 @@ build/
 # anatomy (MIT, github.com/wheresryan22/anatomy), install per hardware/rover-v1/README.md;
 # brag, genjutsu, dembrandt-skills, awwwards-mcp (all MIT), install per scripts/demo_video/README.md
 .claude/skills/
+
+# Regenerated CI outputs that get rebuilt by the workflows — keep out so the repo
+# ships source + committed renderer outputs only, not CI rebuild working copies.
+benchmarks_output/
+.benchmarks_cache/

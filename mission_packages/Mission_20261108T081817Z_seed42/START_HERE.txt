@@ -1,0 +1,17 @@
+# Welcome to your AgriRover Mission Package
+
+## Mission Overview
+- Strategy: moisture_seeker
+- Budget: 60 probes
+- Config: configs/demo.yaml
+
+## Contents
+- **executive_report.md**: The AI-generated agronomist debrief. Open this first.
+- **scene.json**: 3D scene data for the replay viewer.
+- **metrics.json**: Raw performance data.
+- **probes.csv**: Precise coordinates and readings of every probe.
+
+## How to view in 3D
+Run: `uv run agrisim view "C:\Users\Lenovo\Downloads\SMC-main\SMC-main\mission_packages\Mission_20261108T081817Z_seed42"`
+
+The viewer serves the page at http://127.0.0.1:<port>/ and stays up until you press Ctrl+C.
