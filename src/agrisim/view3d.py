@@ -23,6 +23,7 @@ from agrisim.sim import map_now
 from agrisim.weather import rain_mm
 
 if TYPE_CHECKING:
+    from agrisim.config import SimConfig
     from agrisim.sim import RunResult
 
 VIEWER = Path(__file__).resolve().parent / "viewer3d"
@@ -106,6 +107,7 @@ def scene_dict(result: "RunResult") -> dict[str, Any]:
         "truth": _milli(result.truth_grid),  # at the end of the mission
         "truth_k": truth_k if cfg.weather else None,
         "rain": [e.model_dump() for e in cfg.weather.rain] if cfg.weather else [],
+        "physics": _physics(cfg, result, [0.0, *(r.t for r in readings)]),
         "estimate": est,  # estimate[k] = map after k readings
         "sd": sd,  # kriging standard deviation after k readings (None where undefined)
         "rmse": rmse,
@@ -114,6 +116,36 @@ def scene_dict(result: "RunResult") -> dict[str, Any]:
             {"t": round(float(result.times[c.step]), 2), "x": c.x, "y": c.y}
             for c in result.contacts
         ],
+    }
+
+
+def _physics(cfg: "SimConfig", result: "RunResult", times: list[float]) -> dict[str, Any] | None:
+    """The physical soil model's numbers for the page: the soil, the drip runs, and the field's
+    real state at each reading (mean moisture, share too dry, drying rate)."""
+    w = cfg.weather
+    if w is None or w.physical is None:
+        return None
+    p = w.physical
+    wp, fc = p.limits()
+    ts, ks, _, _ = p.hydraulics()
+    mean, dry = [], []
+    for t in times:
+        g = truth_on_grid(result.truth_at(t), result.grid)
+        mean.append(round(float(g.mean()), 4))
+        dry.append(round(float((g < cfg.mapping.dry_threshold).mean()), 4))
+    return {
+        "texture": p.texture.replace("_", " "),
+        "porosity": round(ts, 3),
+        "field_capacity": round(fc, 3),
+        "wilting_point": round(wp, 3),
+        "ks_mm_per_h": round(ks, 2),
+        "start_hour": p.start_hour,
+        "et0_mm_per_day": p.et0_mm_per_day,
+        "kc": p.crop_coefficient,
+        "diurnal": p.diurnal,
+        "irrigation": [e.model_dump() for e in p.irrigation],
+        "mean_k": mean,
+        "dry_k": dry,
     }
 
 

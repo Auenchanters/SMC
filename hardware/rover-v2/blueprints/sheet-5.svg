@@ -1,0 +1,209 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 297" width="420mm" height="297mm" font-family="'Courier New', Courier, monospace">
+<title>AgriRover v2 blueprint, sheet 5: Field envelope and service</title>
+<defs>
+  <marker id="arr" viewBox="0 0 6 6" refX="3" refY="3" markerWidth="4" markerHeight="4" orient="auto-start-reverse"><path d="M0 0L6 3L0 6Z" fill="#dfeaff"/></marker>
+  <marker id="flow" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L6 3L0 6Z" fill="#ffffff"/></marker>
+  <pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M10 0H0V10" fill="none" stroke="#3a67a8" stroke-width="0.12"/></pattern>
+  <pattern id="hatch" width="2.4" height="2.4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="2.4" stroke="#8fb2e6" stroke-width="0.25"/></pattern>
+</defs>
+<style>
+  .part { fill: #1f4f95; stroke: #ffffff; stroke-width: 0.26; }
+  .hi { fill: #2b65b8; stroke: #ffffff; stroke-width: 0.34; }
+  .phantom { fill: none; stroke: #b9d0f5; stroke-width: 0.2; stroke-dasharray: 3 1 0.6 1; }
+  .ground { stroke: #ffffff; stroke-width: 0.4; } .soil { fill: url(#hatch); stroke: none; }
+  .centre { stroke: #9dbcec; stroke-width: 0.15; stroke-dasharray: 5 1.2 1 1.2; }
+  .dim line { stroke: #dfeaff; stroke-width: 0.16; } .dim text { font-size: 2.7px; fill: #ffffff; }
+  .balloon line { stroke: #dfeaff; stroke-width: 0.16; } .balloon circle { fill: #1a478a; stroke: #ffffff; stroke-width: 0.22; }
+  .balloon .dot { fill: #ffffff; } .balloon text { font-size: 2.8px; fill: #ffffff; font-weight: bold; }
+  text { font-size: 2.5px; fill: #eaf2ff; }
+  .vtitle { font-size: 3.2px; font-weight: bold; letter-spacing: 0.3px; fill: #ffffff; }
+  .ttitle { font-size: 3px; font-weight: bold; fill: #ffffff; letter-spacing: 0.3px; }
+  .th { font-size: 2.5px; font-weight: bold; fill: #ffffff; } .td { font-size: 2.45px; fill: #eaf2ff; }
+  .rule { stroke: #dfeaff; stroke-width: 0.2; } .box { fill: none; stroke: #dfeaff; stroke-width: 0.2; }
+  .frame { fill: none; stroke: #ffffff; stroke-width: 0.5; } .frame2 { fill: none; stroke: #ffffff; stroke-width: 0.2; }
+  .big { font-size: 5px; font-weight: bold; fill: #ffffff; letter-spacing: 0.5px; }
+  .node { fill: #1f4f95; stroke: #ffffff; stroke-width: 0.3; } .nodeh { fill: #2b65b8; stroke: #ffffff; stroke-width: 0.4; }
+  .wire { stroke: #ffffff; stroke-width: 0.3; fill: none; } .bus { stroke: #9dd5ff; stroke-width: 0.3; fill: none; stroke-dasharray: 1.6 0.8; }
+  .plant { fill: #2d6e63; fill-opacity: 0.55; stroke: #bff0d8; stroke-width: 0.25; } .stem { stroke: #bff0d8; stroke-width: 0.5; }
+  .ntxt { font-size: 2.5px; fill: #ffffff; } .nsub { font-size: 2.1px; fill: #cfe0fb; }
+</style>
+<rect width="420" height="297" fill="#17407f"/>
+<rect x="8" y="8" width="404" height="281" fill="url(#grid)"/>
+<rect class="frame" x="8" y="8" width="404" height="281"/>
+<rect class="frame2" x="10" y="10" width="400" height="277"/>
+<rect class="soil" x="27.86" y="196" width="234.29" height="15.71"/><line class="ground" x1="27.86" y1="196" x2="262.14" y2="196"/>
+<rect x="144.14" y="138.86" width="1.71" height="8.57" class="part"/>
+<rect x="161.14" y="172.43" width="2.86" height="10.14" class="part"/>
+<rect x="126" y="172.43" width="2.86" height="10.14" class="part"/>
+<rect x="128.57" y="154" width="5.71" height="5.71" class="part"/>
+<rect x="140.71" y="136.29" width="8.57" height="2.57" class="part"/>
+<rect x="134.14" y="147.43" width="21.71" height="12.29" class="part"/>
+<rect x="130" y="160.29" width="30" height="14.29" class="part"/>
+<rect x="129.57" y="159.71" width="30.86" height="0.57" class="part"/>
+<rect x="165.21" y="171.71" width="7.43" height="17.71" class="part"/>
+<rect x="117.36" y="171.71" width="7.43" height="17.71" class="part"/>
+<rect x="164.64" y="165.14" width="8.57" height="30.86" class="part"/>
+<rect x="116.79" y="165.14" width="8.57" height="30.86" class="part"/>
+<rect x="144.14" y="158.57" width="1.71" height="8.14" class="part"/>
+<rect x="129.57" y="158.57" width="30.86" height="1.71" class="part"/>
+<rect x="144.79" y="156" width="0.43" height="10" class="part"/>
+<rect x="144.79" y="156" width="0.43" height="10" class="part"/>
+<rect x="143.86" y="112" width="2.29" height="36.86" class="part"/>
+<rect x="160.43" y="165.71" width="0.71" height="3.43" class="part"/>
+<rect x="128.86" y="165.71" width="0.71" height="3.43" class="part"/>
+<rect x="144.79" y="156" width="0.43" height="10" class="part"/>
+<rect x="142.43" y="148.86" width="5.14" height="7.14" class="part"/>
+<rect x="140.71" y="108.29" width="8.57" height="3.71" class="part"/>
+<rect x="140.14" y="166.71" width="9.71" height="7.86" class="part"/>
+<rect x="129.57" y="158.57" width="30.86" height="1.71" class="part"/>
+<rect x="140.14" y="108.29" width="0.57" height="49.43" class="part"/>
+<rect x="140.14" y="106.86" width="9.71" height="1.43" class="part"/>
+<rect x="144.14" y="158.57" width="1.71" height="8.14" class="part"/>
+<rect x="139.86" y="157.71" width="10.29" height="0.86" class="part"/>
+<rect x="142" y="108" width="6" height="6" class="part"/>
+<rect x="161.86" y="154.29" width="1.43" height="8.14" class="part"/>
+<rect x="126.71" y="154.29" width="1.43" height="8.14" class="part"/>
+<rect x="126.29" y="152" width="37.43" height="2.29" class="part"/>
+<rect x="143.57" y="154.29" width="2.86" height="6" class="part"/>
+<rect x="143.29" y="148.86" width="3.43" height="11.43" class="part"/>
+<rect x="161.14" y="172.43" width="2.86" height="10.14" class="part"/>
+<rect x="126" y="172.43" width="2.86" height="10.14" class="part"/>
+<rect x="142.14" y="144.57" width="5.71" height="4.29" class="part"/>
+<rect x="160" y="160.29" width="0.43" height="14.29" class="part"/>
+<rect x="129.57" y="160.29" width="0.43" height="14.29" class="part"/>
+<rect x="130" y="160.29" width="30" height="14.29" class="part"/>
+<rect x="161.14" y="162.43" width="2.86" height="10" class="part"/>
+<rect x="126" y="162.43" width="2.86" height="10" class="part"/>
+<rect x="165.21" y="171.71" width="7.43" height="17.71" class="part"/>
+<rect x="117.36" y="171.71" width="7.43" height="17.71" class="part"/>
+<rect x="164.64" y="165.14" width="8.57" height="30.86" class="part"/>
+<rect x="116.79" y="165.14" width="8.57" height="30.86" class="part"/>
+<rect x="153.86" y="169.43" width="2.29" height="2.29" class="part"/>
+<rect x="133.86" y="169.43" width="2.29" height="2.29" class="part"/>
+<rect x="118.57" y="168.86" width="52.86" height="5.71" class="part"/>
+<rect x="144.14" y="158.57" width="1.71" height="8.14" class="phantom"/>
+<rect x="129.57" y="158.57" width="30.86" height="1.71" class="phantom"/>
+<rect x="144.79" y="194.57" width="0.43" height="10" class="phantom"/>
+<rect x="144.79" y="194.57" width="0.43" height="10" class="phantom"/>
+<rect x="143.86" y="150.57" width="2.29" height="36.86" class="phantom"/>
+<rect x="144.79" y="194.57" width="0.43" height="10" class="phantom"/>
+<rect x="142.43" y="187.43" width="5.14" height="7.14" class="phantom"/>
+<rect x="140.71" y="146.86" width="8.57" height="3.71" class="phantom"/>
+<rect x="140.14" y="166.71" width="9.71" height="7.86" class="phantom"/>
+<rect x="129.57" y="158.57" width="30.86" height="1.71" class="phantom"/>
+<rect x="140.14" y="108.29" width="0.57" height="49.43" class="phantom"/>
+<rect x="140.14" y="106.86" width="9.71" height="1.43" class="phantom"/>
+<rect x="144.14" y="158.57" width="1.71" height="8.14" class="phantom"/>
+<rect x="139.86" y="157.71" width="10.29" height="0.86" class="phantom"/>
+<rect x="142" y="108" width="6" height="6" class="phantom"/>
+<line class="stem" x1="59.29" y1="196" x2="59.29" y2="93.14"/>
+<ellipse class="plant" cx="59.29" cy="158.86" rx="32.86" ry="16.43"/>
+<ellipse class="plant" cx="59.29" cy="131.71" rx="42.86" ry="16.43"/>
+<ellipse class="plant" cx="59.29" cy="104.57" rx="31.43" ry="16.43"/>
+<path class="phantom" d="M37.86 196 Q59.29 217.43 80.71 196"/>
+<circle cx="59.29" cy="194.86" r="1.1" fill="#9dd5ff" stroke="#fff" stroke-width="0.2"/>
+<line class="stem" x1="230.71" y1="196" x2="230.71" y2="93.14"/>
+<ellipse class="plant" cx="230.71" cy="158.86" rx="32.86" ry="16.43"/>
+<ellipse class="plant" cx="230.71" cy="131.71" rx="42.86" ry="16.43"/>
+<ellipse class="plant" cx="230.71" cy="104.57" rx="31.43" ry="16.43"/>
+<path class="phantom" d="M209.29 196 Q230.71 217.43 252.14 196"/>
+<circle cx="230.71" cy="194.86" r="1.1" fill="#9dd5ff" stroke="#fff" stroke-width="0.2"/>
+<text class="vtitle" x="145" y="24" text-anchor="middle">ROVER IN THE CROP LANE, SEEN FROM THE FRONT</text>
+<g class="dim"><line x1="59.29" y1="205.57" x2="59.29" y2="228.07"/><line x1="230.71" y1="205.57" x2="230.71" y2="228.07"/><line x1="59.29" y1="226.57" x2="230.71" y2="226.57" marker-start="url(#arr)" marker-end="url(#arr)"/><text x="145" y="225.57" text-anchor="middle">1200 row spacing [placeholder]</text></g>
+<g class="dim"><line x1="102.14" y1="132.71" x2="102.14" y2="71.21"/><line x1="187.86" y1="132.71" x2="187.86" y2="71.21"/><line x1="102.14" y1="69.71" x2="187.86" y2="69.71" marker-start="url(#arr)" marker-end="url(#arr)"/><text x="145" y="68.71" text-anchor="middle">600 clear between canopies</text></g>
+<g class="dim"><line x1="116.79" y1="197" x2="116.79" y2="206.5"/><line x1="173.21" y1="197" x2="173.21" y2="206.5"/><line x1="116.79" y1="205" x2="173.21" y2="205" marker-start="url(#arr)" marker-end="url(#arr)"/><text x="145" y="204" text-anchor="middle">395 rover</text></g>
+<g class="dim"><line x1="173.21" y1="161.29" x2="173.21" y2="131.79"/><line x1="187.86" y1="161.29" x2="187.86" y2="131.79"/><line x1="173.21" y1="130.29" x2="187.86" y2="130.29" marker-start="url(#arr)" marker-end="url(#arr)"/><text x="180.54" y="129.29" text-anchor="middle">103 each side</text></g>
+<text class="ttitle" x="22" y="244">WHAT THE PROBE CAN AND CANNOT SEE</text>
+<text class="td" x="22" y="248.4">The rover drives the lane centre and probes there, 600 mm from each drip line (blue dot).</text>
+<text class="td" x="22" y="252.8">The wetted strip under a drip line (dashed) is about 150 mm to each side: the probe's</text>
+<text class="td" x="22" y="257.2">± 60 mm rail does not reach it. A reach of 300 mm would cover half of it.</text>
+<text class="td" x="22" y="261.6">Simulated with the new soil physics: a drip run during the survey raises the map error,</text>
+<text class="td" x="22" y="266">because the water lands where lane-centre probes never go (docs/CALIBRATION.md).</text>
+<text class="td" x="22" y="270.4">Open design question: a longer side reach, or a second probe on an arm.</text>
+<text class="ttitle" x="282" y="22.4" text-anchor="start">SERVICE SCHEDULE [A]</text>
+<line class="rule" x1="282" y1="29.6" x2="404" y2="29.6"/>
+<text class="th" x="283" y="28">WEAR PART</text>
+<text class="th" x="345" y="28">LIFE</text>
+<text class="th" x="373" y="28">UNIT</text>
+<text class="td" x="283" y="32.6">Wiper plate (polyurethane)</text>
+<text class="td" x="345" y="32.6">5,000</text>
+<text class="td" x="373" y="32.6">probe cycles</text>
+<text class="td" x="283" y="37.2">Strip brushes</text>
+<text class="td" x="345" y="37.2">10,000</text>
+<text class="td" x="373" y="37.2">probe cycles</text>
+<text class="td" x="283" y="41.8">Pump inlet filter</text>
+<text class="td" x="345" y="41.8">20,000</text>
+<text class="td" x="373" y="41.8">probe cycles</text>
+<text class="td" x="283" y="46.4">Belt and carriage bearings (behind…</text>
+<text class="td" x="345" y="46.4">50,000</text>
+<text class="td" x="373" y="46.4">probe cycles</text>
+<text class="td" x="283" y="51">Probe (rods, seal)</text>
+<text class="td" x="345" y="51">30,000</text>
+<text class="td" x="373" y="51">probe cycles</text>
+<text class="td" x="283" y="55.6">Tyres</text>
+<text class="td" x="345" y="55.6">300</text>
+<text class="td" x="373" y="55.6">km</text>
+<text class="td" x="283" y="60.2">Battery (LiFePO4)</text>
+<text class="td" x="345" y="60.2">2,000</text>
+<text class="td" x="373" y="60.2">full cycles to 80…</text>
+<text class="td" x="283" y="64.8">Dock water reservoir (10 L)</text>
+<text class="td" x="345" y="64.8">5</text>
+<text class="td" x="373" y="64.8">days of 3 surveys</text>
+<rect class="box" x="282" y="24" width="122" height="43.9"/>
+<text class="ttitle" x="282" y="78.4" text-anchor="start">SOURCING</text>
+<line class="rule" x1="282" y1="85.6" x2="404" y2="85.6"/>
+<text class="th" x="283" y="84">REF</text>
+<text class="th" x="292" y="84">BUY OR MAKE</text>
+<text class="td" x="283" y="88.4">1</text>
+<text class="td" x="292" y="88.4">buy</text>
+<text class="td" x="283" y="92.8">2</text>
+<text class="td" x="292" y="92.8">make</text>
+<text class="td" x="283" y="97.2">3</text>
+<text class="td" x="292" y="97.2">make + buy</text>
+<text class="td" x="283" y="101.6">4</text>
+<text class="td" x="292" y="101.6">make</text>
+<text class="td" x="283" y="106">5</text>
+<text class="td" x="292" y="106">make + buy</text>
+<text class="td" x="283" y="110.4">6</text>
+<text class="td" x="292" y="110.4">make + buy</text>
+<text class="td" x="283" y="114.8">7</text>
+<text class="td" x="292" y="114.8">make</text>
+<text class="td" x="283" y="119.2">8</text>
+<text class="td" x="292" y="119.2">buy + make</text>
+<text class="td" x="283" y="123.6">9</text>
+<text class="td" x="292" y="123.6">make + buy</text>
+<text class="td" x="283" y="128">10</text>
+<text class="td" x="292" y="128">make + buy</text>
+<text class="td" x="283" y="132.4">11</text>
+<text class="td" x="292" y="132.4">buy</text>
+<text class="td" x="283" y="136.8">12</text>
+<text class="td" x="292" y="136.8">make</text>
+<text class="td" x="283" y="141.2">13</text>
+<text class="td" x="292" y="141.2">buy</text>
+<text class="td" x="283" y="145.6">14</text>
+<text class="td" x="292" y="145.6">buy</text>
+<text class="td" x="283" y="150">15</text>
+<text class="td" x="292" y="150">buy</text>
+<text class="td" x="283" y="154.4">16</text>
+<text class="td" x="292" y="154.4">make + buy</text>
+<rect class="box" x="282" y="80" width="122" height="77.3"/>
+<text class="ttitle" x="282" y="166">OPEN QUESTIONS BEFORE BUILDING</text>
+<text class="td" x="282" y="170.4">1  Soil strength on the target farms (sets the push).</text>
+<text class="td" x="282" y="174.8">2  How often each cleaning level is needed in local clay.</text>
+<text class="td" x="282" y="179.2">3  The reference block for the bias check.</text>
+<text class="td" x="282" y="183.6">4  Position along the row without RTK.</text>
+<text class="td" x="282" y="188">5  Rocker stiffness and canopy clearance in a real lane.</text>
+<text class="td" x="282" y="192.4">6  Side reach toward the drip line (this sheet).</text>
+<g>
+  <rect class="frame" x="282" y="257" width="130" height="32" fill="#17407f"/>
+  <line class="rule" x1="282" y1="268" x2="412" y2="268"/><line class="rule" x1="282" y1="278.5" x2="412" y2="278.5"/>
+  <line class="rule" x1="364" y1="268" x2="364" y2="289"/><line class="rule" x1="327" y1="278.5" x2="327" y2="289"/>
+  <text class="big" x="285" y="265">AGRIROVER v2</text>
+  <text class="th" x="345" y="262.5">SOIL-MOISTURE SURVEY ROVER</text><text class="td" x="345" y="266">design targets, not as-built</text>
+  <text class="td" x="285" y="272">TITLE</text><text class="th" x="285" y="276.3">FIELD ENVELOPE AND SERVICE</text>
+  <text class="td" x="366" y="272">SHEET</text><text class="th" x="366" y="276.3">5 OF 5</text>
+  <text class="td" x="285" y="282">SCALE · UNITS · PROJECTION</text><text class="th" x="285" y="286.3">1:7 · mm · 3rd angle</text>
+  <text class="td" x="329" y="282">SOURCE</text><text class="th" x="329" y="286.3">model.mjs</text>
+  <text class="td" x="366" y="282">TEAM · DATE</text><text class="th" x="366" y="286.3">Auenchanters · 2026-11-11</text>
+</g>
+</svg>

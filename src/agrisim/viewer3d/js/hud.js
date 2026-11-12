@@ -94,6 +94,10 @@ export function createHud(D, view, marks) {
     events.push({ t: r.start_s, kind: "info", text: `Rain started: ${r.rate_mm_per_h} mm an hour. Earlier readings go out of date.` });
     events.push({ t: r.start_s + r.duration_s, kind: "info", text: "Rain stopped. The soil is wetter now." });
   }
+  for (const r of D.PHYS?.irrigation ?? []) {
+    events.push({ t: r.start_s, kind: "info", text: `Drip irrigation on: ${r.emitter_l_per_h} L an hour per emitter. The strips along the plant rows are soaking.` });
+    events.push({ t: r.start_s + r.duration_s, kind: "info", text: "Drip irrigation off. The water keeps spreading and draining." });
+  }
   for (const s of stops) {
     if (s.v == null) events.push({ t: s.reveal, kind: "warn", text: `Stop ${s.i + 1}: the probe failed, no reading.` });
     if (s.again) events.push({ t: s.start, kind: "info", text: `Stop ${s.i + 1}: checking a spot again, ${s.again === "rain" ? "it has rained since the first reading" : "the first reading did not fit its neighbours"}.` });
@@ -218,8 +222,11 @@ export function createHud(D, view, marks) {
       const contacts = S.contacts.filter((c) => c.t <= t).length;
       const err = S.rmse[k];
       const rain = D.rainAt(t);
-      const weather = rain ? `Raining ${rain} mm an hour: the soil is getting wetter, so earlier readings go out of date.` : "";
-      const text = [status, sub, shown?.i, prefix, weather, k, failed, here.dist.toFixed(0), contacts, err, phase].join("|");
+      const drip = D.dripAt(t);
+      const weather = rain ? `Raining ${rain} mm an hour: the soil is getting wetter, so earlier readings go out of date.` : drip ? "Drip irrigation is running: the soil along the plant rows is soaking." : "";
+      const P = D.PHYS;
+      const minute = P ? Math.floor((D.hourAt(t) * 60) / 5) * 5 : 0; // the clock moves in 5-minute steps
+      const text = [status, sub, shown?.i, prefix, weather, k, failed, here.dist.toFixed(0), contacts, err, phase, minute].join("|");
       if (text === lastText) return;
       lastText = text;
       $("status").textContent = status;
@@ -234,6 +241,14 @@ export function createHud(D, view, marks) {
         reading.append(sw, `${prefix}: ${verdict(shown.v)}`);
       }
       $("weather").textContent = weather;
+      if (P) {
+        $("soilNow").hidden = false;
+        $("soilHead").textContent = `Soil and weather: ${P.texture} (hidden truth)`;
+        $("soilClock").textContent = `${String(Math.floor(minute / 60)).padStart(2, "0")}:${String(minute % 60).padStart(2, "0")}`;
+        $("soilEt").textContent = `${D.et0At(t).toFixed(2)} mm an hour`;
+        $("soilMean").textContent = `${(P.mean_k[k] * 100).toFixed(1)}%`;
+        $("soilDry").textContent = `${(P.dry_k[k] * 100).toFixed(1)}% of the field`;
+      }
       phaseBars.forEach((b, i) => (b.className = phase < 0 ? "" : i < phase ? "done" : i === phase ? "now" : ""));
       $("sReadings").textContent = `${k} of ${N}${failed ? ` (${failed} failed)` : ""}`;
       $("sReadingsBar").style.width = `${(k / N) * 100}%`;
