@@ -275,6 +275,9 @@ WEATHER = {
 
 
 def _flat(text: str) -> str:
+    """CLI output as plain words: no colour codes, no box drawing, no line wrapping. (On a colour
+    terminal the error box wraps long messages and puts colour codes between the words.)"""
+    text = re.sub(r"\x1b\[[0-9;]*m", "", text)
     return " ".join(re.sub(r"[^\w.:,()<>=\- ]", " ", text).split())
 
 
