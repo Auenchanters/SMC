@@ -1,13 +1,12 @@
-import subprocess
 import os
+import subprocess
 from pathlib import Path
-import webbrowser
-import time
 
 # CONFIGURATION
 RUN_DIR = "runs/demo_pitch_run"
 CONFIG_FILE = "configs/demo.yaml"
-MODEL_NAME = "qwen2.5:1.5b" # Change to qwen2.5:7b if you have it
+MODEL_NAME = "qwen2.5:1.5b"  # Change to qwen2.5:7b if you have it
+
 
 def run_cmd(cmd, description):
     print(f"\n[Step] {description}...")
@@ -17,6 +16,7 @@ def run_cmd(cmd, description):
         return False
     print(f"Done: {description}")
     return True
+
 
 def main():
     print("====================================================")
@@ -44,21 +44,22 @@ def main():
     print("\n====================================================")
     print("🚀 DEMO COMPLETE")
     print("====================================================")
-    
+
     # Open the AI Report
     report_path = latest_run / "debrief.md"
     if report_path.exists():
         print(f"Opening AI Report: {report_path}")
         # This opens the file in the default text editor/browser
-        os.startfile(report_path) 
+        os.startfile(report_path)
 
     # Open the 3D Replay (usually starts a local server)
     print("Opening 3D Mission Replay in browser...")
     # We assume agrisim view was triggered or we can trigger it now
     view_cmd = f"uv run agrisim view {latest_run}"
     subprocess.Popen(view_cmd, shell=True)
-    
+
     print("\nPRO TIP: Show the 'debrief.md' first, then the 3D Replay to prove the AI is correct.")
+
 
 if __name__ == "__main__":
     main()

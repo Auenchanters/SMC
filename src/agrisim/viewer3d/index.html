@@ -46,6 +46,13 @@
       <dt>Plants touched</dt><dd id="sContacts">0</dd>
       <dt title="Average difference between the robot's map and the real moisture">Map is off by (average)</dt><dd id="sError">no map yet</dd>
     </dl>
+    <dl id="soilNow" hidden>
+      <dt class="head" id="soilHead">Soil and weather (hidden truth)</dt>
+      <dt>Time of day</dt><dd id="soilClock"></dd>
+      <dt title="Water the sun and the plants are taking from the soil right now">Drying rate</dt><dd id="soilEt"></dd>
+      <dt title="Average real moisture of the whole field">Field moisture</dt><dd id="soilMean"></dd>
+      <dt title="Share of the field that is really below the too-dry line">Really too dry</dt><dd id="soilDry"></dd>
+    </dl>
     <figure id="trend">
       <figcaption><span>Map error after each reading</span><span id="trendNow" class="num"></span></figcaption>
       <svg id="trendSvg" role="img" aria-label="Map error after each reading"></svg>
@@ -101,7 +108,7 @@
     <dt>Real moisture</dt><dd>The true moisture, which exists only because this is a simulation. The robot never sees it. Compare the two to judge the map.</dd>
     <dt>Map error</dt><dd>How far the robot's map is from the truth at each spot. "Map is off by" is the average of that, in % points; the small chart shows it after every reading.</dd>
     <dt>Uncertainty</dt><dd>How unsure the robot is about each spot: high far from any mark, low near one.</dd>
-    <dt>Time bar</dt><dd>Each tick is a reading, coloured like its flag. Blue stretches are rain. A red line would be a plant touched.</dd>
+    <dt>Time bar</dt><dd>Each tick is a reading, coloured like its flag. Blue stretches are rain; a green strip along the bottom is drip irrigation running. A red line would be a plant touched.</dd>
     <dt>Plants touched</dt><dd>How many times the robot's body overlapped a plant's leaves. The goal is always 0.</dd>
   </dl>
   <h2>Controls</h2>

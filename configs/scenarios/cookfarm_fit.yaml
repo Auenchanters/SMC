@@ -1,0 +1,29 @@
+# Scenario: soil physics fitted to real data. One parameter set fitted to 19 stations of the Cook
+# Agronomy Farm sensor network (Pullman, USA; 2011 season) by scripts/calibrate_cookfarm.py and
+# checked on the unseen 2012 season (docs/CALIBRATION.md). The site is a rain-fed wheat field on
+# silt loam: these numbers are that field's, not a tomato field's. Use it to see how a measured
+# soil behaves; the layer is the fitted root-zone depth, far deeper than the probe reads.
+extends: ../demo.yaml
+
+soil:
+  mean_vwc: 0.30                     # MEASURED: season mean at 0.3 m depth is 0.25 to 0.31
+  std_vwc: 0.034                     # MEASURED: median spread across stations on one day
+  vwc_clip: [0.05, 0.54]
+
+mapping:
+  dry_threshold: 0.21                # PLACEHOLDER: about 30% of available water left
+
+weather:
+  layer_depth: 0.90                  # FITTED (at the upper bound of the search)
+  infiltration_cv: 0.3               # PLACEHOLDER: calibrate
+  infiltration_corr_length: 4.0      # PLACEHOLDER: calibrate
+  step_s: 60
+  physical:
+    texture: silt_loam               # the farm's mapped soil (Thatuna and Naff silt loams)
+    theta_s: 0.547                   # FITTED
+    ks_mm_per_h: 0.237               # FITTED
+    b: 3.91                          # FITTED
+    crop_coefficient: 0.51           # FITTED (season average for the 0.3 m sensor)
+    depletion_fraction: 0.55         # FAO-56 Table 22, wheat
+    et0_mm_per_day: 5.0              # a midsummer day there (Hargreaves, from the station's temperatures)
+    start_hour: 10.0

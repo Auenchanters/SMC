@@ -26,6 +26,13 @@ export function createPlayback(D, { playing = true, speed = 20 } = {}) {
     band.style.width = at(Math.min(r.duration_s, D.T_END - r.start_s));
     track.appendChild(band);
   }
+  for (const r of D.PHYS?.irrigation ?? []) {
+    const band = document.createElement("div");
+    band.className = "drip";
+    band.style.left = at(r.start_s);
+    band.style.width = at(Math.min(r.duration_s, D.T_END - r.start_s));
+    track.appendChild(band);
+  }
   const ticks = D.stops.map((s) => {
     const tick = document.createElement("div");
     tick.className = s.v == null ? "tick fail" : "tick";
@@ -107,7 +114,7 @@ export function createPlayback(D, { playing = true, speed = 20 } = {}) {
     const near = D.stops.reduce((best, s) => (Math.abs(s.reveal - t) < Math.abs((best?.reveal ?? Infinity) - t) ? s : best), null);
     const close = near && Math.abs(near.reveal - t) < D.T_END / 120;
     const what = close ? `<b>Stop ${near.i + 1}</b><br>${near.v == null ? "probe failed" : `${pct(near.v)} water`}` : "";
-    const rain = D.rainAt(t) ? "<br><span class=\"dim\">raining</span>" : "";
+    const rain = D.rainAt(t) ? "<br><span class=\"dim\">raining</span>" : D.dripAt(t) ? "<br><span class=\"dim\">drip irrigation running</span>" : "";
     p.onPreview?.(`${what}${what ? "<br>" : ""}<span class="dim">${clock(t)} into the mission</span>${rain}`, e.clientX, r.top - 70);
   });
   slider.addEventListener("pointerleave", () => p.onPreview?.(null));

@@ -1,0 +1,207 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 297" width="420mm" height="297mm" font-family="'Courier New', Courier, monospace">
+<title>AgriRover v2 blueprint, sheet 3: Probe module and cleaning</title>
+<defs>
+  <marker id="arr" viewBox="0 0 6 6" refX="3" refY="3" markerWidth="4" markerHeight="4" orient="auto-start-reverse"><path d="M0 0L6 3L0 6Z" fill="#dfeaff"/></marker>
+  <marker id="flow" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L6 3L0 6Z" fill="#ffffff"/></marker>
+  <pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M10 0H0V10" fill="none" stroke="#3a67a8" stroke-width="0.12"/></pattern>
+  <pattern id="hatch" width="2.4" height="2.4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="2.4" stroke="#8fb2e6" stroke-width="0.25"/></pattern>
+</defs>
+<style>
+  .part { fill: #1f4f95; stroke: #ffffff; stroke-width: 0.26; }
+  .hi { fill: #2b65b8; stroke: #ffffff; stroke-width: 0.34; }
+  .phantom { fill: none; stroke: #b9d0f5; stroke-width: 0.2; stroke-dasharray: 3 1 0.6 1; }
+  .ground { stroke: #ffffff; stroke-width: 0.4; } .soil { fill: url(#hatch); stroke: none; }
+  .centre { stroke: #9dbcec; stroke-width: 0.15; stroke-dasharray: 5 1.2 1 1.2; }
+  .dim line { stroke: #dfeaff; stroke-width: 0.16; } .dim text { font-size: 2.7px; fill: #ffffff; }
+  .balloon line { stroke: #dfeaff; stroke-width: 0.16; } .balloon circle { fill: #1a478a; stroke: #ffffff; stroke-width: 0.22; }
+  .balloon .dot { fill: #ffffff; } .balloon text { font-size: 2.8px; fill: #ffffff; font-weight: bold; }
+  text { font-size: 2.5px; fill: #eaf2ff; }
+  .vtitle { font-size: 3.2px; font-weight: bold; letter-spacing: 0.3px; fill: #ffffff; }
+  .ttitle { font-size: 3px; font-weight: bold; fill: #ffffff; letter-spacing: 0.3px; }
+  .th { font-size: 2.5px; font-weight: bold; fill: #ffffff; } .td { font-size: 2.45px; fill: #eaf2ff; }
+  .rule { stroke: #dfeaff; stroke-width: 0.2; } .box { fill: none; stroke: #dfeaff; stroke-width: 0.2; }
+  .frame { fill: none; stroke: #ffffff; stroke-width: 0.5; } .frame2 { fill: none; stroke: #ffffff; stroke-width: 0.2; }
+  .big { font-size: 5px; font-weight: bold; fill: #ffffff; letter-spacing: 0.5px; }
+  .node { fill: #1f4f95; stroke: #ffffff; stroke-width: 0.3; } .nodeh { fill: #2b65b8; stroke: #ffffff; stroke-width: 0.4; }
+  .wire { stroke: #ffffff; stroke-width: 0.3; fill: none; } .bus { stroke: #9dd5ff; stroke-width: 0.3; fill: none; stroke-dasharray: 1.6 0.8; }
+  .plant { fill: #2d6e63; fill-opacity: 0.55; stroke: #bff0d8; stroke-width: 0.25; } .stem { stroke: #bff0d8; stroke-width: 0.5; }
+  .ntxt { font-size: 2.5px; fill: #ffffff; } .nsub { font-size: 2.1px; fill: #cfe0fb; }
+</style>
+<rect width="420" height="297" fill="#17407f"/>
+<rect x="8" y="8" width="404" height="281" fill="url(#grid)"/>
+<rect class="frame" x="8" y="8" width="404" height="281"/>
+<rect class="frame2" x="10" y="10" width="400" height="277"/>
+<rect class="soil" x="33.67" y="252" width="76.67" height="25"/><line class="ground" x1="33.67" y1="252" x2="110.33" y2="252"/>
+<rect x="70" y="164.67" width="4" height="19" class="part"/>
+<rect x="36" y="164.67" width="72" height="4" class="part"/>
+<rect x="71.5" y="158.67" width="1" height="23.33" class="part"/>
+<rect x="71.5" y="158.67" width="1" height="23.33" class="part"/>
+<rect x="69.33" y="56" width="5.33" height="86" class="part"/>
+<rect x="71.5" y="158.67" width="1" height="23.33" class="part"/>
+<rect x="66" y="142" width="12" height="16.67" class="part"/>
+<rect x="62" y="47.33" width="20" height="8.67" class="part"/>
+<rect x="60.67" y="183.67" width="22.67" height="18.33" class="part"/>
+<rect x="36" y="164.67" width="72" height="4" class="part"/>
+<rect x="60.67" y="47.33" width="1.33" height="115.33" class="part"/>
+<rect x="60.67" y="44" width="22.67" height="3.33" class="part"/>
+<rect x="70" y="164.67" width="4" height="19" class="part"/>
+<rect x="60" y="162.67" width="24" height="2" class="part"/>
+<rect x="65" y="46.67" width="14" height="14" class="part"/>
+<rect x="70" y="164.67" width="4" height="19" class="phantom"/>
+<rect x="36" y="164.67" width="72" height="4" class="phantom"/>
+<rect x="71.5" y="248.67" width="1" height="23.33" class="phantom"/>
+<rect x="71.5" y="248.67" width="1" height="23.33" class="phantom"/>
+<rect x="69.33" y="146" width="5.33" height="86" class="phantom"/>
+<rect x="71.5" y="248.67" width="1" height="23.33" class="phantom"/>
+<rect x="66" y="232" width="12" height="16.67" class="phantom"/>
+<rect x="62" y="137.33" width="20" height="8.67" class="phantom"/>
+<rect x="60.67" y="183.67" width="22.67" height="18.33" class="phantom"/>
+<rect x="36" y="164.67" width="72" height="4" class="phantom"/>
+<rect x="60.67" y="47.33" width="1.33" height="115.33" class="phantom"/>
+<rect x="60.67" y="44" width="22.67" height="3.33" class="phantom"/>
+<rect x="70" y="164.67" width="4" height="19" class="phantom"/>
+<rect x="60" y="162.67" width="24" height="2" class="phantom"/>
+<rect x="65" y="46.67" width="14" height="14" class="phantom"/>
+<line class="centre" x1="72" y1="40" x2="72" y2="275.33"/>
+<rect class="soil" x="129.67" y="252" width="76.67" height="25"/><line class="ground" x1="129.67" y1="252" x2="206.33" y2="252"/>
+<rect x="154.67" y="47.33" width="26.67" height="115.33" class="part"/>
+<rect x="171.5" y="158.67" width="1" height="23.33" class="part"/>
+<rect x="167.5" y="158.67" width="1" height="23.33" class="part"/>
+<rect x="163.5" y="158.67" width="1" height="23.33" class="part"/>
+<rect x="152.67" y="164.67" width="2.67" height="19" class="part"/>
+<rect x="180.67" y="164.67" width="2.67" height="19" class="part"/>
+<rect x="165.33" y="56" width="5.33" height="86" class="part"/>
+<rect x="162" y="142" width="12" height="16.67" class="part"/>
+<rect x="140.67" y="46.67" width="14" height="14" class="part"/>
+<rect x="159.33" y="47.33" width="17.33" height="8.67" class="part"/>
+<rect x="154.67" y="44" width="26.67" height="3.33" class="part"/>
+<rect x="156.67" y="183.67" width="22.67" height="18.33" class="part"/>
+<rect x="152" y="162.67" width="32" height="2" class="part"/>
+<rect x="156" y="164.67" width="4" height="4" class="part"/>
+<rect x="176" y="164.67" width="4" height="4" class="part"/>
+<rect x="154.67" y="47.33" width="26.67" height="115.33" class="phantom"/>
+<rect x="171.5" y="248.67" width="1" height="23.33" class="phantom"/>
+<rect x="167.5" y="248.67" width="1" height="23.33" class="phantom"/>
+<rect x="163.5" y="248.67" width="1" height="23.33" class="phantom"/>
+<rect x="152.67" y="164.67" width="2.67" height="19" class="phantom"/>
+<rect x="180.67" y="164.67" width="2.67" height="19" class="phantom"/>
+<rect x="165.33" y="146" width="5.33" height="86" class="phantom"/>
+<rect x="162" y="232" width="12" height="16.67" class="phantom"/>
+<rect x="140.67" y="46.67" width="14" height="14" class="phantom"/>
+<rect x="159.33" y="137.33" width="17.33" height="8.67" class="phantom"/>
+<rect x="154.67" y="44" width="26.67" height="3.33" class="phantom"/>
+<rect x="156.67" y="183.67" width="22.67" height="18.33" class="phantom"/>
+<rect x="152" y="162.67" width="32" height="2" class="phantom"/>
+<rect x="156" y="164.67" width="4" height="4" class="phantom"/>
+<rect x="176" y="164.67" width="4" height="4" class="phantom"/>
+<line class="centre" x1="168" y1="40" x2="168" y2="275.33"/>
+<text class="vtitle" x="72" y="30" text-anchor="middle">PROBE MODULE, FRONT</text>
+<text class="vtitle" x="168" y="30" text-anchor="middle">PROBE MODULE, SIDE</text>
+<g class="dim"><line x1="39.33" y1="252" x2="38.83" y2="252"/><line x1="39.33" y1="182" x2="38.83" y2="182"/><line x1="40.33" y1="252" x2="40.33" y2="182" marker-start="url(#arr)" marker-end="url(#arr)"/><text x="39.13" y="217" text-anchor="middle" transform="rotate(-90 39.13 217)">210 parked tips</text></g>
+<g class="dim"><line x1="45" y1="252" x2="44.5" y2="252"/><line x1="45" y1="272" x2="44.5" y2="272"/><line x1="46" y1="252" x2="46" y2="272" marker-start="url(#arr)" marker-end="url(#arr)"/><text x="44.8" y="262" text-anchor="middle" transform="rotate(-90 44.8 262)">60 depth</text></g>
+<g class="dim"><line x1="102.67" y1="202" x2="108.17" y2="202"/><line x1="102.67" y1="183.67" x2="108.17" y2="183.67"/><line x1="109.67" y1="202" x2="109.67" y2="183.67" marker-start="url(#arr)" marker-end="url(#arr)"/><text x="108.47" y="192.83" text-anchor="middle" transform="rotate(-90 108.47 192.83)">station 55</text></g>
+<g class="dim"><line x1="52" y1="159.67" x2="52" y2="136.17"/><line x1="92" y1="159.67" x2="92" y2="136.17"/><line x1="52" y1="134.67" x2="92" y2="134.67" marker-start="url(#arr)" marker-end="url(#arr)"/><text x="72" y="133.67" text-anchor="middle">± 60 rail travel</text></g>
+<g class="dim"><line x1="202" y1="252" x2="207.5" y2="252"/><line x1="202" y1="44" x2="207.5" y2="44"/><line x1="209" y1="252" x2="209" y2="44" marker-start="url(#arr)" marker-end="url(#arr)"/><text x="207.8" y="148" text-anchor="middle" transform="rotate(-90 207.8 148)">624 axis top</text></g>
+<g class="dim"><line x1="133.67" y1="158.67" x2="131.17" y2="158.67"/><line x1="133.67" y1="62" x2="131.17" y2="62"/><line x1="132.67" y1="158.67" x2="132.67" y2="62" marker-start="url(#arr)" marker-end="url(#arr)"/><text x="131.47" y="110.34" text-anchor="middle" transform="rotate(-90 131.47 110.34)">290 stroke</text></g>
+<g class="balloon"><circle cx="72" cy="192.83" r="0.5" class="dot"/><line x1="72" y1="192.83" x2="106" y2="200.83"/><circle cx="106" cy="200.83" r="3.2"/><text x="106" y="201.93" text-anchor="middle">10</text></g>
+<g class="balloon"><circle cx="72" cy="148.67" r="0.5" class="dot"/><line x1="72" y1="148.67" x2="106" y2="144.67"/><circle cx="106" cy="144.67" r="3.2"/><text x="106" y="145.77" text-anchor="middle">11</text></g>
+<g class="balloon"><circle cx="171.33" cy="65.33" r="0.5" class="dot"/><line x1="171.33" y1="65.33" x2="201.33" y2="59.33"/><circle cx="201.33" cy="59.33" r="3.2"/><text x="201.33" y="60.43" text-anchor="middle">9</text></g>
+<line class="rule" x1="232" y1="29.6" x2="404" y2="29.6"/>
+<text class="th" x="233" y="28">PROBE FORCE</text>
+<text class="th" x="301" y="28">MOIST SOIL</text>
+<text class="th" x="331" y="28">DRY CRUST</text>
+<text class="th" x="361" y="28"></text>
+<text class="td" x="233" y="32.6">Push needed [A]</text>
+<text class="td" x="301" y="32.6">42 N</text>
+<text class="td" x="331" y="32.6">106 N</text>
+<text class="td" x="361" y="32.6">cone 1.2 / 3 MPa</text>
+<text class="td" x="233" y="37.2">Push available, probe centred</text>
+<text class="td" x="301" y="37.2">175 N</text>
+<text class="td" x="331" y="37.2">175 N</text>
+<text class="td" x="361" y="37.2">80% of lift-off</text>
+<text class="td" x="233" y="41.8">Push available, 60 mm off centre</text>
+<text class="td" x="301" y="41.8">129 N</text>
+<text class="td" x="331" y="41.8">129 N</text>
+<text class="td" x="361" y="41.8"></text>
+<text class="td" x="233" y="46.4">Margin over dry crust, centred</text>
+<text class="td" x="301" y="46.4"></text>
+<text class="td" x="331" y="46.4">1.6 x</text>
+<text class="td" x="361" y="46.4"></text>
+<rect class="box" x="232" y="24" width="172" height="25.5"/>
+<line class="rule" x1="232" y1="67.6" x2="404" y2="67.6"/>
+<text class="th" x="233" y="66">t, s</text>
+<text class="th" x="249" y="66">PROBE CYCLE (one reading)</text>
+<text class="th" x="319" y="66">SPEED</text>
+<text class="th" x="341" y="66"></text>
+<text class="td" x="233" y="70.6">0 to 5.3</text>
+<text class="td" x="249" y="70.6">Lower to the surface</text>
+<text class="td" x="319" y="70.6">40 mm/s</text>
+<text class="td" x="341" y="70.6"></text>
+<text class="td" x="233" y="75.2">to 15.3</text>
+<text class="td" x="249" y="75.2">Insert 60 mm</text>
+<text class="td" x="319" y="75.2">6 mm/s</text>
+<text class="td" x="341" y="75.2"></text>
+<text class="td" x="233" y="79.8">to 17.3</text>
+<text class="td" x="249" y="79.8">Read (VWC, temperature, EC)</text>
+<text class="td" x="319" y="79.8">2 s</text>
+<text class="td" x="341" y="79.8"></text>
+<text class="td" x="233" y="84.4">to 24.0</text>
+<text class="td" x="249" y="84.4">Retract through wiper plate and brushes</text>
+<text class="td" x="319" y="84.4">40 mm/s</text>
+<text class="td" x="341" y="84.4"></text>
+<text class="td" x="233" y="89">to 27.0</text>
+<text class="td" x="249" y="89">Air knife</text>
+<text class="td" x="319" y="89">3 s</text>
+<text class="td" x="341" y="89"></text>
+<text class="td" x="233" y="93.6">to 28.0</text>
+<text class="td" x="249" y="93.6">Air check: reads clean-air baseline</text>
+<text class="td" x="319" y="93.6">1 s</text>
+<text class="td" x="341" y="93.6">within 0.02</text>
+<text class="td" x="233" y="98.2">+ 10</text>
+<text class="td" x="249" y="98.2">Wet clean when the air check fails twice</text>
+<text class="td" x="319" y="98.2">2 mL</text>
+<text class="td" x="341" y="98.2">about 10% of cycles [A]</text>
+<rect class="box" x="232" y="62" width="172" height="39.3"/>
+<line class="rule" x1="232" y1="119.6" x2="404" y2="119.6"/>
+<text class="th" x="233" y="118">LEVEL</text>
+<text class="th" x="245" y="118">WHEN</text>
+<text class="th" x="277" y="118">CLEANING, NO PERSON NEEDED</text>
+<text class="td" x="233" y="122.6">0</text>
+<text class="td" x="245" y="122.6">every cycle</text>
+<text class="td" x="277" y="122.6">PU wiper plate with three rod slots, then two strip brushes</text>
+<text class="td" x="233" y="127.2">1</text>
+<text class="td" x="245" y="127.2">every cycle</text>
+<text class="td" x="277" y="127.2">3 s air knife, then the air check</text>
+<text class="td" x="233" y="131.8">2</text>
+<text class="td" x="245" y="131.8">check fails</text>
+<text class="td" x="277" y="131.8">stroke through the wipers again, blast, check</text>
+<text class="td" x="233" y="136.4">3</text>
+<text class="td" x="245" y="136.4">still failing</text>
+<text class="td" x="277" y="136.4">1 s water spray, 8 s of air, check</text>
+<text class="td" x="233" y="141">4</text>
+<text class="td" x="245" y="141">after 2 wet cleans</text>
+<text class="td" x="277" y="141">reading marked invalid; survey goes on; rover rechecks later</text>
+<text class="td" x="233" y="145.6">5</text>
+<text class="td" x="245" y="145.6">at the dock</text>
+<text class="td" x="277" y="145.6">wash cup with brush, rinse, dry; reference block within 0.015</text>
+<rect class="box" x="232" y="114" width="172" height="34.7"/>
+<text class="ttitle" x="232" y="166">DROP-IN MODULE</text>
+<text class="td" x="232" y="170.4">Two sideways rails, a sled, a belt-driven linear axis behind a bellows with its</text>
+<text class="td" x="232" y="174.8">stepper beside it, the cleaning station hanging under the sled, and the probe.</text>
+<text class="td" x="232" y="179.2">Held by two thumb screws, one M12 connector and one push-fit air/water line.</text>
+<text class="td" x="232" y="183.6">The rail shifts the probe 5 cm to step round a stone, without driving.</text>
+<text class="td" x="232" y="188">Probe: 3-rod stainless FDR, RS485, galvanically isolated from the rover.</text>
+<text class="td" x="232" y="192.4">Phantom lines: full stroke on level ground.</text>
+<g>
+  <rect class="frame" x="282" y="257" width="130" height="32" fill="#17407f"/>
+  <line class="rule" x1="282" y1="268" x2="412" y2="268"/><line class="rule" x1="282" y1="278.5" x2="412" y2="278.5"/>
+  <line class="rule" x1="364" y1="268" x2="364" y2="289"/><line class="rule" x1="327" y1="278.5" x2="327" y2="289"/>
+  <text class="big" x="285" y="265">AGRIROVER v2</text>
+  <text class="th" x="345" y="262.5">SOIL-MOISTURE SURVEY ROVER</text><text class="td" x="345" y="266">design targets, not as-built</text>
+  <text class="td" x="285" y="272">TITLE</text><text class="th" x="285" y="276.3">PROBE MODULE AND CLEANING</text>
+  <text class="td" x="366" y="272">SHEET</text><text class="th" x="366" y="276.3">3 OF 5</text>
+  <text class="td" x="285" y="282">SCALE · UNITS · PROJECTION</text><text class="th" x="285" y="286.3">1:3 · mm · 3rd angle</text>
+  <text class="td" x="329" y="282">SOURCE</text><text class="th" x="329" y="286.3">model.mjs</text>
+  <text class="td" x="366" y="282">TEAM · DATE</text><text class="th" x="366" y="286.3">Auenchanters · 2026-11-11</text>
+</g>
+</svg>

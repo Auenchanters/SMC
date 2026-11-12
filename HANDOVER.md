@@ -180,6 +180,12 @@ Report problems as GitHub issues with the command, the seed and the config file 
 | agribench: our entry is below state of the art | `planned_survey` beats every baseline on 7 of 24 task metrics in the latest run (8 in the previous one), all of them dry-zone F1. Map error and CRPS tie the coverage designs on soil that does not change, which the evidence says is near the honest limit of v1; whether v2 should gate them differently is a team decision. Dry-zone detection in `harsh_b60` comes and goes: won in the previous run, not in the latest. The latest `runs/suite_*/brief.md` lists what to try next ([benchmarks/README.md](benchmarks/README.md) Section 9) |
 | `dov` baseline fixed within v1 (18 Oct) | It bid on every site and crawled along one lane (−109). It now follows the paper and the authors' code (DOVTD, [benchmarks/README.md](benchmarks/README.md) Section 5) and scores 47.8. Our entry's scores, `baseline.json` and the frozen worlds did not change, but `dov` scores from earlier runs are not comparable (Section 8 there). Still open for the team: it is a one-rover reading of a multi-robot method (it bids on 3 tasks per round, as in their 3-robot trials); a multi-robot track would test the real thing |
 | M10 phase 4 (plants in the 3D replay) | Not started; phases 1 to 3 are done |
+| Physical soil model is not in the benchmark | It is opt-in (`weather.physical`); `benchmarks/v1` still uses the bucket. Adding it means a v2 benchmark folder and a Decision Log entry |
+| Physical soil model: drip and sideways spread untested on data | Only rain, drainage and drying were checked (Cook Farm, [docs/CALIBRATION.md](docs/CALIBRATION.md)). Needs our own plot: readings before and after a drip run |
+| Lane-centre probes miss drip water | Measured: map error 0.026 to 0.037 with the drip running. Needs a longer probe reach (hardware) or row-aware mapping; see the blueprint set, sheet 5 |
+| `CLAUDE.md` was removed (22 Oct) | README, this file and context.md still point to it for the project rules. Restore it, or move the rules here |
+| Two hardware plans disagree | `BOM.csv` / `ROADMAP.md` (Raspberry Pi kit, about $266) against `hardware/rover-v2/` (22 kg, 175 N probe push). The kit is too light to push a probe into dry soil. The team must pick one |
+| Case-study labels | `case_studies/success` found 6% of the dry area and `case_studies/failure` 34%, by their own metrics. Rename or redo them before a demo |
 
 ## 4. Where things live
 
@@ -208,3 +214,13 @@ Report problems as GitHub issues with the command, the seed and the config file 
 - **Fixed (18 Oct):** the `dov` competitor baseline now follows Roberts-Elliott et al. (checked against the paper and their code) instead of bidding on every site. It went from −109 to 47.8; the README lists it among the competitors again.
 
 Details are in the ExecPlan's Surprises & Discoveries section.
+
+## 6. Changes on 12 November 2026
+
+- **Soil physics:** `weather.water_balance` (intake with run-off, drainage, sun-driven drying, drip irrigation, sideways spread) and 11 soil texture classes, opt-in with `weather.physical`. New scenarios: `drip_irrigation`, `monsoon_shower`, `cookfarm_fit`.
+- **Real data:** `scripts/calibrate_cookfarm.py` fits and scores the model on the Cook Agronomy Farm network. Results and limits are in [docs/CALIBRATION.md](docs/CALIBRATION.md).
+- **Time-lapse:** `scripts/soil_timelapse.py` shows two days of the hidden soil.
+- **3D replay:** a soil-and-weather readout, drip irrigation on the time bar, and notes when the drip starts and stops.
+- **Blueprints:** `node hardware/rover-v2/blueprints.mjs` writes five sheets to `hardware/rover-v2/blueprints/` from `model.mjs`. Open `index.html` and print to PDF (A3 landscape), or use the PDF in that folder. Rebuild them after any model change.
+- **Fixes:** the five review-3 bugs that had not reached main (a config `extends:` loop, memory-exhausting weather settings, recheck with no probe site, recheck spots inside the stem keep-out, an empty run folder after a crash); 32 lint errors on main; a rule-based verdict in the AI agronomist.
+- **Tests:** 135 to 162. The 70 benchmark-world runs compared before and after are identical.

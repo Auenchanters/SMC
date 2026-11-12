@@ -1,0 +1,158 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 297" width="420mm" height="297mm" font-family="'Courier New', Courier, monospace">
+<title>AgriRover v2 blueprint, sheet 4: Electrical and power</title>
+<defs>
+  <marker id="arr" viewBox="0 0 6 6" refX="3" refY="3" markerWidth="4" markerHeight="4" orient="auto-start-reverse"><path d="M0 0L6 3L0 6Z" fill="#dfeaff"/></marker>
+  <marker id="flow" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L6 3L0 6Z" fill="#ffffff"/></marker>
+  <pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M10 0H0V10" fill="none" stroke="#3a67a8" stroke-width="0.12"/></pattern>
+  <pattern id="hatch" width="2.4" height="2.4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="2.4" stroke="#8fb2e6" stroke-width="0.25"/></pattern>
+</defs>
+<style>
+  .part { fill: #1f4f95; stroke: #ffffff; stroke-width: 0.26; }
+  .hi { fill: #2b65b8; stroke: #ffffff; stroke-width: 0.34; }
+  .phantom { fill: none; stroke: #b9d0f5; stroke-width: 0.2; stroke-dasharray: 3 1 0.6 1; }
+  .ground { stroke: #ffffff; stroke-width: 0.4; } .soil { fill: url(#hatch); stroke: none; }
+  .centre { stroke: #9dbcec; stroke-width: 0.15; stroke-dasharray: 5 1.2 1 1.2; }
+  .dim line { stroke: #dfeaff; stroke-width: 0.16; } .dim text { font-size: 2.7px; fill: #ffffff; }
+  .balloon line { stroke: #dfeaff; stroke-width: 0.16; } .balloon circle { fill: #1a478a; stroke: #ffffff; stroke-width: 0.22; }
+  .balloon .dot { fill: #ffffff; } .balloon text { font-size: 2.8px; fill: #ffffff; font-weight: bold; }
+  text { font-size: 2.5px; fill: #eaf2ff; }
+  .vtitle { font-size: 3.2px; font-weight: bold; letter-spacing: 0.3px; fill: #ffffff; }
+  .ttitle { font-size: 3px; font-weight: bold; fill: #ffffff; letter-spacing: 0.3px; }
+  .th { font-size: 2.5px; font-weight: bold; fill: #ffffff; } .td { font-size: 2.45px; fill: #eaf2ff; }
+  .rule { stroke: #dfeaff; stroke-width: 0.2; } .box { fill: none; stroke: #dfeaff; stroke-width: 0.2; }
+  .frame { fill: none; stroke: #ffffff; stroke-width: 0.5; } .frame2 { fill: none; stroke: #ffffff; stroke-width: 0.2; }
+  .big { font-size: 5px; font-weight: bold; fill: #ffffff; letter-spacing: 0.5px; }
+  .node { fill: #1f4f95; stroke: #ffffff; stroke-width: 0.3; } .nodeh { fill: #2b65b8; stroke: #ffffff; stroke-width: 0.4; }
+  .wire { stroke: #ffffff; stroke-width: 0.3; fill: none; } .bus { stroke: #9dd5ff; stroke-width: 0.3; fill: none; stroke-dasharray: 1.6 0.8; }
+  .plant { fill: #2d6e63; fill-opacity: 0.55; stroke: #bff0d8; stroke-width: 0.25; } .stem { stroke: #bff0d8; stroke-width: 0.5; }
+  .ntxt { font-size: 2.5px; fill: #ffffff; } .nsub { font-size: 2.1px; fill: #cfe0fb; }
+</style>
+<rect width="420" height="297" fill="#17407f"/>
+<rect x="8" y="8" width="404" height="281" fill="url(#grid)"/>
+<rect class="frame" x="8" y="8" width="404" height="281"/>
+<rect class="frame2" x="10" y="10" width="400" height="277"/>
+<text class="ttitle" x="20" y="22" text-anchor="start">POWER AND SIGNAL BLOCK DIAGRAM</text>
+<rect class="nodeh" x="20" y="60" width="40" height="22" rx="1"/><text class="ntxt" x="40" y="68.6" text-anchor="middle">BATTERY + BMS</text><text class="nsub" x="40" y="71.9" text-anchor="middle">12S LiFePO4, 6 Ah</text><text class="nsub" x="40" y="75.2" text-anchor="middle">38.4 V, 230 Wh</text>
+<rect class="node" x="72" y="64" width="24" height="14" rx="1"/><text class="ntxt" x="84" y="70.25" text-anchor="middle">MAIN FUSE</text><text class="nsub" x="84" y="73.55" text-anchor="middle">30 A</text>
+<polyline class="wire" points="60,71 72,71" marker-end="url(#flow)"/>
+<line class="wire" x1="96" y1="71" x2="104" y2="71"/><line class="wire" x1="104" y1="36" x2="104" y2="152"/>
+<polyline class="wire" points="104,36 114,36" marker-end="url(#flow)"/>
+<rect class="node" x="114" y="27" width="40" height="18" rx="1"/><text class="ntxt" x="134" y="35.25" text-anchor="middle">DRIVE CONTACTOR</text><text class="nsub" x="134" y="38.55" text-anchor="middle">e-stop chain, precharge</text>
+<polyline class="wire" points="154,36 166,36" marker-end="url(#flow)"/>
+<rect class="node" x="166" y="27" width="40" height="18" rx="1"/><text class="ntxt" x="186" y="35.25" text-anchor="middle">2 DUAL BLDC FOC</text><text class="nsub" x="186" y="38.55" text-anchor="middle">200 W per wheel, CAN</text>
+<polyline class="wire" points="206,36 218,36" marker-end="url(#flow)"/>
+<rect class="node" x="218" y="27" width="40" height="18" rx="1"/><text class="ntxt" x="238" y="35.25" text-anchor="middle">4 HUB MOTORS</text><text class="nsub" x="238" y="38.55" text-anchor="middle">hall sensors</text>
+<polyline class="wire" points="104,65 114,65" marker-end="url(#flow)"/>
+<rect class="node" x="114" y="56" width="40" height="18" rx="1"/><text class="ntxt" x="134" y="64.25" text-anchor="middle">24 V ISOLATED DC-DC</text><text class="nsub" x="134" y="67.55" text-anchor="middle">3 A</text>
+<polyline class="wire" points="154,65 166,65" marker-end="url(#flow)"/>
+<rect class="node" x="166" y="56" width="40" height="18" rx="1"/><text class="ntxt" x="186" y="64.25" text-anchor="middle">STEPPER DRIVERS</text><text class="nsub" x="186" y="67.55" text-anchor="middle">stall detection</text>
+<polyline class="wire" points="206,65 218,65" marker-end="url(#flow)"/>
+<rect class="node" x="218" y="56" width="40" height="18" rx="1"/><text class="ntxt" x="238" y="65.9" text-anchor="middle">PROBE, RAIL, ARM AXES</text>
+<polyline class="wire" points="104,94 114,94" marker-end="url(#flow)"/>
+<rect class="node" x="114" y="85" width="40" height="18" rx="1"/><text class="ntxt" x="134" y="93.25" text-anchor="middle">12 V DC-DC</text><text class="nsub" x="134" y="96.55" text-anchor="middle">3 A</text>
+<polyline class="wire" points="154,94 166,94" marker-end="url(#flow)"/>
+<rect class="node" x="166" y="85" width="40" height="18" rx="1"/><text class="ntxt" x="186" y="93.25" text-anchor="middle">PUMPS AND VALVES</text><text class="nsub" x="186" y="96.55" text-anchor="middle">air, water</text>
+<polyline class="wire" points="206,94 218,94" marker-end="url(#flow)"/>
+<rect class="node" x="218" y="85" width="40" height="18" rx="1"/><text class="ntxt" x="238" y="94.9" text-anchor="middle">2D LIDAR</text>
+<polyline class="wire" points="104,123 114,123" marker-end="url(#flow)"/>
+<rect class="node" x="114" y="114" width="40" height="18" rx="1"/><text class="ntxt" x="134" y="122.25" text-anchor="middle">ISOLATED 12 V</text><text class="nsub" x="134" y="125.55" text-anchor="middle">0.2 A</text>
+<polyline class="wire" points="154,123 166,123" marker-end="url(#flow)"/>
+<rect class="node" x="166" y="114" width="40" height="18" rx="1"/><text class="ntxt" x="186" y="123.9" text-anchor="middle">ISOLATED RS485</text>
+<polyline class="wire" points="206,123 218,123" marker-end="url(#flow)"/>
+<rect class="node" x="218" y="114" width="40" height="18" rx="1"/><text class="ntxt" x="238" y="120.6" text-anchor="middle">SOIL PROBE</text><text class="nsub" x="238" y="123.9" text-anchor="middle">no current path</text><text class="nsub" x="238" y="127.2" text-anchor="middle">through wet soil</text>
+<polyline class="wire" points="104,152 114,152" marker-end="url(#flow)"/>
+<rect class="node" x="114" y="143" width="40" height="18" rx="1"/><text class="ntxt" x="134" y="151.25" text-anchor="middle">5.1 V DC-DC</text><text class="nsub" x="134" y="154.55" text-anchor="middle">5 A, hold-up</text>
+<polyline class="wire" points="154,152 166,152" marker-end="url(#flow)"/>
+<rect class="node" x="166" y="143" width="40" height="18" rx="1"/><text class="ntxt" x="186" y="151.25" text-anchor="middle">RASPBERRY PI 5</text><text class="nsub" x="186" y="154.55" text-anchor="middle">mission, mapping</text>
+<polyline class="wire" points="206,152 218,152" marker-end="url(#flow)"/>
+<rect class="node" x="218" y="143" width="40" height="18" rx="1"/><text class="ntxt" x="238" y="151.25" text-anchor="middle">CAMERAS, GNSS</text><text class="nsub" x="238" y="154.55" text-anchor="middle">USB</text>
+<rect class="nodeh" x="166" y="176" width="40" height="20" rx="1"/><text class="ntxt" x="186" y="183.6" text-anchor="middle">REAL-TIME MCU</text><text class="nsub" x="186" y="186.9" text-anchor="middle">watchdog, encoders,</text><text class="nsub" x="186" y="190.2" text-anchor="middle">steppers, safety</text>
+<polyline class="bus" points="186,161 186,176" marker-end="url(#flow)"/>
+<text class="nsub" x="188" y="170" text-anchor="start">USB</text>
+<polyline class="bus" points="166,186 160,186 160,41 166,41" marker-end="url(#flow)"/>
+<text class="nsub" x="158" y="192" text-anchor="end">CAN to drives</text>
+<polyline class="bus" points="176,196 176,206 40,206 40,82" marker-end="url(#flow)"/>
+<text class="nsub" x="60" y="204" text-anchor="start">CAN / I2C: cell voltages, current, temperatures</text>
+<polyline class="bus" points="206,186 212,186 212,21 134,21 134,27" marker-end="url(#flow)"/>
+<text class="nsub" x="214" y="192" text-anchor="start">opens the drive contactor</text>
+<text class="ttitle" x="20" y="226">SAFETY DOES NOT DEPEND ON SOFTWARE</text>
+<text class="td" x="20" y="230.4">The e-stop and the RC kill switch open the drive contactor directly.</text>
+<text class="td" x="20" y="234.8">The MCU stops the motors if the Pi's heartbeat is missing for 200 ms.</text>
+<text class="td" x="20" y="239.2">The motor controllers stop if the MCU's CAN messages stop.</text>
+<text class="td" x="20" y="243.6">IP65 enclosure, M12/M8 IP67 connectors, membrane vent, conformal-coated boards.</text>
+<text class="td" x="20" y="248">Solid line: power. Dashed line: signal.</text>
+<line class="rule" x1="282" y1="29.6" x2="404" y2="29.6"/>
+<text class="th" x="283" y="28">BMS LIMITS</text>
+<text class="th" x="345" y="28">SETTING</text>
+<text class="td" x="283" y="32.6">Cell over / under voltage</text>
+<text class="td" x="345" y="32.6">3.65 / 2.5 V</text>
+<text class="td" x="283" y="37.2">Soft cut-off (rover returns to dock)</text>
+<text class="td" x="345" y="37.2">2.9 V per cell</text>
+<text class="td" x="283" y="41.8">Continuous / peak current</text>
+<text class="td" x="345" y="41.8">25 / 50 A</text>
+<text class="td" x="283" y="46.4">Short circuit</text>
+<text class="td" x="345" y="46.4">120 A in 200 us</text>
+<text class="td" x="283" y="51">Charge temperature</text>
+<text class="td" x="345" y="51">0 to 45 C</text>
+<text class="td" x="283" y="55.6">Discharge temperature</text>
+<text class="td" x="345" y="55.6">-20 to 60 C</text>
+<text class="td" x="283" y="60.2">Balancing</text>
+<text class="td" x="345" y="60.2">> 30 mV, 60 mA</text>
+<text class="td" x="283" y="64.8">Charge current at the dock</text>
+<text class="td" x="345" y="64.8">3 A (0.5 C)</text>
+<text class="td" x="283" y="69.4">Return to dock at</text>
+<text class="td" x="345" y="69.4">30% charge</text>
+<rect class="box" x="282" y="24" width="122" height="48.5"/>
+<line class="rule" x1="282" y1="89.6" x2="404" y2="89.6"/>
+<text class="th" x="283" y="88">ENERGY FOR ONE SURVEY</text>
+<text class="th" x="345" y="88">Wh</text>
+<text class="td" x="283" y="92.6">Driving 466 m</text>
+<text class="td" x="345" y="92.6">5.2</text>
+<text class="td" x="283" y="97.2">32 turns in place</text>
+<text class="td" x="345" y="97.2">4.8</text>
+<text class="td" x="283" y="101.8">Electronics, always on</text>
+<text class="td" x="345" y="101.8">10.8</text>
+<text class="td" x="283" y="106.4">Probe axis, 60 readings</text>
+<text class="td" x="345" y="106.4">4.8</text>
+<text class="td" x="283" y="111">Cleaning</text>
+<text class="td" x="345" y="111">0.5</text>
+<text class="td" x="283" y="115.6">TOTAL</text>
+<text class="td" x="345" y="115.6">26.1</text>
+<text class="td" x="283" y="120.2">Usable in the pack (80%)</text>
+<text class="td" x="345" y="120.2">184</text>
+<text class="td" x="283" y="124.8">Surveys per charge</text>
+<text class="td" x="345" y="124.8">7.1</text>
+<text class="td" x="283" y="129.4">Mission time</text>
+<text class="td" x="345" y="129.4">46 min</text>
+<rect class="box" x="282" y="84" width="122" height="48.5"/>
+<line class="rule" x1="282" y1="149.6" x2="404" y2="149.6"/>
+<text class="th" x="283" y="148">SUPPLY RAIL</text>
+<text class="th" x="317" y="148">FEEDS</text>
+<text class="td" x="283" y="152.6">Drive</text>
+<text class="td" x="317" y="152.6">2 dual BLDC FOC controllers, current-limited</text>
+<text class="td" x="283" y="157.2">24 V, 3 A</text>
+<text class="td" x="317" y="157.2">probe stepper, Y-rail stepper, scan-arm steppers</text>
+<text class="td" x="283" y="161.8">12 V, 3 A</text>
+<text class="td" x="317" y="161.8">air pump, water pump, solenoid valves, lidar</text>
+<text class="td" x="283" y="166.4">5.1 V, 5 A</text>
+<text class="td" x="317" y="166.4">Raspberry Pi 5 and USB cameras</text>
+<text class="td" x="283" y="171">Probe, 12 V, 0.2 A</text>
+<text class="td" x="317" y="171">the soil probe: no current path through wet soil</text>
+<rect class="box" x="282" y="144" width="122" height="30.1"/>
+<text class="ttitle" x="282" y="186">WHY LiFePO4</text>
+<text class="td" x="282" y="190.4">Far harder to push into thermal runaway than nickel-rich</text>
+<text class="td" x="282" y="194.8">Li-ion, about 2,000 cycles [A], and its extra weight sits</text>
+<text class="td" x="282" y="199.2">low and over the probe, where it adds push.</text>
+<g>
+  <rect class="frame" x="282" y="257" width="130" height="32" fill="#17407f"/>
+  <line class="rule" x1="282" y1="268" x2="412" y2="268"/><line class="rule" x1="282" y1="278.5" x2="412" y2="278.5"/>
+  <line class="rule" x1="364" y1="268" x2="364" y2="289"/><line class="rule" x1="327" y1="278.5" x2="327" y2="289"/>
+  <text class="big" x="285" y="265">AGRIROVER v2</text>
+  <text class="th" x="345" y="262.5">SOIL-MOISTURE SURVEY ROVER</text><text class="td" x="345" y="266">design targets, not as-built</text>
+  <text class="td" x="285" y="272">TITLE</text><text class="th" x="285" y="276.3">ELECTRICAL AND POWER</text>
+  <text class="td" x="366" y="272">SHEET</text><text class="th" x="366" y="276.3">4 OF 5</text>
+  <text class="td" x="285" y="282">SCALE · UNITS · PROJECTION</text><text class="th" x="285" y="286.3">NTS · mm · 3rd angle</text>
+  <text class="td" x="329" y="282">SOURCE</text><text class="th" x="329" y="286.3">model.mjs</text>
+  <text class="td" x="366" y="282">TEAM · DATE</text><text class="th" x="366" y="286.3">Auenchanters · 2026-11-11</text>
+</g>
+</svg>

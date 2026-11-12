@@ -34,7 +34,7 @@ def _load(config: Path) -> "SimConfig":
         raise typer.BadParameter(msg, param_hint="--config") from None
     except UnicodeDecodeError:
         raise typer.BadParameter(f"{config} is not UTF-8 text", param_hint="--config") from None
-    except (OSError, TypeError, AttributeError) as exc:  # missing extends: file, non-mapping YAML
+    except (OSError, TypeError, AttributeError, ValueError) as exc:  # bad extends:, non-mapping
         raise typer.BadParameter(f"{config}: {exc}", param_hint="--config") from None
 
 
@@ -128,7 +128,14 @@ def run(
         _check_model(model, cfg)
     out_dir = new_dir(_out_root(out), run_dir_name(seed))
     rrd = out_dir / "recording.rrd"
-    result = run_survey(cfg, seed, policy, rerun=rerun, budget=budget, rrd_path=rrd, model=model)
+    try:
+        result = run_survey(
+            cfg, seed, policy, rerun=rerun, budget=budget, rrd_path=rrd, model=model
+        )
+    except BaseException:
+        if not any(out_dir.iterdir()):  # a failed run leaves no empty folder behind
+            out_dir.rmdir()
+        raise
     save_run(result, out_dir)
     m, r = result.map_metrics, result.run_metrics
     typer.echo(f"run folder     {out_dir}")

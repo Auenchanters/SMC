@@ -92,6 +92,18 @@ def map_now(
     return mapper.estimate(grid)
 
 
+def _beside(layout: FieldLayout, graph: LaneGraph, site: ProbeSite, offset: float) -> ProbeSite:
+    """A spot `offset` m along the lane from an already-probed site that stays on the lane and
+    stem_keepout from every stem: towards the field's middle if allowed, else the other way, else
+    the same site again."""
+    toward = 1.0 if site.x < (graph.x_west + graph.x_east) / 2 else -1.0
+    for sign in (toward, -toward):
+        spot = ProbeSite(site.x + sign * offset, site.y, site.lane)
+        if graph.x_west <= spot.x <= graph.x_east and layout.site_ok([spot])[0]:
+            return spot
+    return site
+
+
 def _adaptive_legs(
     policy: Policy,
     cfg: SimConfig,
@@ -114,8 +126,9 @@ def _adaptive_legs(
     graph = LaneGraph.from_layout(layout)
     spacing = cfg.survey.candidate_spacing
     sites = tuple(layout.candidate_probe_sites(spacing))
-    site_xy = np.array([(s.x, s.y) for s in sites])
-    mid_x = (graph.x_west + graph.x_east) / 2
+    site_xy = np.array([(s.x, s.y) for s in sites]).reshape(-1, 2)
+    if not sites:  # stem_keepout left no site anywhere: nothing to probe, not even a recheck
+        return
     for _ in range(probes):
         times = np.zeros(len(sites), dtype=int)
         for x, y in probed:
@@ -130,8 +143,7 @@ def _adaptive_legs(
         k = policy.choose(ctx)
         site = sites[k]
         if times[k]:
-            step = 0.15 * int(times[k]) * (1 if site.x < mid_x else -1)
-            site = ProbeSite(site.x + step, site.y, site.lane)
+            site = _beside(layout, graph, site, 0.15 * int(times[k]))
         wps, _ = graph.shortest_path(here, site)
         yield [*wps[:-1], Waypoint(wps[-1].x, wps[-1].y, probe=True)]
         here = site
@@ -159,7 +171,7 @@ def run_survey(
     start_soil = SoilTruth.generate(cfg.soil, layout, rng_soil)
     dynamics = None
     if cfg.weather is not None:
-        dynamics = SoilDynamics(start_soil, cfg.weather, cfg.soil.vwc_clip, rng_weather)
+        dynamics = SoilDynamics(start_soil, cfg.weather, cfg.soil.vwc_clip, rng_weather, layout)
     truth = Truth(start_soil, dynamics)
     grid = GridSpec.for_field(cfg.field, cfg.mapping.output_resolution)
     probe = MoistureProbe(cfg.probe)

@@ -8,7 +8,7 @@
 [![agribench](https://github.com/Auenchanters/SMC/actions/workflows/benchmark.yml/badge.svg)](https://github.com/Auenchanters/SMC/actions/workflows/benchmark.yml)
 [![Python 3.13](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Windows native](https://img.shields.io/badge/Windows-native,_no_WSL-0078D4?logo=windows&logoColor=white)](#quickstart)
-[![tests](https://img.shields.io/badge/tests-134_passing-3FB950)](tests/)
+[![tests](https://img.shields.io/badge/tests-162_passing-3FB950)](tests/)
 [![Gymnasium](https://img.shields.io/badge/Gymnasium-1.3-0081A5)](https://gymnasium.farama.org/)
 [![Rerun](https://img.shields.io/badge/Rerun-0.39-6E40C9)](https://rerun.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -228,6 +228,28 @@ Going back helps a little: 2 to 3% better, on 18 of the 30 fields. That is not c
 ```powershell
 uv run agrisim run --config configs/scenarios/rain_shower.yaml --seed 7 --policy fixed_plus_recheck --view
 ```
+
+### Soil physics, checked against real data (12 November 2026)
+
+The soil can now follow real soil physics instead of the simple bucket: add a `physical:` section under `weather:`.
+- **Intake:** dry soil takes water in faster, and a cloudburst on heavy or crusted soil partly runs off (Green-Ampt).
+- **Drainage:** fast when soaked and almost nil below field capacity (Campbell).
+- **Drying:** follows the sun through the day, slows as the soil dries and stops at the wilting point (FAO-56).
+- **Drip irrigation:** wets a strip along each plant row, and the water spreads sideways.
+- **Soil properties:** 11 texture classes from Clapp and Hornberger (1978).
+
+On two years of data from the Cook Agronomy Farm sensor network, the physical model forecast an unseen season with a median error of 0.028 m³/m³, against 0.037 for the bucket. It was better at 12 of 19 stations (Wilcoxon p = 0.005). That farm is rain-fed wheat on silt loam, measured at 0.3 m: the test supports the model's form, not our tomato numbers. Method, results and limits: [docs/CALIBRATION.md](docs/CALIBRATION.md).
+
+![Measured and forecast soil moisture at three stations](docs/img/cookfarm_validation.png)
+
+The physics also exposed a weakness. With the drip lines running during a survey, the map error rose from 0.026 to 0.037 on 12 of 12 fields: the water lands along the rows, and the rover probes the lane centres.
+
+```powershell
+uv run agrisim run --config configs/scenarios/drip_irrigation.yaml --seed 7 --policy planned_survey --view
+uv run python scripts/soil_timelapse.py --out runs/timelapse
+```
+
+The frozen benchmark still uses the bucket, and its results are unchanged.
 
 ## What is new here
 
@@ -481,7 +503,7 @@ uv run pytest -q
 .\scripts\check_licenses.ps1
 ```
 
-There are 135 tests. They take about 2 minutes and need no network. They cover:
+There are 162 tests. They take about 2 minutes and need no network. They cover:
 - geometry validation;
 - field determinism;
 - the soil generator's correlation structure, checked against the exponential covariance;
@@ -566,7 +588,7 @@ src/agrisim/
   config.py     pydantic models + geometry validation, load(path)
   field.py      rows, plants, lanes, headlands, candidate probe sites
   soil.py       hidden truth: FFT Gaussian random field + drip stripes + dry/wet patches
-  weather.py    rain, evapotranspiration, drainage during a mission
+  weather.py    rain, evapotranspiration, drainage during a mission; the physical soil-water model and drip irrigation
   sensor.py     moisture probe: footprint mean, bias, noise, quantisation, failures, hard soil
   rover.py      differential-drive kinematics, footprint
   planning.py   boustrophedon full-coverage planner, closed-form lane graph
@@ -590,7 +612,7 @@ scripts/            demo.ps1 / demo.sh, check_licenses.ps1 / .sh, make_media.py,
 tests/              pytest suite
 docs/               README images and video, FUTURE_SCOPE.md
 models/ppo_v1/      trained MaskablePPO policy + its held-out evaluation
-hardware/rover-v2/  rover hardware design: model, calculations, drawings, anatomy figures, BOM (v1, superseded, in rover-v1/)
+hardware/rover-v2/  rover hardware design: model, calculations, drawings, blueprints (5 sheets, PDF), anatomy figures, BOM (v1, superseded, in rover-v1/)
 ```
 
 The planning documents:
@@ -598,6 +620,7 @@ The planning documents:
 - [EXECPLAN.md](EXECPLAN.md): the milestone plan, with every decision, surprise and result.
 - [research.md](research.md): competitors, papers, our flaws, and the work packages.
 - [docs/FUTURE_SCOPE.md](docs/FUTURE_SCOPE.md): what to build next.
+- [docs/CALIBRATION.md](docs/CALIBRATION.md): the soil physics and its check against real data.
 - [CLAUDE.md](CLAUDE.md): rules for the coding agent.
 
 ## Handover
