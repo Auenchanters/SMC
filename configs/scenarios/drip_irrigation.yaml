@@ -1,0 +1,22 @@
+# Scenario: the physical soil-water model on a drip-irrigated bed. The drip lines run for 20
+# minutes while the rover surveys, so the strips along the plant rows soak and spread sideways.
+# Soil physics: Clapp & Hornberger (1978) sandy loam; ET: FAO-56 (Allen et al. 1998).
+extends: ../demo.yaml
+
+mapping:
+  output_resolution: 0.25            # fine enough to show the wetted strip along each row
+
+weather:
+  layer_depth: 0.10                  # PLACEHOLDER: calibrate (sensing depth of the probe)
+  infiltration_cv: 0.3               # PLACEHOLDER: calibrate
+  infiltration_corr_length: 4.0      # PLACEHOLDER: calibrate
+  step_s: 60
+  physical:
+    texture: sandy_loam              # PLACEHOLDER: red sandy loam is common around Kolar; confirm on site
+    et0_mm_per_day: 5.0              # PLACEHOLDER: calibrate (a clear dry-season day)
+    crop_coefficient: 1.05           # FAO-56 Table 12, tomato mid-season, ground cover not full
+    depletion_fraction: 0.4          # FAO-56 Table 22, tomato
+    start_hour: 9.0                  # the survey starts at 09:00 solar time
+    lateral_diffusivity_m2_per_h: 0.004   # PLACEHOLDER: calibrate (how fast the wet strip widens)
+    irrigation:
+      - {start_s: 300, duration_s: 1200, emitter_l_per_h: 2.0, emitter_spacing: 0.4, strip_half_width: 0.15}   # PLACEHOLDER: the farm's drip line

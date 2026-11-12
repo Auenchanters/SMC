@@ -88,12 +88,22 @@ class Facts:
 
     @property
     def verdict(self) -> str:
-        """SUCCESS, PARTIAL or FAIL, decided from the metrics alone."""
+        """SUCCESS, PARTIAL or FAIL, decided from the metrics alone.
+
+        Combines our thresholds (dry F1 / RMSE) with upstream's rules: a plant
+        contact is a hard FAIL; a map that finds under 30% of the truly dry area,
+        or fewer than 80% of probes returning a value, downgrades to PARTIAL.
+        """
         if self.plant_contacts > 0:
             return "FAIL"
-        if self.dry_f1 >= SUCCESS_DRY_F1 and self.rmse <= SUCCESS_MAX_RMSE:
-            return "SUCCESS"
-        return "PARTIAL"
+        status = "SUCCESS"
+        if self.truth_dry_fraction > 0.01 and self.dry_recall < 0.3:
+            status = "PARTIAL"
+        if self.probes_used and self.valid_probes / self.probes_used < 0.8:
+            status = "PARTIAL"
+        if not (self.dry_f1 >= SUCCESS_DRY_F1 and self.rmse <= SUCCESS_MAX_RMSE):
+            status = "PARTIAL"
+        return status
 
     def as_block(self) -> str:
         return f"""### VERIFIED TELEMETRY (computed in code; do not contradict or recompute)
@@ -136,6 +146,38 @@ def load_run_data(run_dir: Path) -> tuple[dict[str, Any], list[dict[str, str]]]:
         except (ValueError, KeyError):
             hotspots = probes[:10]
     return data, hotspots
+
+
+def mission_verdict(run: dict[str, Any], soil_map: dict[str, Any]) -> tuple[str, list[str]]:
+    """Upstream's rule-based verdict, kept for compatibility.
+
+    Returns (status, reasons) where status is SUCCESS, PARTIAL or FAIL.
+    """
+    reasons: list[str] = []
+    status = "SUCCESS"
+    if run.get("plant_contacts", 0) > 0:
+        status = "FAIL"
+        reasons.append(f"{run['plant_contacts']} plant contact(s); the limit is 0")
+    recall = soil_map.get("dry_recall")
+    dry_share = soil_map.get("truth_dry_fraction", 0) or 0
+    if dry_share > 0.01 and (recall is None or recall < 0.3):
+        found = "none" if recall is None else f"{recall:.0%}"
+        if status == "SUCCESS":
+            status = "PARTIAL"
+        reasons.append(f"the map found {found} of the truly dry area (under 30%)")
+    used, valid = run.get("probes_used", 0), run.get("valid_probes", 0)
+    if used and valid / used < 0.8:
+        if status == "SUCCESS":
+            status = "PARTIAL"
+        reasons.append(f"only {valid} of {used} probes returned a reading")
+    cal = soil_map.get("calibration_95")
+    if cal is not None and not 0.85 <= cal <= 0.995:
+        reasons.append(
+            f"the map's 95% band holds {cal:.0%} of cells; treat its confidence with care"
+        )
+    if not reasons:
+        reasons = ["no plant contacts, and the dry area was found"]
+    return status, reasons
 
 
 def generate_prompt(facts: Facts, hotspots: list[dict[str, str]]) -> str:

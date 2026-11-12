@@ -1,0 +1,26 @@
+# Scenario: the physical soil-water model in a cloudburst on heavy soil. Rain falls faster than
+# the soil can take it in, so part of it runs off, and what soaks in drains slowly afterwards.
+# Soil physics: Clapp & Hornberger (1978) sandy clay loam with a surface crust.
+extends: ../demo.yaml
+
+probe:
+  bad_contact_prob: 0.05             # PLACEHOLDER: calibrate
+  bad_contact_drop: 0.10             # PLACEHOLDER: calibrate
+
+mapping:
+  output_resolution: 0.25            # fine enough to show the wetted strip along each row
+
+weather:
+  layer_depth: 0.10                  # PLACEHOLDER: calibrate (sensing depth of the probe)
+  infiltration_cv: 0.4               # PLACEHOLDER: calibrate
+  infiltration_corr_length: 4.0      # PLACEHOLDER: calibrate
+  step_s: 60
+  rain:
+    - {start_s: 600, duration_s: 900, rate_mm_per_h: 60}   # PLACEHOLDER: a 15-minute cloudburst
+  physical:
+    texture: sandy_clay_loam         # PLACEHOLDER: confirm on site
+    crust_factor: 0.5                # PLACEHOLDER: calibrate (a sealed surface halves the intake)
+    et0_mm_per_day: 4.0              # PLACEHOLDER: calibrate
+    crop_coefficient: 1.05           # FAO-56 Table 12, tomato mid-season
+    depletion_fraction: 0.4          # FAO-56 Table 22, tomato
+    start_hour: 14.0                 # an afternoon storm

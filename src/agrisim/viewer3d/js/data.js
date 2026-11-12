@@ -84,6 +84,17 @@ export async function loadSurvey(url) {
     // With weather the real moisture changes: truthAt(k) is the field when reading k was taken.
     truthAt: (k) => (S.truth_k ? S.truth_k[k] : S.truth),
     rainAt: (t) => (S.rain ?? []).reduce((r, e) => r + (t >= e.start_s && t < e.start_s + e.duration_s ? e.rate_mm_per_h : 0), 0),
+    // The physical soil model (null for the simple one): drip runs and the sun's drying rate.
+    PHYS: S.physics ?? null,
+    dripAt: (t) => (S.physics?.irrigation ?? []).some((e) => t >= e.start_s && t < e.start_s + e.duration_s),
+    hourAt: (t) => ((S.physics?.start_hour ?? 0) + t / 3600) % 24,
+    et0At(t) {
+      const P = S.physics;
+      if (!P) return 0;
+      if (!P.diurnal) return (P.et0_mm_per_day * P.kc) / 24;
+      const h = ((P.start_hour + t / 3600) % 24) - 6;
+      return h > 0 && h < 12 ? ((P.et0_mm_per_day * P.kc * Math.PI) / 24) * Math.sin((Math.PI * h) / 12) : 0;
+    },
     rand: mulberry(S.seed * 7919 + 11),
   };
 }

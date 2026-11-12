@@ -65,3 +65,18 @@ def test_view_needs_a_scene(tmp_path: Path) -> None:
     assert res.exit_code == 2
     # On CI (GITHUB_ACTIONS) the error box is coloured; compare the plain text.
     assert "--view" in re.sub(r"\x1b\[[0-9;]*m", "", res.output)
+
+
+def test_scene_carries_the_physical_soil_model(cfg: SimConfig) -> None:
+    from agrisim.config import load
+
+    assert scene_dict(run_survey(cfg, 3, budget=5))["physics"] is None  # the simple bucket: nothing
+    drip = load(REPO / "configs" / "scenarios" / "drip_irrigation.yaml")
+    s = scene_dict(run_survey(drip, 3, budget=5))
+    p = s["physics"]
+    assert p["texture"] == "sandy loam" and p["wilting_point"] < p["field_capacity"] < p["porosity"]
+    assert len(p["irrigation"]) == 1 and len(p["mean_k"]) == len(p["dry_k"]) == 6
+    assert all(0 <= d <= 1 for d in p["dry_k"]) and len(s["truth_k"]) == 6
+    json.dumps(s, allow_nan=False)
+    for name in ("data.js", "hud.js", "playback.js"):  # the page reads what the scene now carries
+        assert "PHYS" in (VIEWER / "js" / name).read_text(encoding="utf-8")

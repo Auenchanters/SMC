@@ -20,7 +20,7 @@ from agrisim.bench import parse_seeds
 from agrisim.cli import app
 from agrisim.config import RoverConfig, SimConfig
 from agrisim.control import densify
-from agrisim.field import FieldLayout
+from agrisim.field import FieldLayout, ProbeSite
 from agrisim.metrics import lane_coverage
 from agrisim.sim import run_survey
 from agrisim.view3d import make_server
@@ -261,3 +261,61 @@ def test_review4_gate_reports_a_broken_report_cleanly(tmp_path: Path) -> None:
         report.write_bytes(text)
         code, out = cli("gate", str(report))
         assert code == 2 and "not an agrisim suite report" in out, out
+
+
+WEATHER = {
+    "layer_depth": 0.1,
+    "field_capacity": 0.3,
+    "drainage_per_h": 0.5,
+    "evapotranspiration_mm_per_h": 0.4,
+    "infiltration_cv": 0.4,
+    "infiltration_corr_length": 4.0,
+    "step_s": 60,
+}
+
+
+def _flat(text: str) -> str:
+    """CLI output as plain words: no colour codes, no box drawing, no line wrapping. (On a colour
+    terminal the error box wraps long messages and puts colour codes between the words.)"""
+    text = re.sub(r"\x1b\[[0-9;]*m", "", text)
+    return " ".join(re.sub(r"[^\w.:,()<>=\- ]", " ", text).split())
+
+
+def test_23_configs_that_extend_each_other_are_refused(tmp_path: Path) -> None:
+    (tmp_path / "a.yaml").write_text("extends: b.yaml\n", encoding="utf-8")
+    (tmp_path / "b.yaml").write_text("extends: a.yaml\n", encoding="utf-8")
+    (tmp_path / "c.yaml").write_text("extends: [a.yaml]\n", encoding="utf-8")
+    res = CliRunner().invoke(app, ["run", "--config", str(tmp_path / "a.yaml"), "--seed", "1"])
+    assert res.exit_code == 2 and "extend each other in a loop" in _flat(res.output)
+    res = CliRunner().invoke(app, ["run", "--config", str(tmp_path / "c.yaml"), "--seed", "1"])
+    assert res.exit_code == 2 and "one file name" in _flat(res.output)
+
+
+def test_24_weather_settings_that_would_exhaust_memory_are_refused() -> None:
+    for change in ({"step_s": 0.001}, {"infiltration_corr_length": 5000.0}):
+        d = demo()
+        d["weather"] = {**WEATHER, **change}
+        with pytest.raises(ValidationError):
+            SimConfig.model_validate(d)
+
+
+def test_25_26_recheck_with_no_sites_and_recheck_spots_clear_of_stems() -> None:
+    d = demo()
+    d["field"]["stem_keepout"] = 0.59  # no lane-centre point is this far from every stem
+    none = SimConfig.model_validate(d)
+    for policy in ("recheck", "fixed_plus_recheck"):
+        assert run_survey(none, 1, policy, budget=6).run_metrics.plant_contacts == 0
+    d = demo()
+    d["weather"] = {**WEATHER, "rain": [{"start_s": 300, "duration_s": 300, "rate_mm_per_h": 20}]}
+    cfg = SimConfig.model_validate(d)
+    res = run_survey(cfg, 7, "recheck", budget=40)
+    spots = [ProbeSite(r.x, r.y, 0) for r in res.readings]
+    assert res.layout.site_ok(spots).all()
+
+
+def test_27_a_failed_run_leaves_no_empty_folder(tmp_path: Path) -> None:
+    out = tmp_path / "runs"
+    args = ["run", "--config", str(DEMO), "--seed", "1", "--policy", "ppo", "--out", str(out)]
+    res = CliRunner().invoke(app, [*args, "--model", str(tmp_path / "missing.zip")])
+    assert res.exit_code != 0
+    assert not out.exists() or not any(out.iterdir())
