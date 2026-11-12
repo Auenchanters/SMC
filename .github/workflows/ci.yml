@@ -17,7 +17,9 @@ jobs:
       - run: uv sync --locked
       - run: uv run ruff check .
       - run: uv run ruff format --check .
-      - run: uv run mypy src
+      # No path argument: pyproject.toml's [tool.mypy] files list decides what is checked,
+      # so CI and a local `uv run mypy` cannot drift apart.
+      - run: uv run mypy
       - run: uv run pytest -q
       - name: Licence gate (no GPL/AGPL/LGPL)
         run: uv run pip-licenses --partial-match --fail-on "GPL;General Public License"

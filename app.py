@@ -20,10 +20,15 @@ selected_model = st.sidebar.selectbox(
     "Select AI Agronomist", ["smc-edge-specialist", "smc-edge-doctor", "smc-brain"]
 )
 
-config_file = st.sidebar.selectbox(
-    "Select Field Config",
-    ["configs/demo.yaml"],  # Can be expanded to list all files in configs/
-)
+
+def _field_configs() -> list[str]:
+    """Every field config on disk: the ones in configs/ and the scenarios under it."""
+    found = sorted(Path("configs").glob("*.yaml"))
+    found += sorted(Path("configs/scenarios").glob("*.yaml"))
+    return [p.as_posix() for p in found] or ["configs/demo.yaml"]
+
+
+config_file = st.sidebar.selectbox("Select Field Config", _field_configs())
 
 probe_budget = st.sidebar.slider("Probe Budget", 10, 100, 30)
 strategy = st.sidebar.selectbox(

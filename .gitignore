@@ -19,3 +19,6 @@ build/
 # ships source + committed renderer outputs only, not CI rebuild working copies.
 benchmarks_output/
 .benchmarks_cache/
+
+# Local pytest transcripts, never committed:
+*.log

@@ -37,6 +37,9 @@ def main() -> int:
     )
     parser.add_argument("--budget", type=int, default=20, help="Probe budget for the mission")
     parser.add_argument(
+        "--seed", type=int, default=42, help="Simulation seed (42 keeps the demo repeatable)"
+    )
+    parser.add_argument(
         "--strategy", type=str, default="moisture_seeker", help="Probing strategy to use"
     )
     parser.add_argument(
@@ -58,7 +61,7 @@ def main() -> int:
         "--policy",
         args.strategy,
         "--seed",
-        "42",  # Fixed seed for consistent demos
+        str(args.seed),
         "--budget",
         str(args.budget),
         "--scene",
