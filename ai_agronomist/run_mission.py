@@ -1,8 +1,9 @@
 """Run one survey, ask the local AI agronomist for a debrief, and package the result.
 
-Every stage prints a machine-readable marker line (`MISSION_RUN_DIR=...`,
-`MISSION_PACKAGE_DIR=...`) so that callers such as `app.py` never have to parse prose.
-The command exits non-zero as soon as a stage fails.
+Run it from the repository root. Every stage prints a machine-readable marker line
+(`MISSION_RUN_DIR=...`, `MISSION_PACKAGE_DIR=...`) so that callers such as
+`control_centre_app.py` never have to parse prose. The command exits non-zero as soon as a
+stage fails.
 """
 
 import argparse
@@ -87,7 +88,7 @@ def main() -> int:
         "uv",
         "run",
         "python",
-        "scripts/agri_advisor.py",
+        "ai_agronomist/write_debrief.py",
         str(run_folder),
         "--output",
         "executive_report.md",

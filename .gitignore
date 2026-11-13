@@ -22,3 +22,6 @@ benchmarks_output/
 
 # Local pytest transcripts, never committed:
 *.log
+
+# Mission packages written by ai_agronomist/run_mission.py (saved examples live in examples/):
+mission_packages/

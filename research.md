@@ -879,7 +879,7 @@ Checked on 11 and 12 November 2026. [V] unless marked.
 - **TerraBlaster** (USA): laser-induced breakdown spectroscopy towed at 5 mph for nutrients; launch planned for the end of 2026. Nutrient mapping is moving to towed sensors.
 - **Fasal**: 12,000 farmers; FasalJet valve automation launched 29 January 2026; claims over 83 billion litres saved.
 - **Niqo Robotics** (formerly TartanSense, Bengaluru): spot-spraying cameras leased to village entrepreneurs at Rs 4 lakh, who charge farmers Rs 300 to 500 an acre (June 2024). The Indian model for selling farm robotics as a service.
-- **Low-cost capacitive sensor v1.2** (the one in `BOM.csv`): RMSE 4.5 to 4.9% gravimetric after soil-specific calibration, unit-to-unit variation 6.5 to 16% (Abdelmoneim et al., Sensors 25(2):343, 2025).
+- **Low-cost capacitive sensor v1.2** (the one in `docs/pitch/prototype_kit_bom.csv`): RMSE 4.5 to 4.9% gravimetric after soil-specific calibration, unit-to-unit variation 6.5 to 16% (Abdelmoneim et al., Sensors 25(2):343, 2025).
 - **More hardware failures:** Guardian Agriculture (closed August 2025, about $51.7 million raised), AgroIntelli (bankrupt March 2026, 65 Robotti delivered), Monarch Tractor (assets to Caterpillar, April 2026, over $200 million raised), AIGRO (bankrupt 19 October 2026).
 
 **What is wrong with our idea** [P] (the full write-up, with sources, is the team's Claude doc "AgriRover: What's Wrong With Our Idea")

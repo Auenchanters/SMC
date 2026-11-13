@@ -11,9 +11,9 @@ Verified against the tree, not assumed:
 | Simulated field, probe, rover, mapping, metrics | works (`src/agrisim`, 21 modules) |
 | CLI: `run`, `view`, `bench`, `suite`, `gate`, `train`, `eval` | works |
 | agribench v1: 8 tasks, 11 baselines, 2 oracles, fresh-field protocol | works; entry 78.5, below state of the art |
-| Mission packaging (`scripts/mission_manager.py` → folder) | works, verified end to end |
-| AI debrief (Ollama, computed verdict, validation) | works (`scripts/agri_advisor.py`) |
-| Control panel | Streamlit single-user (`app.py`) |
+| Mission packaging (`ai_agronomist/run_mission.py` → folder) | works, verified end to end |
+| AI debrief (Ollama, computed verdict, validation) | works (`ai_agronomist/write_debrief.py`) |
+| Control panel | Streamlit single-user (`ai_agronomist/control_centre_app.py`) |
 | Real probe readings in | **nothing** |
 | Real rover link (serial, radio, MQTT) | **nothing** |
 | Persistent store (database) | **nothing** — each run is an orphan folder of CSV/JSON |
@@ -91,7 +91,7 @@ Software only; it must work against the mock before any hardware exists.
 
 Today's advisor is a script tied to one folder and one model endpoint.
 
-- Move the logic into `src/agrisim/advisor/` (`facts.py`, `prompt.py`, `validate.py`, `render.py`, `backends/`), keeping `scripts/agri_advisor.py` as a thin CLI so nothing breaks.
+- Move the logic into `src/agrisim/advisor/` (`facts.py`, `prompt.py`, `validate.py`, `render.py`, `backends/`), keeping `ai_agronomist/write_debrief.py` as a thin CLI so nothing breaks.
 - Backends: `ollama` (local, default), `openai_compatible` (`base_url` + key from the environment), `none` (template report with no model). Offline always works.
 - Grounding from the store: the prompt gains the field's history (last N missions, zone deficits, calibration state) and the report cites probe and zone identifiers that exist in the database.
 - Cost and safety: per-mission token ceiling, cache keyed by `prompt_sha256`, refusal path that still writes a report, and no model call when metrics are missing.

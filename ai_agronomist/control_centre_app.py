@@ -1,6 +1,6 @@
 """SMC Rover Control Center: launch a mission and show the AI agronomist's debrief.
 
-Run with: uv run streamlit run app.py
+Run with: uv run streamlit run ai_agronomist/control_centre_app.py
 """
 
 import re
@@ -48,7 +48,7 @@ if st.sidebar.button("🚀 Launch Mission"):
             "uv",
             "run",
             "python",
-            "scripts/mission_manager.py",
+            "ai_agronomist/run_mission.py",
             "--config",
             config_file,
             "--budget",

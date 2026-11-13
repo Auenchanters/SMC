@@ -12,8 +12,8 @@ from pathlib import Path
 
 # CONFIGURATION
 CONFIG_FILE = "configs/demo.yaml"
-MODEL_NAME = "qwen3.5:4b"  # setup.bat pulls it
-ADVISOR = "scripts/agri_advisor.py"
+MODEL_NAME = "qwen3.5:4b"  # ai_agronomist/setup_models.bat pulls it
+ADVISOR = "ai_agronomist/write_debrief.py"
 CLI = "src/agrisim/cli.py"
 
 

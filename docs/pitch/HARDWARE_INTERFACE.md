@@ -27,7 +27,7 @@ At the end of the mission, a local script will calculate the run summary:
 ## 3. Synchronization Process
 1. **Physical Connection**: Rover is plugged into the Base Station via USB or synced via Wi-Fi.
 2. **Data Transfer**: The `runs/` folder is copied from the Pi to the Laptop.
-3. **Analysis**: `agri_advisor.py` is executed on the transferred folder.
+3. **Analysis**: `write_debrief.py` is executed on the transferred folder.
 
 ## 4. Hardware Mapping
 | Sim Variable | Physical Component | Method |

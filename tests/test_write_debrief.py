@@ -1,6 +1,6 @@
 """The AI agronomist must not contradict the telemetry it is given.
 
-`scripts/` is not an installed package, so the module is loaded from its path.
+`ai_agronomist/` is not an installed package, so the module is loaded from its path.
 """
 
 import importlib.util
@@ -10,12 +10,12 @@ from typing import Any
 
 import pytest
 
-ADVISOR = Path(__file__).resolve().parents[1] / "scripts" / "agri_advisor.py"
+ADVISOR = Path(__file__).resolve().parents[1] / "ai_agronomist" / "write_debrief.py"
 
 
 @pytest.fixture(scope="module")
 def advisor() -> ModuleType:
-    spec = importlib.util.spec_from_file_location("agri_advisor", ADVISOR)
+    spec = importlib.util.spec_from_file_location("write_debrief", ADVISOR)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)

@@ -5,7 +5,7 @@ This roadmap outlines the transition from the software prototype to a physical, 
 ## Phase 1: Software Baseline (Complete ✅)
 - [x] Core Simulator (`agrisim`) developed.
 - [x] Precision Probing Policies implemented.
-- [x] Local AI Agronomist (`agri_advisor.py`) integrated.
+- [x] Local AI Agronomist (`write_debrief.py`) integrated.
 - [x] 3D Replay Visualization system functional.
 
 ## Phase 2: Hardware Integration (Weeks 1-3)

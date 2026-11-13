@@ -62,8 +62,8 @@ select = ["E", "F", "W", "I", "UP", "B", "SIM", "NPY", "RUF"]
 
 [tool.mypy]
 strict = true
-# The AI debrief layer is typed too; the media/video scripts under scripts/ are not yet.
-files = ["src/agrisim", "scripts/agri_advisor.py", "scripts/mission_manager.py", "app.py"]
+# The AI debrief layer (ai_agronomist/) is typed too; the scripts under scripts/ are not yet.
+files = ["src/agrisim", "ai_agronomist"]
 
 [[tool.mypy.overrides]]
 module = ["pykrige.*"]  # PyKrige ships no type information

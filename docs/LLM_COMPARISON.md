@@ -41,7 +41,7 @@ One mission (demo field, `moisture_seeker`, 30 probes, seed 42; verdict PARTIAL)
 
 Two things mattered more than the choice of model:
 
-- **Thinking must be off.** Qwen 3.5 is a thinking model. Left on, it ran for 7 minutes and returned no text at all. `scripts/agri_advisor.py` now switches it off (the verdict and the numbers are computed in code) and treats an empty answer as an error.
+- **Thinking must be off.** Qwen 3.5 is a thinking model. Left on, it ran for 7 minutes and returned no text at all. `ai_agronomist/write_debrief.py` now switches it off (the verdict and the numbers are computed in code) and treats an empty answer as an error.
 - **The prompt must give the reason.** Told only "PARTIAL" and "plant contacts: 0", Qwen 3.5 blamed the rover for failing to make contact with plants, and Qwen 2.5 called a map over the error limit "quite accurate". With the reasons in the prompt, both got the status right.
 
 Still true of both: the `smc-*` Modelfiles ask for nitrogen, phosphorus, potassium, pH and conductivity, which the rover does not measure.

@@ -20,7 +20,7 @@ import yaml
 from openai import OpenAI
 
 DEFAULT_URL = "http://localhost:11434/v1"
-DEFAULT_MODEL = "qwen3.5:4b"  # setup.bat pulls it
+DEFAULT_MODEL = "qwen3.5:4b"  # ai_agronomist/setup_models.bat pulls it
 
 # Verdict thresholds. Draft values, like every PLACEHOLDER in configs/: an agronomist should
 # set these before anyone quotes them.

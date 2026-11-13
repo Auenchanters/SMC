@@ -10,10 +10,30 @@ Claude must never appear as an author, committer or contributor of this reposito
 
 ## Read first
 - @context.md: full project context, verified research, licence and platform rules, architecture. Source of truth.
-- @EXECPLAN.md: the living execution plan. Work milestone by milestone. Keep its Progress, Surprises & Discoveries, Decision Log and Outcomes & Retrospective sections up to date as you work.
+- EXECPLAN.md: the living execution plan (a long log: search it, do not load it whole). Work milestone by milestone. Keep its Progress, Surprises & Discoveries, Decision Log and Outcomes & Retrospective sections up to date as you work.
 - HANDOVER.md: current state, the step-by-step test plan with expected numbers, and open items. Read its section 0 before your first change.
 - research.md: competitors, related papers, our known flaws, and the work packages and paper plan for what to build next. Read it before planning new milestones.
 - Working on our agribench entry: start from the latest `runs/suite_*/brief.md` (or the CI artifact). It says what to improve next and how to test it.
+
+## Repository map (where to look)
+| Path | What it holds |
+|---|---|
+| `src/agrisim/` | The simulator package, one job per module: `config` (YAML models and validation), `field`, `soil` (hidden truth), `weather` (rain, drying, the physical soil model, drip), `sensor`, `rover`, `planning`, `control`, `safety`, `mapping`, `metrics` (may read the truth), `policies` (every probing strategy), `sim` (`run_survey`), `bench`, `suite` (agribench), `env` (Gymnasium, PPO), `io`, `viz` (Rerun, map colours), `view3d` and `viewer3d/` (3D replay), `cli` |
+| `tests/` | pytest, files named after what they test; `test_robustness.py` holds the regressions from reviews |
+| `configs/` | `demo.yaml` and `scenarios/*.yaml` (each one `extends:` the demo) |
+| `benchmarks/` | agribench: `README.md` (protocol), `solution.yaml` (our entry), `v1/` (frozen) |
+| `ai_agronomist/` | The AI debrief layer, outside the package: `write_debrief.py`, `run_mission.py`, `control_centre_app.py` (Streamlit), `demo_pipeline.py`, `setup_models.bat`, `modelfiles/`. Run its scripts from the repository root |
+| `scripts/` | One-off tools: `calibrate_cookfarm.py`, `soil_timelapse.py`, `make_media.py`, `demo_video/`, the demo and licence-check scripts |
+| `hardware/` | Rover designs in Node.js; most files are generated from `model.mjs` |
+| `docs/` | `CALIBRATION.md`, `FUTURE_SCOPE.md`, `PRODUCTION_PLAN.md`, `LLM_COMPARISON.md`, `pitch/` (funding pitch and low-cost prototype plan) |
+| `examples/` | Saved outputs of past runs. Nothing reads them; do not search or edit them |
+| `runs/`, `mission_packages/` | Outputs of your own runs, gitignored |
+
+To scan fast:
+- Search with `git grep` or a tool that honours `.gitignore`. A plain recursive grep walks `.venv/` and `runs/` and stalls.
+- `EXECPLAN.md` (120 KB) and `research.md` (90 KB) are long logs. Search them by keyword or date; do not read them whole.
+- Skip `uv.lock`, `examples/`, `src/agrisim/viewer3d/vendor/`, `hardware/*/anatomy/*.html` and `hardware/rover-v2/blueprints/`.
+- Never rename `src/agrisim/env.py` or its classes (the trained model in `models/ppo_v1/` loads them by name), and never move `context.md` or `research.md` (the frozen benchmark's files cite them).
 
 ## What this repo is
 `agrisim`: a pure-Python simulator of a planted tomato field where a small rover drives inter-row lanes without touching plants, probes soil moisture, and reconstructs a moisture grid plus an uncertainty grid. It also exposes a Gymnasium environment for training adaptive probing. Layer A only; no ROS or Gazebo code in this package.
@@ -53,7 +73,7 @@ A task is done only when ruff, mypy, pytest and the licence gate all pass. A cha
 - Update `benchmarks/v1/baseline.json` (`--update-baseline`) only for a real, reported improvement or an accepted trade-off, and say which in the commit message.
 
 ## Conventions
-- Layout: `src/agrisim/` (package), `tests/`, `configs/`, `scripts/`, `runs/` (gitignored outputs).
+- Layout: see the repository map above. New code for the simulator goes in `src/agrisim/`, anything that talks to a language model in `ai_agronomist/`, saved outputs in `examples/`. Keep the repository root to the files already there.
 - SI units; soil moisture is volumetric water content (m³/m³). World frame: origin at the field's south-west corner, x along rows, y across rows.
 - Determinism: every random draw comes from a `numpy.random.Generator` created from the run seed. No global random state. Same config + seed must give identical outputs.
 - Type hints on all public functions; small pure functions; no hidden I/O inside core modules.

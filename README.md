@@ -357,7 +357,7 @@ Our known weaknesses, with evidence. The full list, with severity and fixes, is 
 - **The learned policy loses to simple baselines.** Its global network cannot easily point at one specific site among 464, and 200k training steps are few. A per-site action head is untested.
 - **The weather model flatters the robot.** The robot's own rain correction is nearly perfect. Irrigation during a mission exists only in the opt-in physical model, not in the benchmark, and the physical model's drip and sideways spread have not been checked against data.
 - **The AI debrief leans on the simulator's hidden truth.** Its accuracy numbers (map error, dry area found) cannot be computed on a real rover, and no agronomist has checked its advice ([AI agronomist debrief](#ai-mission-debrief-local-extension)).
-- **Two hardware plans disagree.** `BOM.csv` and `ROADMAP.md` describe a Raspberry Pi kit (about $266); `hardware/rover-v2/` is a 22 kg rover with a 175 N probe push. The kit is too light to push a probe into dry soil. The team has not picked one ([HANDOVER.md](HANDOVER.md) Section 3).
+- **Two hardware plans disagree.** `docs/pitch/prototype_kit_bom.csv` and `docs/pitch/ROADMAP.md` describe a Raspberry Pi kit (about $266); `hardware/rover-v2/` is a 22 kg rover with a 175 N probe push. The kit is too light to push a probe into dry soil. The team has not picked one ([HANDOVER.md](HANDOVER.md) Section 3).
 - **One crop and one field geometry.** Generalisation across row spacings and field sizes is only partly tested (the large-field task).
 - **Positioning error is independent per reading.** Real GNSS error without RTK drifts over time.
 
@@ -630,34 +630,34 @@ The two videos and the 3D replay screenshots (`viewer3d*.jpg`) are made by [scri
 The repository has an AI layer on top of the simulator: a local language model writes a debrief of a run for a farm manager. Nothing in `src/agrisim` imports it, so the core results and gates above are unaffected.
 
 ```powershell
-uv run python scripts/mission_manager.py --config configs/demo.yaml --budget 60 --strategy moisture_seeker --model smc-brain
-uv run streamlit run app.py
-uv run python scripts/agri_advisor.py runs/<run folder> --model qwen3.5:4b
+uv run python ai_agronomist/run_mission.py --config configs/demo.yaml --budget 60 --strategy moisture_seeker --model smc-brain
+uv run streamlit run ai_agronomist/control_centre_app.py
+uv run python ai_agronomist/write_debrief.py runs/<run folder> --model qwen3.5:4b
 ```
 
-- `scripts/mission_manager.py` runs a whole mission: survey, debrief and a mission package.
-- `app.py` is a small local page (Streamlit) that launches a mission and shows the debrief.
-- `scripts/agri_advisor.py` writes a debrief for a run folder you already have. Add `--print-prompt` to see the verdict and the prompt without calling a model.
+- `ai_agronomist/run_mission.py` runs a whole mission: survey, debrief and a mission package.
+- `ai_agronomist/control_centre_app.py` is a small local page (Streamlit) that launches a mission and shows the debrief.
+- `ai_agronomist/write_debrief.py` writes a debrief for a run folder you already have. Add `--print-prompt` to see the verdict and the prompt without calling a model.
 
-It needs a local [Ollama](https://ollama.com/) serving the model, reached through the OpenAI-compatible endpoint at `http://localhost:11434/v1`, so nothing leaves the laptop. The `Modelfile*` files in the repository root build the `smc-*` models on Qwen 3.5 (4B, Apache-2.0, a 3.3 GB download that runs on a 6 GB graphics card), and `setup.bat` creates them (`ollama list` shows what is pulled). Qwen 3.5 needs a current Ollama: version 0.13.5 refused the download and 0.40.16 works (`winget upgrade Ollama.Ollama`).
+It needs a local [Ollama](https://ollama.com/) serving the model, reached through the OpenAI-compatible endpoint at `http://localhost:11434/v1`, so nothing leaves the laptop. The files in `ai_agronomist/modelfiles/` build the `smc-*` models on Qwen 3.5 (4B, Apache-2.0, a 3.3 GB download that runs on a 6 GB graphics card), and `ai_agronomist/setup_models.bat` creates them (`ollama list` shows what is pulled). Qwen 3.5 needs a current Ollama: version 0.13.5 refused the download and 0.40.16 works (`winget upgrade Ollama.Ollama`).
 
-The division of work matters. `metrics.json` decides the verdict (SUCCESS, PARTIAL or FAIL) and supplies every number; `scripts/agri_advisor.py` checks the model's prose against it; only the narrative is generated. A report that claims a plant contact when `plant_contacts` is 0, or invents a duration, is rewritten once and then flagged at the end of the file rather than trusted.
+The division of work matters. `metrics.json` decides the verdict (SUCCESS, PARTIAL or FAIL) and supplies every number; `ai_agronomist/write_debrief.py` checks the model's prose against it; only the narrative is generated. A report that claims a plant contact when `plant_contacts` is 0, or invents a duration, is rewritten once and then flagged at the end of the file rather than trusted.
 
 The verdict rules:
 - any plant contact is a FAIL;
 - under 30% of the truly dry area found, or under 80% of probes returning a reading, is a PARTIAL;
 - SUCCESS also needs dry-zone F1 of at least 0.60 and map error (RMSE) of at most 0.035. These two thresholds are draft values.
 
-The model is told why the verdict is what it is, and that zero plant contacts is the goal; the same reasons are printed at the top of the debrief. The rules exist because an 8B model called a random survey a success when nothing touched a plant. [llm.md](llm.md) compares three models on the same runs: the smallest (1.5B) missed coordinates and invented numbers, and the 8B one read the data correctly but misjudged the mission.
+The model is told why the verdict is what it is, and that zero plant contacts is the goal; the same reasons are printed at the top of the debrief. The rules exist because an 8B model called a random survey a success when nothing touched a plant. [docs/LLM_COMPARISON.md](docs/LLM_COMPARISON.md) compares three models on the same runs: the smallest (1.5B) missed coordinates and invented numbers, and the 8B one read the data correctly but misjudged the mission.
 
-Each mission writes `mission_packages/Mission_<run>/` with the debrief, `metrics.json`, `probes.csv`, `scene.json` and `START_HERE.txt`. Replay it with `uv run agrisim view <package folder>`; add `--scene` to `agrisim run` to write `scene.json` without starting the viewer.
+Each mission writes `mission_packages/Mission_<run>/` (gitignored; six saved ones are in `examples/mission_packages/`) with the debrief, `metrics.json`, `probes.csv`, `scene.json` and `START_HERE.txt`. Replay it with `uv run agrisim view <package folder>`; add `--scene` to `agrisim run` to write `scene.json` without starting the viewer.
 
 What to know before a demo:
-- **The two case studies are mislabelled.** By their own `metrics.json`, `case_studies/success` found 6% of the dry area and `case_studies/failure` found 34%. The rules above call both PARTIAL. Their saved debriefs were written before the rules and say otherwise.
+- **The two case studies are mislabelled.** By their own `metrics.json`, `examples/case_studies/success` found 6% of the dry area and `examples/case_studies/failure` found 34%. The rules above call both PARTIAL. Their saved debriefs were written before the rules and say otherwise.
 - **It works on simulated runs only.** The accuracy numbers in the debrief come from the simulator's hidden truth, which a real rover will not have.
 - **No agronomist has checked the advice.**
 
-The pitch material around it: [PITCH.md](PITCH.md), [DEMO_GUIDE.md](DEMO_GUIDE.md), [ROADMAP.md](ROADMAP.md), [HARDWARE_INTERFACE.md](HARDWARE_INTERFACE.md) and [BOM.csv](BOM.csv). `demo_pipeline.py` runs the simulation, the debrief and the 3D replay in one go.
+The pitch material around it: [docs/pitch/PITCH.md](docs/pitch/PITCH.md), [docs/pitch/DEMO_GUIDE.md](docs/pitch/DEMO_GUIDE.md), [docs/pitch/ROADMAP.md](docs/pitch/ROADMAP.md), [docs/pitch/HARDWARE_INTERFACE.md](docs/pitch/HARDWARE_INTERFACE.md) and [docs/pitch/prototype_kit_bom.csv](docs/pitch/prototype_kit_bom.csv). `ai_agronomist/demo_pipeline.py` runs the simulation, the debrief and the 3D replay in one go.
 
 ## Optional: NVIDIA GPU
 
@@ -699,18 +699,27 @@ src/agrisim/
   cli.py        agrisim run | bench | suite | gate | train | eval | view
 configs/            demo.yaml (all placeholders, marked "PLACEHOLDER: calibrate") and scenarios/
 benchmarks/         agribench: protocol (README.md), our entry (solution.yaml), frozen v1/ suite
+tests/              pytest suite, one file per module (test_<module>.py)
 scripts/            demo.ps1 / demo.sh, check_licenses.ps1 / .sh, make_media.py, demo_video/,
-                    calibrate_cookfarm.py, soil_timelapse.py, agri_advisor.py (the AI debrief),
-                    mission_manager.py (a whole mission as one package)
-tests/              pytest suite
-docs/               README images and video, FUTURE_SCOPE.md, CALIBRATION.md, PRODUCTION_PLAN.md
-case_studies/       two saved runs with their AI debriefs (labels need redoing, see HANDOVER.md)
-demo_pipeline.py    simulation + AI debrief + 3D replay in one go
-app.py              local Streamlit page: launch a mission, read the debrief
-Modelfile*, setup.bat  the smc-* Ollama models for the AI debrief
-mission_packages/   saved example missions (debrief, metrics, probes)
+                    calibrate_cookfarm.py, soil_timelapse.py
+ai_agronomist/      the AI debrief layer; nothing in src/agrisim imports it
+  write_debrief.py        a run folder -> a written debrief, with a rule-based verdict
+  run_mission.py          survey + debrief + one mission package
+  control_centre_app.py   local Streamlit page: launch a mission, read the debrief
+  demo_pipeline.py        survey + debrief + 3D replay in one go
+  setup_models.bat        pulls qwen3.5:4b and builds the smc-* Ollama models
+  modelfiles/             one <model name>.Modelfile per smc-* model; unused/ holds older ones
+docs/               CALIBRATION.md, FUTURE_SCOPE.md, PRODUCTION_PLAN.md, LLM_COMPARISON.md,
+                    img/ and media/ (README images and videos)
+  pitch/            PITCH.md, ROADMAP.md, DEMO_GUIDE.md, HARDWARE_INTERFACE.md, prototype_kit_bom.csv
+examples/           saved outputs, kept as they were written; nothing reads them
+  case_studies/           two runs with their AI debriefs (labels need redoing, see HANDOVER.md)
+  mission_packages/       six mission packages (debrief, metrics, probes)
+  debrief_samples/        early debriefs of a good and a bad run
+  moisture_seeker_bench/  the first bench of the moisture_seeker strategy
 models/ppo_v1/      trained MaskablePPO policy + its held-out evaluation
 hardware/rover-v2/  rover hardware design: model, calculations, drawings, blueprints (5 sheets, PDF), anatomy figures, BOM, BUILD_BRIEF.md (v1, superseded, in rover-v1/)
+runs/, mission_packages/   outputs of your own runs (gitignored)
 ```
 
 The planning documents:
@@ -721,8 +730,8 @@ The planning documents:
 - [docs/CALIBRATION.md](docs/CALIBRATION.md): the soil physics and its check against real data.
 - [docs/PRODUCTION_PLAN.md](docs/PRODUCTION_PLAN.md): the software needed to survey a real farm, in order.
 - [hardware/rover-v2/BUILD_BRIEF.md](hardware/rover-v2/BUILD_BRIEF.md): what the software needs from the hardware.
-- [PITCH.md](PITCH.md), [ROADMAP.md](ROADMAP.md), [DEMO_GUIDE.md](DEMO_GUIDE.md), [HARDWARE_INTERFACE.md](HARDWARE_INTERFACE.md), [BOM.csv](BOM.csv): the funding pitch and the low-cost prototype plan.
-- [llm.md](llm.md): three language models compared on the AI debrief.
+- [docs/pitch/PITCH.md](docs/pitch/PITCH.md), [docs/pitch/ROADMAP.md](docs/pitch/ROADMAP.md), [docs/pitch/DEMO_GUIDE.md](docs/pitch/DEMO_GUIDE.md), [docs/pitch/HARDWARE_INTERFACE.md](docs/pitch/HARDWARE_INTERFACE.md), [docs/pitch/prototype_kit_bom.csv](docs/pitch/prototype_kit_bom.csv): the funding pitch and the low-cost prototype plan.
+- [docs/LLM_COMPARISON.md](docs/LLM_COMPARISON.md): three language models compared on the AI debrief.
 - [CLAUDE.md](CLAUDE.md): rules for the coding agent.
 
 ## Handover
