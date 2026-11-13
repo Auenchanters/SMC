@@ -23,6 +23,7 @@ Claude must never appear as an author, committer or contributor of this reposito
 | `configs/` | `demo.yaml` and `scenarios/*.yaml` (each one `extends:` the demo) |
 | `benchmarks/` | agribench: `README.md` (protocol), `solution.yaml` (our entry), `v1/` (frozen) |
 | `ai_agronomist/` | The AI debrief layer, outside the package: `write_debrief.py`, `run_mission.py`, `control_centre_app.py` (Streamlit), `demo_pipeline.py`, `setup_models.bat`, `modelfiles/`. Run its scripts from the repository root |
+| `huggingface_space/` | The hosted app (Space `Auenchanters/SMC`): `app.py`, a trimmed `requirements.txt`, the Space `README.md`. Deploy with `scripts/deploy_huggingface_space.py`, which adds `src/agrisim` and `configs/` |
 | `scripts/` | One-off tools: `calibrate_cookfarm.py`, `soil_timelapse.py`, `make_media.py`, `demo_video/`, the demo and licence-check scripts |
 | `hardware/` | Rover designs in Node.js; most files are generated from `model.mjs` |
 | `docs/` | `CALIBRATION.md`, `FUTURE_SCOPE.md`, `PRODUCTION_PLAN.md`, `LLM_COMPARISON.md`, `pitch/` (funding pitch and low-cost prototype plan) |

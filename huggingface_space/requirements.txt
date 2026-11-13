@@ -1,0 +1,11 @@
+# What the simulator needs to run a survey. Same pins as pyproject.toml, without torch,
+# stable-baselines3, gymnasium (only the PPO policy uses them), streamlit and openai.
+numpy==2.5.4
+scipy==1.18.1
+shapely==2.2.0
+pydantic>=2.11.10,<=2.12.5  # the range Gradio's MCP extra allows; the repository pins 2.14.1
+pyyaml==6.0.3
+pykrige==1.7.3
+rerun-sdk==0.39.0
+typer==0.27.3
+matplotlib==3.11.2
