@@ -121,12 +121,17 @@ def test_drip_wets_the_rows_not_the_lanes_and_delivers_the_emitters_volume() -> 
     start = SoilTruth.generate(cfg.soil, layout, rng_soil)
     dyn = SoilDynamics(start, cfg.weather, cfg.soil.vwc_clip, rng_weather, layout)
     e = cfg.weather.physical.irrigation[0]
-    rate = irrigation_rate(cfg.weather.physical, e.start_s, e.start_s + 60, dyn._to_row)
+    rate = irrigation_rate(cfg.weather.physical, e.start_s, e.start_s + 60, dyn._rows)
     assert isinstance(rate, np.ndarray)
     litres_per_h = float(rate.sum()) * start.resolution**2  # mm/h x m^2 = L/h
     f = cfg.field
     emitters = len(layout.row_y) * (f.length_x - 2 * f.headland) / e.emitter_spacing
-    assert litres_per_h == pytest.approx(emitters * e.emitter_l_per_h, rel=0.03)
+    assert litres_per_h == pytest.approx(emitters * e.emitter_l_per_h, rel=1e-9)
+    # Every row gets its own emitters' volume, wherever it falls on the grid (the strip is
+    # narrower than a cell here, so sampling it at cell centres gave rows 0.27x to 1.87x).
+    nearest = np.abs(start.y_centres[:, None] - layout.row_y).argmin(axis=1)
+    per_row = np.bincount(nearest, weights=rate.sum(axis=1), minlength=len(layout.row_y))
+    assert per_row == pytest.approx(np.full(len(layout.row_y), per_row.mean()), rel=1e-9)
     before, after = dyn.at(e.start_s).grid, dyn.at(e.start_s + e.duration_s).grid
     gy = start.y_centres
     on_row = np.abs(gy[:, None] - layout.row_y).min(axis=1) < 0.1

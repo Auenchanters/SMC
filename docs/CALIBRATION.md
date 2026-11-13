@@ -67,10 +67,11 @@ The picture shows why. Real soil dries fast while it is wet and then levels off 
 4. **Neither model captures the crop's growth stage.** Both miss the timing of the fastest drying by a week or two at some stations.
 5. **Drip irrigation and sideways spread are not tested at all.** No open dataset we could reach has them.
 6. **Every number in the tomato scenarios is still a placeholder**, now with a named source: the texture table and FAO-56 crop values instead of round guesses.
+7. **The intake law is a simplified Green-Ampt.** Green and Ampt divide the suction term by the depth of water already infiltrated. A one-layer model does not track that, so the code divides by the layer depth. The result is a lower intake capacity (1.33 × Ks for a 0.1 m layer of sandy loam at field capacity, where the wetting front at the layer's depth would give 2.8 × Ks), so run-off in a cloudburst is over-estimated. The Cook Farm test (daily data) cannot tell the two apart.
 
 ## 6. What the physical model showed in simulation
 
-Running a survey while the drip lines are on (`configs/scenarios/drip_irrigation.yaml`) makes a known weakness visible. The water lands on the strips along the plant rows, 0.6 m from the lane centres where the rover probes. The rows soak, the rover's readings do not change, and its map error rises: from 0.026 with the drip off to 0.037 with it on (RMSE, `planned_survey`, the same 12 fields, seeds 200 to 211; higher on all 12). Lane-centre probing cannot see drip irrigation. This is flaw 6 in research.md, now reproduced by the physics instead of assumed.
+Running a survey while the drip lines are on (`configs/scenarios/drip_irrigation.yaml`) makes a known weakness visible. The water lands on the strips along the plant rows, 0.6 m from the lane centres where the rover probes. The rows soak, the rover's readings do not change, and its map error rises: from 0.026 with the drip off to 0.035 with it on (RMSE, `planned_survey`, the same 12 fields, seeds 200 to 211; higher on all 12). The first measurement gave 0.037; it was made before a fix that gives every drip row exactly its emitters' water, where rows used to get 0.27 to 1.87 times their share depending on where they fell on the 0.25 m soil grid. Lane-centre probing cannot see drip irrigation. This is flaw 6 in research.md, now reproduced by the physics instead of assumed.
 
 A two-day time-lapse of the hidden soil (`scripts/soil_timelapse.py`):
 

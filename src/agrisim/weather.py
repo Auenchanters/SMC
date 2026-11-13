@@ -41,11 +41,6 @@ def rain_mm(cfg: WeatherConfig, t0: float, t1: float) -> float:
     return total
 
 
-def raining(cfg: WeatherConfig, t: float) -> float:
-    """Rain rate at time t, mm/h."""
-    return sum(e.rate_mm_per_h for e in cfg.rain if e.start_s <= t < e.start_s + e.duration_s)
-
-
 def et0_rate(p: PhysicalSoilConfig, t: float) -> float:
     """Reference evapotranspiration at mission time t, mm/h. With `diurnal`, a half sine from
     06:00 to 18:00 solar time whose area is the day's total; otherwise the daily mean."""
@@ -68,9 +63,11 @@ def water_balance(
     """One step of the soil layer's water balance. Pure: the same function runs the hidden truth,
     the rover's own forecast and the calibration against field data.
 
-    1. Intake: water arriving at `supply_mm_per_h` soaks in up to the Green-Ampt capacity
-       Ks (1 + psi_f (theta_s - theta) / depth), with the wetting front at the layer's depth;
-       dry soil takes water faster. The rest, and anything above porosity, runs off.
+    1. Intake: water arriving at `supply_mm_per_h` soaks in up to a Green-Ampt-style capacity
+       Ks (1 + psi_f (theta_s - theta) / depth); dry soil takes water faster. The rest, and
+       anything above porosity, runs off. (Green and Ampt divide by the depth of water already
+       infiltrated, which a one-layer model does not track. Dividing by the layer depth gives a
+       lower capacity, so run-off is over-estimated, not under-estimated.)
     2. Drainage: gravity flow at K(theta) = Ks (theta / theta_s)^(2b + 3) (Campbell 1974),
        integrated exactly over the step, so it is stable for any step length.
     3. Evapotranspiration: Kc ET0, cut back in proportion once the soil is drier than the readily
@@ -105,26 +102,42 @@ def _spread(v: FloatArray, diffusivity: float, dt_h: float, resolution: float) -
     return v
 
 
+@dataclasses.dataclass(frozen=True)
+class DripRows:
+    """Where the drip lines lie on the soil grid."""
+
+    offset: FloatArray  # (ny, rows): each cell centre's signed distance across to each row, m
+    planted: FloatArray  # (nx,): share of each cell's length that lies between the headlands
+    cell: float  # grid resolution, m
+
+
 def irrigation_rate(
-    p: PhysicalSoilConfig, t0: float, t1: float, pattern: FloatArray | None
+    p: PhysicalSoilConfig, t0: float, t1: float, rows: DripRows | None
 ) -> FloatArray | float:
     """Drip water arriving between t0 and t1, mm/h per cell (the mean over the step)."""
-    if pattern is None or not p.irrigation:
+    if rows is None or not p.irrigation:
         return 0.0
     total: FloatArray | float = 0.0
     for e in p.irrigation:
         on = max(0.0, min(t1, e.start_s + e.duration_s) - max(t0, e.start_s)) / (t1 - t0)
         if on > 0:
-            # one emitter's flow over its share of the strip; `pattern` averages 1 across it
+            # one emitter's flow over its share of the strip; `_strip` averages 1 across it
             mean_rate = e.emitter_l_per_h / (e.emitter_spacing * 2 * e.strip_half_width)
-            total = total + on * mean_rate * _strip(pattern, e.strip_half_width)
+            across = _strip(rows.offset, e.strip_half_width, rows.cell).sum(axis=1)
+            total = total + on * mean_rate * across[:, None] * rows.planted[None, :]
     return total
 
 
-def _strip(distance_to_row: FloatArray, half_width: float) -> FloatArray:
-    """Cross-row profile of a drip strip: a cos^2 bump that averages 1 over its width."""
-    d = np.minimum(distance_to_row, half_width)  # (inf outside the planted area)
-    return np.asarray(2 * np.cos(np.pi * d / (2 * half_width)) ** 2, dtype=np.float64)
+def _strip(offset: FloatArray, half_width: float, cell: float) -> FloatArray:
+    """Cross-row profile of a drip strip, a cos^2 bump that averages 1 over its width, as its
+    mean over a cell `cell` wide centred `offset` from the row. Integrated, not sampled at the
+    cell centre: a strip narrower than a cell would otherwise give each row a different volume."""
+
+    def area(u: FloatArray) -> FloatArray:  # integral of 2 cos^2(pi u / (2 half_width)) from 0
+        u = np.clip(u, -half_width, half_width)
+        return np.asarray(u + half_width / np.pi * np.sin(np.pi * u / half_width))
+
+    return np.asarray((area(offset + cell / 2) - area(offset - cell / 2)) / cell, dtype=np.float64)
 
 
 def _step(
@@ -170,16 +183,19 @@ class SoilDynamics:
         layout: FieldLayout | None = None,
     ) -> None:
         self.cfg, self.clip = cfg, clip
-        # Distance from each cell to the nearest drip line (drip irrigation only).
-        self._to_row: FloatArray | None = None
+        self._rows: DripRows | None = None  # drip irrigation only
         if cfg.physical is not None and cfg.physical.irrigation:
             if layout is None:
                 raise ValueError("drip irrigation needs the field layout (the plant rows)")
-            f = layout.cfg
-            gx, gy = np.meshgrid(start.x_centres, start.y_centres)
-            d = np.abs(gy[..., None] - layout.row_y).min(axis=-1)
-            planted = (gx >= f.headland) & (gx <= f.length_x - f.headland)
-            self._to_row = np.where(planted, d, np.inf)
+            f, res, x = layout.cfg, start.resolution, start.x_centres
+            inside = np.minimum(x + res / 2, f.length_x - f.headland) - np.maximum(
+                x - res / 2, f.headland
+            )
+            self._rows = DripRows(
+                offset=start.y_centres[:, None] - np.asarray(layout.row_y)[None, :],
+                planted=np.clip(inside / res, 0.0, 1.0),
+                cell=res,
+            )
         z = gaussian_random_field(
             start.grid.shape, start.resolution, cfg.infiltration_corr_length, "gaussian", rng
         )
@@ -194,7 +210,7 @@ class SoilDynamics:
             drip: FloatArray | float = 0.0
             if self.cfg.physical is not None:
                 t0 = j * self.cfg.step_s
-                drip = irrigation_rate(self.cfg.physical, t0, t0 + self.cfg.step_s, self._to_row)
+                drip = irrigation_rate(self.cfg.physical, t0, t0 + self.cfg.step_s, self._rows)
             grid = _step(
                 self.cfg,
                 prev.grid.astype(np.float64),
@@ -227,21 +243,24 @@ def current_view(
     *,
     keep_failed: bool = False,
 ) -> list[ProbeReading]:
-    """The readings as the rover uses them at time `now`: each valid one replaced by a newer valid
+    """The readings as the rover uses them at time `now`: each one replaced by a newer valid
     reading within SUPERSEDE_RADIUS, the rest brought forward to `now`.
 
     Failed readings are dropped unless `keep_failed`, which mappers need: a failed insertion is
     a censored sample ("drier than the threshold"), not an absence of information. Anything that
-    counts probes must leave the flag off.
+    counts probes must leave the flag off. Valid readings come first, in the order taken.
     """
-    valid = [r for r in readings if r.valid and r.value is not None]
-    out = []
-    for i, r in enumerate(valid):
-        if any(math.hypot(q.x - r.x, q.y - r.y) < SUPERSEDE_RADIUS for q in valid[i + 1 :]):
+    out, failed = [], []
+    for i, r in enumerate(readings):
+        if any(
+            q.valid and q.value is not None and math.hypot(q.x - r.x, q.y - r.y) < SUPERSEDE_RADIUS
+            for q in readings[i + 1 :]
+        ):
             continue
-        if cfg is not None and r.value is not None:
+        if not r.valid or r.value is None:
+            failed.append(r)
+            continue
+        if cfg is not None:
             r = dataclasses.replace(r, value=bring_forward(cfg, r.value, r.t, now, clip))
         out.append(r)
-    if keep_failed:
-        out.extend(r for r in readings if not r.valid)
-    return out
+    return out + failed if keep_failed else out

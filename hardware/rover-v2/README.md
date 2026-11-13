@@ -7,6 +7,7 @@ The redesigned rover: a rocker-differential chassis on hub-motor wheels, with an
 | `model.mjs` | Parametric model: dimensions, masses, stability, probe force, traction, probe cycle, battery, BMS limits, service intervals, BOM |
 | `calc.mjs` → `CALCULATIONS.md` | Every number DESIGN.md quotes, recomputed from the model |
 | `drawings.mjs` → `drawings/rover-v2-views.svg` | Front, side and plan views (third-angle, 1:5) with a parts list |
+| `blueprints.mjs` → `blueprints/sheet-1.svg` to `sheet-5.svg`, `blueprints/index.html` | Five blueprint sheets. `blueprints/AgriRover-v2-blueprints.pdf` is printed by hand from `index.html` (A3 landscape); reprint it after a model change |
 | `anatomy/build.mjs` + `anatomy/rocker.mjs` + `anatomy/live.js` → `anatomy/rover-anatomy-light.html`, `anatomy/rover-anatomy.html` | Fig 1, the whole rover on a soil tray. Hover or use the arrow keys to move the probe. Space runs a probe cycle, R shifts the probe module along its rail, T raises two pads under diagonal wheels (a 100 mm twist): the rocker beams turn, the differential bar rocks, and the body stays level |
 | `anatomy/cleaning-build.mjs` + `anatomy/cleaning-live.js` → `anatomy/probe-cleaning-light.html`, `anatomy/probe-cleaning.html` | Fig 2, the cleaning station in section: wiper plate, strip brushes, air knife, wet clean and air check, escalating through levels 0 to 3 on one stubborn sample |
 
@@ -17,6 +18,7 @@ Needs Node.js 20.10 or later. From the repository root in PowerShell:
 ```powershell
 node hardware/rover-v2/calc.mjs
 node hardware/rover-v2/drawings.mjs
+node hardware/rover-v2/blueprints.mjs
 ```
 
 `model.mjs` derives the probe axis height from the stroke and checks it when it loads (the carriage never goes below the rails, only the extension rod and the probe pass the cleaning station, the head passes between the rails); it throws if a change breaks that.

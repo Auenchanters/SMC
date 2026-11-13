@@ -1,4 +1,3 @@
-# ruff: noqa: E501
 """Time-lapse of the hidden soil over two days: drip irrigation each morning, an afternoon
 cloudburst, and the sun drying the field. Shows the physical soil-water model at work without
 the rover (a survey lasts half an hour; wetting and drying play out over hours and days).
@@ -88,8 +87,8 @@ def main() -> None:
     extent = (0, cfg.field.length_x, 0, cfg.field.width_y)
 
     def clock(t: float) -> str:
-        h = (w.physical.start_hour + t / 3600) % 24  # type: ignore[union-attr]
-        return f"day {int((w.physical.start_hour + t / 3600) // 24) + 1}, {int(h):02d}:{int(h % 1 * 60):02d}"  # type: ignore[union-attr]
+        day, h = divmod(w.physical.start_hour + t / 3600, 24)  # type: ignore[union-attr]
+        return f"day {int(day) + 1}, {int(h):02d}:{int(h % 1 * 60):02d}"
 
     def draw(i: int, path: Path) -> None:
         t = float(times[i])
@@ -199,15 +198,17 @@ def main() -> None:
                 s.set_color("#2b333b")
             for night in (12, 36):  # 18:00 to 06:00
                 axis.axvspan(night, night + 12, color="#000", alpha=0.25, lw=0)
-        fig.text(0.64, 0.06, f"Soil: {w.physical.texture.replace('_', ' ')} (Clapp & Hornberger 1978). Placeholder field.",  # type: ignore[union-attr]
-                 color="#aab5bd", fontsize=9)  # fmt: skip
+        texture = w.physical.texture.replace("_", " ")  # type: ignore[union-attr]
+        note = f"Soil: {texture} (Clapp & Hornberger 1978). Placeholder field."
+        fig.text(0.64, 0.06, note, color="#aab5bd", fontsize=9)
         fig.savefig(path, facecolor=fig.get_facecolor())
         plt.close(fig)
 
     a.out.mkdir(parents=True, exist_ok=True)
     draw(len(times) - 1, a.out / "soil_timelapse.png")
     print(
-        f"rows {rows[0]:.3f} -> peak {max(rows):.3f} -> {rows[-1]:.3f}; lanes {lanes[0]:.3f} -> peak {max(lanes):.3f} -> {lanes[-1]:.3f}"
+        f"rows {rows[0]:.3f} -> peak {max(rows):.3f} -> {rows[-1]:.3f}; "
+        f"lanes {lanes[0]:.3f} -> peak {max(lanes):.3f} -> {lanes[-1]:.3f}"
     )
     if a.no_frames:
         return
@@ -216,11 +217,10 @@ def main() -> None:
     for i in range(len(times)):
         draw(i, frames / f"f_{i:04d}.png")
     if shutil.which("ffmpeg"):
-        subprocess.run(
-            ["ffmpeg", "-y", "-loglevel", "error", "-framerate", "24", "-i", str(frames / "f_%04d.png"),
-             "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "20", str(a.out / "soil_timelapse.mp4")],
-            check=True,
-        )  # fmt: skip
+        encode = ["-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "20"]
+        source = ["-framerate", "24", "-i", str(frames / "f_%04d.png")]
+        video = str(a.out / "soil_timelapse.mp4")
+        subprocess.run(["ffmpeg", "-y", "-loglevel", "error", *source, *encode, video], check=True)
     print("wrote", a.out)
 
 

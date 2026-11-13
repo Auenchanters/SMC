@@ -12,7 +12,7 @@ from pathlib import Path
 
 # CONFIGURATION
 CONFIG_FILE = "configs/demo.yaml"
-MODEL_NAME = "qwen2.5:1.5b"  # Change to qwen2.5:7b if you have it
+MODEL_NAME = "qwen3.5:4b"  # setup.bat pulls it
 ADVISOR = "scripts/agri_advisor.py"
 CLI = "src/agrisim/cli.py"
 

@@ -14,6 +14,7 @@ from agrisim.config import CensoredConfig, SimConfig, load
 from agrisim.mapping import GridSpec, KrigingMapper
 from agrisim.sensor import ProbeReading
 from agrisim.sim import run_survey
+from agrisim.weather import current_view
 
 ROOT = Path(__file__).resolve().parents[1]
 CENSORED = CensoredConfig(threshold=0.20, min_readings=3, sigma_floor=0.01)
@@ -52,6 +53,32 @@ def test_censored_probe_never_exceeds_the_threshold(cfg: SimConfig) -> None:
         m.update(ProbeReading(float(i), 1.0, 0.0, v, True))
     m.update(ProbeReading(9.0, 1.0, 0.0, None, False))
     assert float(m.xyz[-1, 2]) < CENSORED.threshold
+
+
+def test_censored_values_do_not_depend_on_order_or_on_each_other(cfg: SimConfig) -> None:
+    """Three failures among four readings: all get the value one failure would get."""
+    valid = [
+        ProbeReading(float(i), 1.0, 0.0, v, True) for i, v in enumerate([0.28, 0.30, 0.26, 0.29])
+    ]
+    failed = [ProbeReading(9.0 + i, 1.0, 0.0, None, False) for i in range(3)]
+    one = _kriging(cfg, CENSORED)
+    for r in [*valid, failed[0]]:
+        one.update(r)
+    mixed = _kriging(cfg, CENSORED)
+    for r in [failed[0], valid[0], failed[1], *valid[1:], failed[2]]:
+        mixed.update(r)
+    assert mixed.xyz[4:, 2] == pytest.approx(np.full(3, one.xyz[-1, 2]), abs=1e-15)
+
+
+def test_a_failed_probe_is_replaced_by_a_later_reading_beside_it() -> None:
+    readings = [
+        ProbeReading(1.0, 1.0, 0.0, None, False),  # failed here...
+        ProbeReading(5.0, 1.0, 10.0, None, False),
+        ProbeReading(1.15, 1.0, 20.0, 0.27, True),  # ...then read 0.15 m further along
+    ]
+    kept = current_view(readings, None, 30.0, (0.05, 0.45), keep_failed=True)
+    assert [(r.x, r.valid) for r in kept] == [(1.15, True), (5.0, False)]
+    assert [r.x for r in current_view(readings, None, 30.0, (0.05, 0.45))] == [1.15]
 
 
 def test_too_few_readings_falls_back_one_sigma_below(cfg: SimConfig) -> None:

@@ -52,25 +52,25 @@ class _Readings:
     """Keeps the valid readings; failed probes are ignored unless censoring is enabled."""
 
     def __init__(self, censored: CensoredConfig | None = None) -> None:
-        self._xyz: list[tuple[float, float, float]] = []
+        self._xyz: list[tuple[float, float, float]] = []  # valid readings
+        self._failed: list[tuple[float, float]] = []  # failed insertions, kept when censoring
         self._censored = censored
 
     def update(self, reading: ProbeReading) -> None:
         if reading.valid and reading.value is not None:
             self._xyz.append((reading.x, reading.y, reading.value))
         elif self._censored is not None:
-            self._xyz.append((reading.x, reading.y, self._censored_value()))
+            self._failed.append((reading.x, reading.y))
 
-    def _censored_value(self) -> float:
-        """E[theta | theta < threshold] for a normal prior fitted to the readings so far.
+    def _censored_value(self, c: CensoredConfig) -> float:
+        """E[theta | theta < threshold] for a normal prior fitted to the valid readings.
 
         A failed insertion is evidence of dry, hard soil, so the reading is placed at the
         truncated-normal mean below the threshold (research.md WP4). With too few readings to
-        fit a prior, the threshold less one sigma is used instead.
+        fit a prior, the threshold less one sigma is used instead. Every failed insertion gets
+        the same value, from the valid readings only: the order of the readings does not matter,
+        and one censored value never shifts the next.
         """
-        c = self._censored
-        if c is None:  # pragma: no cover - callers check first
-            raise ValueError("censoring is not enabled")
         z = np.array([value for _, _, value in self._xyz], dtype=np.float64)
         if len(z) < c.min_readings:
             return float(c.threshold - c.sigma_floor)
@@ -86,7 +86,12 @@ class _Readings:
 
     @property
     def xyz(self) -> FloatArray:
-        return np.array(self._xyz, dtype=np.float64).reshape(-1, 3)
+        """(n, 3) x, y, value: the valid readings, then any censored ones."""
+        rows = list(self._xyz)
+        if self._censored is not None and self._failed:
+            value = self._censored_value(self._censored)
+            rows += [(x, y, value) for x, y in self._failed]
+        return np.array(rows, dtype=np.float64).reshape(-1, 3)
 
 
 def _global_mean(z: FloatArray, grid: GridSpec) -> tuple[FloatArray, FloatArray]:

@@ -182,11 +182,11 @@ Report problems as GitHub issues with the command, the seed and the config file 
 | M10 phase 4 (plants in the 3D replay) | Not started; phases 1 to 3 are done |
 | Physical soil model is not in the benchmark | It is opt-in (`weather.physical`); `benchmarks/v1` still uses the bucket. Adding it means a v2 benchmark folder and a Decision Log entry |
 | Physical soil model: drip and sideways spread untested on data | Only rain, drainage and drying were checked (Cook Farm, [docs/CALIBRATION.md](docs/CALIBRATION.md)). Needs our own plot: readings before and after a drip run |
-| Lane-centre probes miss drip water | Measured: map error 0.026 to 0.037 with the drip running. Needs a longer probe reach (hardware) or row-aware mapping; see the blueprint set, sheet 5 |
+| Lane-centre probes miss drip water | Measured: map error 0.026 to 0.035 with the drip running (12 fields; 0.036 on 30). Needs a longer probe reach (hardware) or row-aware mapping; see the blueprint set, sheet 5 |
 | `CLAUDE.md` restored (13 Nov), not yet brought up to date | It was removed on 22 Oct and is back as it was then. Its contributor list still says "teammate: TBD" although two teammates have merged work; it says `uv run mypy src` where CI now runs `uv run mypy`; and its "no web dashboard" rule disagrees with `app.py` (next rows) |
 | Two hardware plans disagree | `BOM.csv` / `ROADMAP.md` (Raspberry Pi kit, about $266) against `hardware/rover-v2/` (22 kg, 175 N probe push). The kit is too light to push a probe into dry soil. The team must pick one |
 | Case-study labels | `case_studies/success` found 6% of the dry area and `case_studies/failure` 34%, by their own metrics. Rename or redo them before a demo. Their saved debriefs were written before the rule-based verdict and contradict it (the merged rules call both PARTIAL) |
-| Blueprints are not checked in CI | `ci.yml` rebuilds the calculations, drawings and anatomy figures, but not `hardware/rover-v2/blueprints.mjs`, and `hardware/rover-v2/README.md` does not list it. A model change can leave the five sheets stale without CI noticing (rebuilt by hand on 12 Nov: no difference). The PDF is printed by hand and can also go stale |
+| Blueprint PDF is printed by hand | CI now rebuilds the five sheets and `index.html` (`blueprints.mjs`) and fails if they are stale. `AgriRover-v2-blueprints.pdf` is still printed from `index.html` by hand, so reprint it after a model change |
 | `openai` and `streamlit` are core dependencies | Only the AI layer (`scripts/agri_advisor.py`, `app.py`) uses them, and `streamlit` brings about 20 more packages. Both are pinned and Apache-2.0. Moving them to an optional group is a team decision |
 | `app.py` against the "no web dashboard in this phase" rule | The rule is in `CLAUDE.md`. `app.py` is a local Streamlit page. The team should either drop the rule or the page |
 | `certifi` is MPL-2.0 | It came in with `streamlit`. The licence gate passes (it blocks GPL, AGPL and LGPL only), but MPL is not on the project's list of allowed licences. Needs the team's approval and a Decision Log entry |
@@ -237,3 +237,16 @@ Details are in the ExecPlan's Surprises & Discoveries section.
 - **Censored readings:** `mapping.censored` (off by default) maps a failed insertion as "drier than the threshold". Scenario: `configs/scenarios/censored_hard_soil.yaml`.
 - **New strategy:** `moisture_seeker`. It is not a benchmark baseline (`benchmarks/v1/suite.yaml` lists those by name) and not our entry.
 - **Checked before the merge (commit `9676d46`):** ruff, ruff format, mypy (Windows and Linux, 24 files), 175 tests, the licence gate, `uv lock --check`, and the agribench quick tier (hard gate and regression gate pass; scores on the public fields identical to the commit before).
+
+## 8. Audit of 13 November 2026
+
+A written gold standard (12 lines, [EXECPLAN.md](EXECPLAN.md), Validation and Acceptance) and an audit against it. Eight lines are met; the four that are not need a field, a full benchmark run or a team decision.
+
+- **Fixed: drip water per row.** A row used to get 0.27 to 1.87 times its emitters' water, depending on where it fell on the soil grid. The drip penalty on the map is now 0.026 to 0.035 (it was reported as 0.037).
+- **Fixed: censored readings.** One failed probe no longer shifts the value given to the next. Dry area found on the harsh world: 31% to 47% (it was reported as 50%).
+- **Fixed: AI verdict.** A field with no dry zone can now be a SUCCESS.
+- **Removed:** three pieces of code nothing called. **Added:** blueprints to CI.
+- **Checked and clean:** 390 runs of every strategy on every config; byte-identical repeat runs; the soil texture table against its source; the benchmark's public-field scores (unchanged).
+- **Tests:** 175 to 178.
+- **AI debrief on a newer model (13 Nov):** `qwen3.5:4b` replaces `qwen2.5:3b` (needs a current Ollama; `setup.bat` pulls it). Thinking is switched off, an empty answer is an error, and the prompt and the report now say why the verdict is what it is. Comparison in [llm.md](llm.md).
+- **Open:** the app's three AI agronomists behave as one, because `agri_advisor.py` sends its own system message, which replaces the Modelfile's. Their Modelfiles also ask for nutrients, pH and conductivity, which the rover does not measure. Decide: one model, or make the three really differ.

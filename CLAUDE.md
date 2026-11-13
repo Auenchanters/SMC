@@ -37,8 +37,8 @@ Python 3.13 via `uv`. numpy, scipy, shapely, pydantic v2, PyYAML, PyKrige, rerun
     uv sync
     uv run ruff check .
     uv run ruff format --check .
-    uv run mypy src
-    uv run mypy src --platform linux   # CI also type-checks on Ubuntu; Windows-only APIs need a sys.platform check
+    uv run mypy
+    uv run mypy --platform linux   # CI also type-checks on Ubuntu; Windows-only APIs need a sys.platform check
     uv run pytest -q
     uv run agrisim run --config configs/demo.yaml --seed 7
     uv run agrisim run --config configs/demo.yaml --seed 7 --rerun

@@ -13,7 +13,7 @@ uv run agrisim run --config configs/demo.yaml --seed 7
 Run the AI advisor on the run folder that was just created.
 ```powershell
 # Replace <folder> with the actual run folder name (e.g., runs/2026...)
-uv run python scripts/agri_advisor.py <folder> --model qwen2.5:1.5b
+uv run python scripts/agri_advisor.py <folder> --model qwen3.5:4b
 ```
 **What to say**: *"Instead of just giving a farmer a spreadsheet of numbers, we use a local AI Agronomist to interpret the telemetry and generate an executive action plan."*
 

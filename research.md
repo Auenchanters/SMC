@@ -886,7 +886,7 @@ Checked on 11 and 12 November 2026. [V] unless marked.
 1. A farm of about 1.15 ha cannot own a 22 kg robot; it has to be a service.
 2. A moisture map is stale within hours, so it cannot schedule irrigation. Its value is in things that stay true for weeks: clogged emitters, leaks, zones that always dry first, where to put a fixed sensor.
 3. Fixed sensors already do scheduling for a monthly fee.
-4. Lane-centre probes miss drip water [S]: map error 0.026 to 0.037 with the drip running.
+4. Lane-centre probes miss drip water [S]: map error 0.026 to 0.035 with the drip running (0.037 before the drip-volume fix of 13 November).
 5. Dry-zone recall is low [S]: 6% and 34% in the repo's two case studies.
 6. No data from our own field.
 

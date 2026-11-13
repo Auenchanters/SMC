@@ -20,13 +20,13 @@ import yaml
 from openai import OpenAI
 
 DEFAULT_URL = "http://localhost:11434/v1"
-DEFAULT_MODEL = "qwen2.5:1.5b"
+DEFAULT_MODEL = "qwen3.5:4b"  # setup.bat pulls it
 
 # Verdict thresholds. Draft values, like every PLACEHOLDER in configs/: an agronomist should
 # set these before anyone quotes them.
 SUCCESS_DRY_F1 = 0.60
-PARTIAL_DRY_F1 = 0.30
 SUCCESS_MAX_RMSE = 0.035
+DRY_AREA_TO_JUDGE = 0.01  # below this share of truly dry cells there is no dry zone to find
 DURATION_TOLERANCE_MIN = 1.0
 
 # Prose that contradicts a survey in which no plant was touched.
@@ -90,26 +90,52 @@ class Facts:
     def verdict(self) -> str:
         """SUCCESS, PARTIAL or FAIL, decided from the metrics alone.
 
-        Combines our thresholds (dry F1 / RMSE) with upstream's rules: a plant
-        contact is a hard FAIL; a map that finds under 30% of the truly dry area,
-        or fewer than 80% of probes returning a value, downgrades to PARTIAL.
+        A plant contact is a hard FAIL. SUCCESS means no shortfall at all. Anything else is
+        PARTIAL.
         """
         if self.plant_contacts > 0:
             return "FAIL"
-        status = "SUCCESS"
-        if self.truth_dry_fraction > 0.01 and self.dry_recall < 0.3:
-            status = "PARTIAL"
-        if self.probes_used and self.valid_probes / self.probes_used < 0.8:
-            status = "PARTIAL"
-        if not (self.dry_f1 >= SUCCESS_DRY_F1 and self.rmse <= SUCCESS_MAX_RMSE):
-            status = "PARTIAL"
-        return status
+        return "PARTIAL" if self.shortfalls else "SUCCESS"
+
+    @property
+    def shortfalls(self) -> list[str]:
+        """Why the mission is not a SUCCESS, in plain words (empty for a SUCCESS). The model is
+        given these: left to guess, it invents a reason (it once blamed "0 plant contacts")."""
+        out = []
+        if self.plant_contacts > 0:
+            out.append(f"the rover touched plants {self.plant_contacts} time(s); the limit is 0")
+        # A field with no dry zone has no dry scores (metrics.json holds null): not a shortfall.
+        if self.truth_dry_fraction > DRY_AREA_TO_JUDGE:
+            if self.dry_recall < 0.3:
+                out.append(
+                    f"the map found only {self.dry_recall:.0%} of the truly dry area "
+                    "(at least 30% is needed)"
+                )
+            elif self.dry_f1 < SUCCESS_DRY_F1:
+                out.append(
+                    f"dry-zone F1 is {self.dry_f1:.2f} (at least {SUCCESS_DRY_F1:.2f} is needed)"
+                )
+        if self.probes_used and self.probe_success < 0.8:
+            out.append(
+                f"only {self.valid_probes} of {self.probes_used} probes returned a value "
+                "(at least 80% is needed)"
+            )
+        if self.rmse > SUCCESS_MAX_RMSE:
+            out.append(
+                f"map error (RMSE) is {self.rmse:.4f} VWC (at most {SUCCESS_MAX_RMSE} is allowed)"
+            )
+        return out
+
+    @property
+    def why(self) -> str:
+        """One sentence explaining the verdict."""
+        return "; ".join(self.shortfalls) or "no plant was touched and every target was met"
 
     def as_block(self) -> str:
         return f"""### VERIFIED TELEMETRY (computed in code; do not contradict or recompute)
-- Mission verdict: {self.verdict}
+- Mission verdict: {self.verdict}, because: {self.why}
 - Policy used: {self.policy}
-- Plant contacts: {self.plant_contacts} (0 means no plant was touched at all)
+- Plant contacts: {self.plant_contacts} (the rover must never touch a plant: 0 is the goal)
 - Mission time: {self.minutes:.2f} minutes
 - Path length: {self.path_m:.2f} metres
 - Probes that returned a value: {self.valid_probes} of {self.probes_used}
@@ -148,41 +174,12 @@ def load_run_data(run_dir: Path) -> tuple[dict[str, Any], list[dict[str, str]]]:
     return data, hotspots
 
 
-def mission_verdict(run: dict[str, Any], soil_map: dict[str, Any]) -> tuple[str, list[str]]:
-    """Upstream's rule-based verdict, kept for compatibility.
-
-    Returns (status, reasons) where status is SUCCESS, PARTIAL or FAIL.
-    """
-    reasons: list[str] = []
-    status = "SUCCESS"
-    if run.get("plant_contacts", 0) > 0:
-        status = "FAIL"
-        reasons.append(f"{run['plant_contacts']} plant contact(s); the limit is 0")
-    recall = soil_map.get("dry_recall")
-    dry_share = soil_map.get("truth_dry_fraction", 0) or 0
-    if dry_share > 0.01 and (recall is None or recall < 0.3):
-        found = "none" if recall is None else f"{recall:.0%}"
-        if status == "SUCCESS":
-            status = "PARTIAL"
-        reasons.append(f"the map found {found} of the truly dry area (under 30%)")
-    used, valid = run.get("probes_used", 0), run.get("valid_probes", 0)
-    if used and valid / used < 0.8:
-        if status == "SUCCESS":
-            status = "PARTIAL"
-        reasons.append(f"only {valid} of {used} probes returned a reading")
-    cal = soil_map.get("calibration_95")
-    if cal is not None and not 0.85 <= cal <= 0.995:
-        reasons.append(
-            f"the map's 95% band holds {cal:.0%} of cells; treat its confidence with care"
-        )
-    if not reasons:
-        reasons = ["no plant contacts, and the dry area was found"]
-    return status, reasons
-
-
 def generate_prompt(facts: Facts, hotspots: list[dict[str, str]]) -> str:
     """The user message: fixed facts first, then what the narrative should cover."""
-    lines = [f"- Pos({p['x_m']}, {p['y_m']}): {p['value_vwc']} VWC" for p in hotspots]
+    lines = [
+        f"- Pos({float(p['x_m']):.1f}, {float(p['y_m']):.1f}): {p['value_vwc']} VWC"
+        for p in hotspots
+    ]
     return f"""
 You are an Expert AI Agronomist and Precision Irrigation Consultant.
 You have just received the mission telemetry from an autonomous soil-moisture survey rover.
@@ -253,6 +250,8 @@ def verified_header(facts: Facts) -> str:
 
 **Mission status: {facts.verdict}** (computed from the telemetry, not from the narrative below)
 
+Why: {facts.why}.
+
 | Field | Value |
 |---|---|
 | Plant contacts | {facts.plant_contacts} |
@@ -281,12 +280,25 @@ def render_report(facts: Facts, narrative: str, problems: list[str]) -> str:
             "",
             "---",
             "",
-            "> **Validation notes**: the narrative below disagreed with the telemetry. Correct the",
+            "> **Validation notes**: the narrative above disagreed with the telemetry. Correct the",
             "> report from the table above, do not trust these sentences.",
             "",
             *[f"> - {p}" for p in problems],
         ]
     return "\n".join(parts).rstrip() + "\n"
+
+
+def _complete(client: OpenAI, model: str, messages: list[dict[str, str]]) -> str:
+    """The model's answer. Thinking is switched off: the verdict and every number are computed
+    in code, and a thinking model (Qwen 3.5) otherwise spends minutes and its whole answer on
+    reasoning and returns no text. An empty answer is an error, never an empty report."""
+    response = client.chat.completions.create(  # type: ignore[call-overload]
+        model=model, messages=messages, reasoning_effort="none"
+    )
+    text = (response.choices[0].message.content or "").strip()
+    if not text:
+        raise RuntimeError(f"model {model!r} returned no text")
+    return text
 
 
 def ask_model(client: OpenAI, model: str, facts: Facts, hotspots: list[dict[str, str]]) -> str:
@@ -297,8 +309,7 @@ def ask_model(client: OpenAI, model: str, facts: Facts, hotspots: list[dict[str,
         {"role": "system", "content": system},
         {"role": "user", "content": prompt},
     ]
-    response = client.chat.completions.create(model=model, messages=messages)  # type: ignore[arg-type]
-    text = (response.choices[0].message.content or "").strip()
+    text = _complete(client, model, messages)
     problems = validate_report(text, facts)
     if not problems:
         return text
@@ -315,8 +326,7 @@ def ask_model(client: OpenAI, model: str, facts: Facts, hotspots: list[dict[str,
             ),
         },
     ]
-    response = client.chat.completions.create(model=model, messages=messages)  # type: ignore[arg-type]
-    return (response.choices[0].message.content or "").strip()
+    return _complete(client, model, messages)
 
 
 def main() -> int:
