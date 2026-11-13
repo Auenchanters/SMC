@@ -8,7 +8,7 @@
 [![agribench](https://github.com/Auenchanters/SMC/actions/workflows/benchmark.yml/badge.svg)](https://github.com/Auenchanters/SMC/actions/workflows/benchmark.yml)
 [![Python 3.13](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Windows native](https://img.shields.io/badge/Windows-native,_no_WSL-0078D4?logo=windows&logoColor=white)](#quickstart)
-[![tests](https://img.shields.io/badge/tests-162_passing-3FB950)](tests/)
+[![tests](https://img.shields.io/badge/tests-175_passing-3FB950)](tests/)
 [![Gymnasium](https://img.shields.io/badge/Gymnasium-1.3-0081A5)](https://gymnasium.farama.org/)
 [![Rerun](https://img.shields.io/badge/Rerun-0.39-6E40C9)](https://rerun.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -190,6 +190,8 @@ Every benchmark run also writes `brief.md`, a ready-made task for the next perso
 uv run agrisim suite --tier quick --workers 8
 ```
 
+Latest quick run (13 November 2026, commit `9676d46`, after the soil-physics, mission-manager and censored-reading merges): the hard gate and the regression gate pass, and our entry's scores on the public fields are identical to those before the merges. Overall 72.7 [95% CI 59.1, 88.5] on 16 fresh fields per task, highest of the real strategies; status still below state of the art. The quick tier has too few fields for per-task wins to reach significance (0 of 12 here, 1 of 12 on the commit before). No full run has been made since 18 October.
+
 ### Earlier results: held-out evaluation
 
 These numbers come from `agrisim eval` (held-out fields, seeds 100 to 149, budget 30 probes, no deadline), measured before agribench existed. Transcripts are in [EXECPLAN.md, *Artifacts and Notes*](EXECPLAN.md#artifacts-and-notes).
@@ -243,9 +245,56 @@ On two years of data from the Cook Agronomy Farm sensor network, the physical mo
 
 ![Measured and forecast soil moisture at three stations](docs/img/cookfarm_validation.png)
 
-The physics also exposed a weakness. With the drip lines running during a survey, the map error rose from 0.026 to 0.037 on 12 of 12 fields: the water lands along the rows, and the rover probes the lane centres.
+The physics also exposed a weakness: the drip water lands along the rows, and the rover probes the lane centres.
+
+#### Latest simulations (12 and 13 November 2026)
+
+All from `agrisim bench`, with no deadline. These scenarios are not part of the frozen benchmark, and every soil number in them is still a placeholder. The drip and cloudburst tables use 30 fields (seeds 0 to 29) and budget 60, run at commit `95ed51a`; the drip run repeated at `9676d46` gave identical rows. The hard-soil table uses 50 fields (seeds 0 to 49) and budget 60, at `9676d46`.
+
+**Drip lines running during the survey** (`configs/scenarios/drip_irrigation.yaml`: 2 L/h emitters for 20 minutes, starting 5 minutes in), against the same fields with the drip off:
+
+| Strategy | Map error (RMSE), drip off | Map error (RMSE), drip running | Dry-zone F1, drip running | Cells inside the map's 95% band, drip running | Mission time |
+|---|---|---|---|---|---|
+| planned_survey (our entry) | 0.0263 ± 0.0015 | 0.0373 ± 0.0010 | **0.48** | 88% | 33 min |
+| spatial_coverage | 0.0264 ± 0.0014 | 0.0382 ± 0.0010 | 0.42 | 86% | 29 min |
+| fixed_spacing | 0.0271 ± 0.0015 | 0.0389 ± 0.0010 | 0.33 | 86% | 28 min |
+| fixed_plus_recheck | 0.0263 ± 0.0014 | 0.0361 ± 0.0010 | 0.41 | 89% | 37 min |
+| greedy_variance | 0.0243 ± 0.0017 | 0.0315 ± 0.0012 | 0.42 | 91% | 66 min |
+
+- **The drip raises every strategy's map error on all 30 fields.** For our entry it goes from 0.026 to 0.037 (42% worse). This repeats the team's first measurement (the same two numbers on 12 other fields).
+- **The map becomes overconfident.** With the drip off, 95 to 97% of cells fall inside the map's own 95% band; with it running, 86 to 91%. The rover's forecast of its old readings leaves irrigation out.
+- **Dry-zone detection barely moves.** Our entry's F1 goes from 0.50 to 0.48 and is still the highest, though the intervals (± 0.07 to 0.09) overlap.
+- `greedy_variance` has the lowest error but takes twice as long (66 minutes, 1,514 m). The frozen benchmark's deadlines would cut it short.
+
+**A cloudburst on heavy soil** (`configs/scenarios/monsoon_shower.yaml`: 60 mm/h for 15 minutes on crusted sandy clay loam, 1 misread in 20):
+
+| Strategy | Map error (RMSE) | Dry area found (recall) | Distance | Mission time |
+|---|---|---|---|---|
+| greedy_variance | 0.0273 ± 0.0016 | 6% | 1502 m | 65 min |
+| planned_survey (our entry) | 0.0277 ± 0.0014 | **18%** | 1130 m | 52 min |
+| spatial_coverage | 0.0288 ± 0.0014 | 4% | 468 m | 29 min |
+| fixed_spacing | 0.0290 ± 0.0012 | 4% | 466 m | 28 min |
+| fixed_plus_recheck | 0.0306 ± 0.0018 | 3% | 602 m | 33 min |
+
+After the storm almost every strategy loses the dry zones. Our entry, which waits out the rain, finds the most (18%), and that is still low. Map error is close across the strategies.
+
+**Failed probes read as "drier than the threshold"** (`configs/scenarios/censored_hard_soil.yaml`: the benchmark's harsh world with the new opt-in `mapping.censored`), against the same fields with failed probes ignored:
+
+| Strategy | Dry area found (recall), ignored → censored | Dry-zone precision | Dry-zone F1 | Map error (RMSE) |
+|---|---|---|---|---|
+| planned_survey (our entry) | 31% → **50%** | 0.56 → 0.47 | 0.37 → 0.46 | 0.0358 → 0.0353 |
+| moisture_seeker (new) | 31% → **51%** | 0.57 → 0.48 | 0.41 → 0.47 | 0.0361 → 0.0353 |
+| spatial_coverage | 22% → **42%** | 0.36 → 0.40 | 0.28 → 0.36 | 0.0358 → 0.0347 |
+
+- **The map finds much more of the dry area**, on 41 to 45 of the 50 fields for each strategy. In hard soil the driest spots are the ones the probe cannot enter, so the map used to have no readings there.
+- **Precision falls for the two adaptive strategies** (0.56 to 0.47 for our entry): a censored sample also paints some soil on the wetter side of the threshold as dry.
+- **Map error barely moves** (lower on 23 to 32 of 50 fields).
+- **It does not change the ranking.** Every strategy shares the mapper and improves together, and `moisture_seeker` ties our entry on dry-zone F1 (0.47 ± 0.05 against 0.46 ± 0.05) while driving more than twice as far (1,369 m against 606 m) and taking 61 minutes against 34.
 
 ```powershell
+uv run agrisim bench --config configs/scenarios/drip_irrigation.yaml --seeds 0-29 --budget 60 --workers 8
+uv run agrisim bench --config configs/scenarios/monsoon_shower.yaml --seeds 0-29 --budget 60 --workers 8
+uv run agrisim bench --config configs/scenarios/censored_hard_soil.yaml --seeds 0-49 --budget 60 --strategies planned_survey,moisture_seeker,spatial_coverage --workers 8
 uv run agrisim run --config configs/scenarios/drip_irrigation.yaml --seed 7 --policy planned_survey --view
 uv run python scripts/soil_timelapse.py --out runs/timelapse
 ```
@@ -275,11 +324,13 @@ The frozen benchmark still uses the bucket, and its results are unchanged.
    - Windows-native with no WSL, Docker or compiler.
    - The same config and seed give a byte-identical `metrics.json`.
    - Windows no longer throttles benchmark workers in the background.
+9. **Soil physics checked on real data.** An opt-in physical soil-water model (intake, drainage, drying, drip irrigation) that forecast an unseen season at a real farm better than the simple bucket ([Soil physics](#soil-physics-checked-against-real-data-12-november-2026)).
+10. **A written debrief with a verdict the language model cannot change.** A local model explains a run to a farm manager; fixed rules decide whether the mission succeeded ([AI agronomist debrief](#ai-mission-debrief-local-extension)).
 
 **Innovations we can make next** (detail in [docs/FUTURE_SCOPE.md](docs/FUTURE_SCOPE.md)):
 
 - **A per-zone irrigation plan and a water-regret score.** Turn the map into litres per drip zone, which is what a farmer or an irrigation controller like FasalJet acts on.
-- **Failed insertions as information.** A probe that fails in hard soil says "drier than X". Treated as a censored reading, it could win the harsh task.
+- **Failed insertions as information: built as an opt-in, not yet in the benchmark.** A probe that fails in hard soil says "drier than X". `mapping.censored` now maps it that way and raises the dry area found from 31% to 50% on the harsh world ([latest simulations](#latest-simulations-12-and-13-november-2026)). It lowers precision, and using it in agribench needs a new benchmark version.
 - **Side reach plus row-aware kriging.** Lane-centre readings cannot tell probe bias apart from the wetter drip line under the rows ([research.md §7.1](research.md)). A reach of 0.30 m would see half of it, against about 2% with the current ±60 mm rail.
 - **Lookahead planning.** It matters more as probes get slower: 29 s for rover v2, about 10 minutes for an onboard lab.
 
@@ -290,7 +341,7 @@ The frozen benchmark still uses the bucket, and its results are unchanged.
 | Simulating a planted tomato field: rows, plants, lanes, headlands, hidden soil moisture, weather during a mission | ROS, Gazebo, Unity, Isaac or other 3D-engine code (Phase 2, a separate plan) |
 | Rover kinematics, lane-only path planning and following, plant-contact checks | Building the physical rover. v2 is a complete design, not yet built ([hardware/](hardware/)). |
 | Probe model: noise, bias, failures, hard soil, misreads | Cameras and disease detection (Phase 3) |
-| Kriging map plus uncertainty, scored against the truth | Real field data. Every number is a placeholder until calibrated. |
+| Kriging map plus uncertainty, scored against the truth | Data from our own field. The soil physics is checked on a public wheat-farm dataset; every tomato number is a placeholder until calibrated. |
 | Probing strategies, the published baselines and a learned policy (Gymnasium + MaskablePPO) | Web dashboards and cloud services |
 | agribench: frozen tasks, fresh fields, paired statistics, CI on every push | Crops other than tomato, until someone has their numbers |
 | The 3D replay and the Rerun live view | Irrigation control. The map is the output today; a zone plan is future scope. |
@@ -302,9 +353,11 @@ Our known weaknesses, with evidence. The full list, with severity and fixes, is 
 - **No real data yet (the biggest gap).** Every soil and probe number is a placeholder: moisture levels, noise, patch sizes, row spacing, the "dry" threshold. The results compare strategies *inside the simulator*; they are not field accuracy. Every research robot we compare against has a real robot or real data.
 - **Map error ties the coverage designs on soil that does not change.** Two noise draws of the same probe layout already differ by 7 to 15% per field, and an optimised layout lowers kriging variance only 0.3 to 1.9% below k-means. A significant win needs information the v1 fields do not offer to a strategy that cannot see the truth.
 - **Dry zones under hard soil are won only narrowly** (`harsh_b60`). The probe reads 0.02 wet, so probes at the edge of a dry zone read wet, and half the probes in dry soil fail. Since the repeat-probe fix our entry beats every baseline there, but the interval is wide (71 to 121), and earlier runs did not win it.
-- **Lane-centre probes cannot see the drip line under the rows.** In the demo config, the placeholder probe bias happens to cancel most of that unseen difference ([research.md §7.1](research.md)).
+- **Lane-centre probes cannot see the drip line under the rows.** In the demo config, the placeholder probe bias happens to cancel most of that unseen difference ([research.md §7.1](research.md)). With the physical soil model it is now measured: running the drip during a survey raises map error from 0.026 to 0.037 and leaves the map overconfident ([latest simulations](#latest-simulations-12-and-13-november-2026)).
 - **The learned policy loses to simple baselines.** Its global network cannot easily point at one specific site among 464, and 200k training steps are few. A per-site action head is untested.
-- **The weather model flatters the robot.** The robot's own rain correction is nearly perfect, and there is no irrigation during a mission yet.
+- **The weather model flatters the robot.** The robot's own rain correction is nearly perfect. Irrigation during a mission exists only in the opt-in physical model, not in the benchmark, and the physical model's drip and sideways spread have not been checked against data.
+- **The AI debrief leans on the simulator's hidden truth.** Its accuracy numbers (map error, dry area found) cannot be computed on a real rover, and no agronomist has checked its advice ([AI agronomist debrief](#ai-mission-debrief-local-extension)).
+- **Two hardware plans disagree.** `BOM.csv` and `ROADMAP.md` describe a Raspberry Pi kit (about $266); `hardware/rover-v2/` is a 22 kg rover with a 175 N probe push. The kit is too light to push a probe into dry soil. The team has not picked one ([HANDOVER.md](HANDOVER.md) Section 3).
 - **One crop and one field geometry.** Generalisation across row spacings and field sizes is only partly tested (the large-field task).
 - **Positioning error is independent per reading.** Real GNSS error without RTK drifts over time.
 
@@ -499,12 +552,12 @@ Soil moisture is volumetric water content (VWC): cubic metres of water per cubic
 ```powershell
 uv run ruff check .
 uv run ruff format --check .
-uv run mypy src
+uv run mypy
 uv run pytest -q
 .\scripts\check_licenses.ps1
 ```
 
-There are 162 tests. They take about 2 minutes and need no network. They cover:
+There are 175 tests. They take about 2 minutes and need no network. They cover:
 - geometry validation;
 - field determinism;
 - the soil generator's correlation structure, checked against the exponential covariance;
@@ -520,7 +573,10 @@ There are 162 tests. They take about 2 minutes and need no network. They cover:
 - clean CLI errors for bad configs, policies and benchmark reports;
 - Gymnasium's `check_env`;
 - an end-to-end train-and-eval smoke test;
-- the DOV baseline no longer crawling along one lane (it must drive far and beat random).
+- the DOV baseline no longer crawling along one lane (it must drive far and beat random);
+- the physical soil-water model (intake, drainage, drying, drip);
+- censored readings, checked against `scipy.stats.truncnorm`;
+- the AI debrief's verdict rules and its check of the model's prose.
 
 For agribench they cover:
 - CRPS against its definition;
@@ -571,18 +627,37 @@ The two videos and the 3D replay screenshots (`viewer3d*.jpg`) are made by [scri
 
 ## AI mission debrief (local extension)
 
-This working copy adds an AI layer on top of the simulator. Nothing in `src/agrisim` imports it, so the core results and gates above are unaffected.
+The repository has an AI layer on top of the simulator: a local language model writes a debrief of a run for a farm manager. Nothing in `src/agrisim` imports it, so the core results and gates above are unaffected.
 
 ```powershell
 uv run python scripts/mission_manager.py --config configs/demo.yaml --budget 60 --strategy moisture_seeker --model smc-brain
 uv run streamlit run app.py
+uv run python scripts/agri_advisor.py runs/<run folder> --model qwen2.5:1.5b
 ```
 
-It needs a local Ollama serving one of the `smc-*` models (the `Modelfile*` files in the repository root build them; `ollama list` shows what is pulled), reached through the OpenAI-compatible endpoint at `http://localhost:11434/v1`.
+- `scripts/mission_manager.py` runs a whole mission: survey, debrief and a mission package.
+- `app.py` is a small local page (Streamlit) that launches a mission and shows the debrief.
+- `scripts/agri_advisor.py` writes a debrief for a run folder you already have. Add `--print-prompt` to see the verdict and the prompt without calling a model.
+
+It needs a local [Ollama](https://ollama.com/) serving the model, reached through the OpenAI-compatible endpoint at `http://localhost:11434/v1`, so nothing leaves the laptop. The `Modelfile*` files in the repository root build the `smc-*` models, and `setup.bat` creates them (`ollama list` shows what is pulled).
 
 The division of work matters. `metrics.json` decides the verdict (SUCCESS, PARTIAL or FAIL) and supplies every number; `scripts/agri_advisor.py` checks the model's prose against it; only the narrative is generated. A report that claims a plant contact when `plant_contacts` is 0, or invents a duration, is rewritten once and then flagged at the end of the file rather than trusted.
 
+The verdict rules:
+- any plant contact is a FAIL;
+- under 30% of the truly dry area found, or under 80% of probes returning a reading, is a PARTIAL;
+- SUCCESS also needs dry-zone F1 of at least 0.60 and map error (RMSE) of at most 0.035. These two thresholds are draft values.
+
+The rules exist because an 8B model called a random survey a success when nothing touched a plant. [llm.md](llm.md) compares three models on the same runs: the smallest (1.5B) missed coordinates and invented numbers, and the 8B one read the data correctly but misjudged the mission.
+
 Each mission writes `mission_packages/Mission_<run>/` with the debrief, `metrics.json`, `probes.csv`, `scene.json` and `START_HERE.txt`. Replay it with `uv run agrisim view <package folder>`; add `--scene` to `agrisim run` to write `scene.json` without starting the viewer.
+
+What to know before a demo:
+- **The two case studies are mislabelled.** By their own `metrics.json`, `case_studies/success` found 6% of the dry area and `case_studies/failure` found 34%. The rules above call both PARTIAL. Their saved debriefs were written before the rules and say otherwise.
+- **It works on simulated runs only.** The accuracy numbers in the debrief come from the simulator's hidden truth, which a real rover will not have.
+- **No agronomist has checked the advice.**
+
+The pitch material around it: [PITCH.md](PITCH.md), [DEMO_GUIDE.md](DEMO_GUIDE.md), [ROADMAP.md](ROADMAP.md), [HARDWARE_INTERFACE.md](HARDWARE_INTERFACE.md) and [BOM.csv](BOM.csv). `demo_pipeline.py` runs the simulation, the debrief and the 3D replay in one go.
 
 ## Optional: NVIDIA GPU
 
@@ -624,11 +699,18 @@ src/agrisim/
   cli.py        agrisim run | bench | suite | gate | train | eval | view
 configs/            demo.yaml (all placeholders, marked "PLACEHOLDER: calibrate") and scenarios/
 benchmarks/         agribench: protocol (README.md), our entry (solution.yaml), frozen v1/ suite
-scripts/            demo.ps1 / demo.sh, check_licenses.ps1 / .sh, make_media.py, demo_video/
+scripts/            demo.ps1 / demo.sh, check_licenses.ps1 / .sh, make_media.py, demo_video/,
+                    calibrate_cookfarm.py, soil_timelapse.py, agri_advisor.py (the AI debrief),
+                    mission_manager.py (a whole mission as one package)
 tests/              pytest suite
-docs/               README images and video, FUTURE_SCOPE.md
+docs/               README images and video, FUTURE_SCOPE.md, CALIBRATION.md, PRODUCTION_PLAN.md
+case_studies/       two saved runs with their AI debriefs (labels need redoing, see HANDOVER.md)
+demo_pipeline.py    simulation + AI debrief + 3D replay in one go
+app.py              local Streamlit page: launch a mission, read the debrief
+Modelfile*, setup.bat  the smc-* Ollama models for the AI debrief
+mission_packages/   saved example missions (debrief, metrics, probes)
 models/ppo_v1/      trained MaskablePPO policy + its held-out evaluation
-hardware/rover-v2/  rover hardware design: model, calculations, drawings, blueprints (5 sheets, PDF), anatomy figures, BOM (v1, superseded, in rover-v1/)
+hardware/rover-v2/  rover hardware design: model, calculations, drawings, blueprints (5 sheets, PDF), anatomy figures, BOM, BUILD_BRIEF.md (v1, superseded, in rover-v1/)
 ```
 
 The planning documents:
@@ -637,6 +719,10 @@ The planning documents:
 - [research.md](research.md): competitors, papers, our flaws, and the work packages.
 - [docs/FUTURE_SCOPE.md](docs/FUTURE_SCOPE.md): what to build next.
 - [docs/CALIBRATION.md](docs/CALIBRATION.md): the soil physics and its check against real data.
+- [docs/PRODUCTION_PLAN.md](docs/PRODUCTION_PLAN.md): the software needed to survey a real farm, in order.
+- [hardware/rover-v2/BUILD_BRIEF.md](hardware/rover-v2/BUILD_BRIEF.md): what the software needs from the hardware.
+- [PITCH.md](PITCH.md), [ROADMAP.md](ROADMAP.md), [DEMO_GUIDE.md](DEMO_GUIDE.md), [HARDWARE_INTERFACE.md](HARDWARE_INTERFACE.md), [BOM.csv](BOM.csv): the funding pitch and the low-cost prototype plan.
+- [llm.md](llm.md): three language models compared on the AI debrief.
 - [CLAUDE.md](CLAUDE.md): rules for the coding agent.
 
 ## Handover

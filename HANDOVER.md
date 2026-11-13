@@ -35,7 +35,7 @@ Definition of done for any change. All of these must pass before you commit:
 ```powershell
 uv run ruff check .
 uv run ruff format --check .
-uv run mypy src
+uv run mypy
 uv run pytest -q
 .\scripts\check_licenses.ps1
 ```
@@ -68,7 +68,7 @@ Work through these in order and tick each one. "Expected" values came from the t
 |---|---|---|
 | A1 | `uv run ruff check .` | `All checks passed!` |
 | A2 | `uv run ruff format --check .` | all files already formatted |
-| A3 | `uv run mypy src` | `Success: no issues found in 18 source files` |
+| A3 | `uv run mypy` | `Success: no issues found in 24 source files` |
 | A4 | `uv run pytest -q` | `70 passed` (about 50 to 140 s) |
 | A5 | `.\scripts\check_licenses.ps1` | exit code 0, with no GPL, AGPL or LGPL package listed |
 
@@ -183,9 +183,14 @@ Report problems as GitHub issues with the command, the seed and the config file 
 | Physical soil model is not in the benchmark | It is opt-in (`weather.physical`); `benchmarks/v1` still uses the bucket. Adding it means a v2 benchmark folder and a Decision Log entry |
 | Physical soil model: drip and sideways spread untested on data | Only rain, drainage and drying were checked (Cook Farm, [docs/CALIBRATION.md](docs/CALIBRATION.md)). Needs our own plot: readings before and after a drip run |
 | Lane-centre probes miss drip water | Measured: map error 0.026 to 0.037 with the drip running. Needs a longer probe reach (hardware) or row-aware mapping; see the blueprint set, sheet 5 |
-| `CLAUDE.md` was removed (22 Oct) | README, this file and context.md still point to it for the project rules. Restore it, or move the rules here |
+| `CLAUDE.md` restored (13 Nov), not yet brought up to date | It was removed on 22 Oct and is back as it was then. Its contributor list still says "teammate: TBD" although two teammates have merged work; it says `uv run mypy src` where CI now runs `uv run mypy`; and its "no web dashboard" rule disagrees with `app.py` (next rows) |
 | Two hardware plans disagree | `BOM.csv` / `ROADMAP.md` (Raspberry Pi kit, about $266) against `hardware/rover-v2/` (22 kg, 175 N probe push). The kit is too light to push a probe into dry soil. The team must pick one |
-| Case-study labels | `case_studies/success` found 6% of the dry area and `case_studies/failure` 34%, by their own metrics. Rename or redo them before a demo |
+| Case-study labels | `case_studies/success` found 6% of the dry area and `case_studies/failure` 34%, by their own metrics. Rename or redo them before a demo. Their saved debriefs were written before the rule-based verdict and contradict it (the merged rules call both PARTIAL) |
+| Blueprints are not checked in CI | `ci.yml` rebuilds the calculations, drawings and anatomy figures, but not `hardware/rover-v2/blueprints.mjs`, and `hardware/rover-v2/README.md` does not list it. A model change can leave the five sheets stale without CI noticing (rebuilt by hand on 12 Nov: no difference). The PDF is printed by hand and can also go stale |
+| `openai` and `streamlit` are core dependencies | Only the AI layer (`scripts/agri_advisor.py`, `app.py`) uses them, and `streamlit` brings about 20 more packages. Both are pinned and Apache-2.0. Moving them to an optional group is a team decision |
+| `app.py` against the "no web dashboard in this phase" rule | The rule is in `CLAUDE.md`. `app.py` is a local Streamlit page. The team should either drop the rule or the page |
+| `certifi` is MPL-2.0 | It came in with `streamlit`. The licence gate passes (it blocks GPL, AGPL and LGPL only), but MPL is not on the project's list of allowed licences. Needs the team's approval and a Decision Log entry |
+| Censored readings are not in the benchmark | `mapping.censored` is opt-in. On the harsh world it raises dry-zone recall and lowers precision (README, latest simulations). Using it in agribench is a new benchmark version |
 
 ## 4. Where things live
 
@@ -224,3 +229,11 @@ Details are in the ExecPlan's Surprises & Discoveries section.
 - **Blueprints:** `node hardware/rover-v2/blueprints.mjs` writes five sheets to `hardware/rover-v2/blueprints/` from `model.mjs`. Open `index.html` and print to PDF (A3 landscape), or use the PDF in that folder. Rebuild them after any model change.
 - **Fixes:** the five review-3 bugs that had not reached main (a config `extends:` loop, memory-exhausting weather settings, recheck with no probe site, recheck spots inside the stem keep-out, an empty run folder after a crash); 32 lint errors on main; a rule-based verdict in the AI agronomist.
 - **Tests:** 135 to 162. The 70 benchmark-world runs compared before and after are identical.
+
+## 7. Changes merged on 13 November 2026 (PR #2)
+
+- **Mission manager:** `scripts/mission_manager.py` runs a survey, the AI debrief and writes one package folder under `mission_packages/`. `app.py` is a local Streamlit page on top of it. `agrisim run --scene` writes `scene.json` without starting the viewer.
+- **AI debrief:** the verdict and every number come from `metrics.json`; the model's prose is checked against it, rewritten once, then flagged. The two sets of verdict rules (PR #3's and this one's) are now one.
+- **Censored readings:** `mapping.censored` (off by default) maps a failed insertion as "drier than the threshold". Scenario: `configs/scenarios/censored_hard_soil.yaml`.
+- **New strategy:** `moisture_seeker`. It is not a benchmark baseline (`benchmarks/v1/suite.yaml` lists those by name) and not our entry.
+- **Checked before the merge (commit `9676d46`):** ruff, ruff format, mypy (Windows and Linux, 24 files), 175 tests, the licence gate, `uv lock --check`, and the agribench quick tier (hard gate and regression gate pass; scores on the public fields identical to the commit before).
