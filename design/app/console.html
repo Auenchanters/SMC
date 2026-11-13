@@ -91,6 +91,34 @@ button,select,input{font:inherit;color:inherit}
   .theme span{display:none}
 }
 
+/* guided tour: the one place blur is allowed; it pushes back what the step is not about */
+.tour-veil{position:fixed;inset:0;z-index:50;opacity:0;pointer-events:none;transition:opacity var(--t-move) var(--in)}
+.tour-veil i{position:fixed;background:rgba(var(--shadow),.38);backdrop-filter:blur(3px) saturate(.7);-webkit-backdrop-filter:blur(3px) saturate(.7);
+  transition:left var(--t-move) var(--in),top var(--t-move) var(--in),width var(--t-move) var(--in),height var(--t-move) var(--in)}
+.tour-ring{position:fixed;z-index:51;border:2px solid var(--flag);border-radius:12px;pointer-events:none;opacity:0;
+  transition:left var(--t-move) var(--in),top var(--t-move) var(--in),width var(--t-move) var(--in),height var(--t-move) var(--in),opacity var(--t-fast) linear}
+.tour-card{position:fixed;z-index:52;width:340px;background:var(--surface);color:var(--ink);border:1px solid var(--line-2);border-radius:14px;padding:16px 18px 18px;
+  box-shadow:0 1px 2px rgba(var(--shadow),.35),0 12px 32px rgba(var(--shadow),.28);display:none;
+  transition:left var(--t-move) var(--in),top var(--t-move) var(--in)}
+.touring .tour-veil{opacity:1;pointer-events:auto}
+.touring .tour-card{display:block}
+.tour-card.centre{left:50%!important;top:50%!important;transform:translate(-50%,-50%);width:420px}
+.tour-card.swap h2,.tour-card.swap p{animation:tour-in var(--t-move) var(--in)}
+@keyframes tour-in{from{transform:translateY(8px);opacity:0}}
+.tour-meta{display:flex;justify-content:space-between;align-items:center}
+.tour-skip{background:none;border:0;padding:4px 0;color:var(--ink-2);font-size:13px;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.tour-bar{height:3px;border-radius:2px;background:var(--line);margin:8px 0 12px;overflow:hidden}
+.tour-bar i{display:block;height:100%;background:var(--leaf);transition:width var(--t-move) var(--in)}
+.tour-card h2{font:700 22px/1.2 var(--slab);letter-spacing:-.01em;margin:0 0 6px}
+.tour-card p{margin:0 0 16px;font-size:15px;line-height:1.5;color:var(--ink-2)}
+.tour-nav{display:flex;gap:8px;justify-content:space-between}
+.tour-nav .btn[disabled]{opacity:.4;cursor:default}
+.tour-next{width:auto;min-height:44px;font-size:16px;flex:1;max-width:190px}
+.tour-btn{height:34px;border:1px solid var(--line-2);border-radius:6px;background:transparent;padding:0 10px;font-size:13px;font-weight:700;color:var(--ink-2);cursor:pointer}
+@media (max-width:760px){
+  .tour-card,.tour-card.centre{left:8px!important;right:8px;top:auto!important;bottom:8px;width:auto;transform:none}
+}
+
 .wrap{max-width:1400px;margin:0 auto;padding:0 24px}
 .sub{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-top:20px}
 .sub a{padding:10px 14px;color:var(--ink-2);text-decoration:none;font-weight:700;font-size:14px;border-bottom:3px solid transparent;margin-bottom:-1px}
@@ -165,11 +193,13 @@ tbody tr[aria-selected=true]{background:var(--leaf-soft);box-shadow:inset 3px 0 
 </style>
 </head>
 <body>
+<div id="app">
 <header class="top">
   <a class="brand" href="#">SMC <small>soil survey</small></a>
   <nav class="pages" aria-label="Pages"><a href="simulator.html">Simulator</a><a href="#" aria-current="page">Console</a></nav>
   <span class="sp"></span>
   <span class="status"><i></i><span>Rover idle · simulator</span></span>
+  <button class="tour-btn" id="tourBtn" aria-label="Take the tour of this page">Tour</button>
   <button class="theme" id="theme" aria-label="Switch colour theme"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M8 2a6 6 0 0 0 0 12z" fill="currentColor"/></svg><span id="themeLabel">System</span></button>
   <span class="who">Admin</span>
 </header>
@@ -207,6 +237,119 @@ tbody tr[aria-selected=true]{background:var(--leaf-soft);box-shadow:inset 3px 0 
 </main>
 <div class="toast" id="toast" role="status">Rules saved. New runs use them.</div>
 
+</div>
+<script>
+/* Guided tour, shared by both pages. Each page calls startTour({key, steps}) where a step is
+   {target: CSS selector or null for a centred card, title, text, enter: optional function run before the step}.
+   Everything but the target is dimmed and blurred; the clear hole moves from part to part. */
+const Tour = (() => {
+  let steps = [], key = '', i = 0, open = false, lastFocus = null;
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const app = document.getElementById('app');
+  const veil = document.createElement('div'); veil.className = 'tour-veil';
+  const ring = document.createElement('div'); ring.className = 'tour-ring';
+  const card = document.createElement('div'); card.className = 'tour-card';
+  card.setAttribute('role', 'dialog'); card.setAttribute('aria-modal', 'true'); card.setAttribute('aria-labelledby', 'tourTitle');
+  card.innerHTML = `<div class="tour-meta"><span class="over" id="tourCount"></span><button class="tour-skip" id="tourSkip">Skip tour</button></div>
+    <div class="tour-bar"><i id="tourBar"></i></div>
+    <h2 id="tourTitle"></h2><p id="tourText"></p>
+    <div class="tour-nav"><button class="btn" id="tourBack">Back</button><button class="go tour-next" id="tourNext"><span id="tourNextText">Next</span><span aria-hidden="true">→</span></button></div>`;
+  document.body.append(veil, ring, card);
+  const $t = id => card.querySelector('#' + id);
+  const find = sel => [...document.querySelectorAll(sel)].find(e => e.getClientRects().length); /* first visible match */
+
+  /* four blurred panels around the spotlight; no clip-path cut-out, which some renderers draw wrongly */
+  veil.innerHTML = '<i></i><i></i><i></i><i></i>';
+  const [pt, pb, pl, pr] = veil.children;
+  const box = (e, x, y, w, h) => Object.assign(e.style, { left: x + 'px', top: y + 'px', width: Math.max(w, 0) + 'px', height: Math.max(h, 0) + 'px' });
+  function hole(r) {
+    const W = innerWidth, H = innerHeight;
+    if (!r) { box(pt, 0, 0, W, H); box(pb, 0, H, W, 0); box(pl, 0, 0, 0, 0); box(pr, W, 0, 0, 0); return; }
+    const x = r.left, y = r.top, x2 = x + r.width, y2 = y + r.height;
+    box(pt, 0, 0, W, y); box(pb, 0, y2, W, H - y2); box(pl, 0, y, x, r.height); box(pr, x2, y, W - x2, r.height);
+  }
+  function rectOf(el) {
+    const b = el.getBoundingClientRect(), pad = 6, top = el.closest(".top") ? -4 : 56; /* never under the top bar, unless the part is in it */
+    const y = Math.max(b.top - pad, top + 4), y2 = Math.min(b.bottom + pad, innerHeight - 4);
+    return { left: Math.max(b.left - pad, 4), top: y, width: Math.min(b.width + pad * 2, innerWidth - 8), height: Math.max(y2 - y, 40) };
+  }
+  function place() {
+    const s = steps[i], el = s.target && find(s.target);
+    const phone = innerWidth < 760;
+    if (!el) { hole(null); ring.style.opacity = 0; card.classList.add('centre'); card.style.left = card.style.top = ''; return; }
+    card.classList.remove('centre');
+    const r = rectOf(el); hole(r);
+    Object.assign(ring.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px', opacity: 1 });
+    if (phone) { card.style.left = card.style.top = ''; return; } /* phone: card docks at the bottom (CSS) */
+    const cw = card.offsetWidth, ch = card.offsetHeight, gap = 14;
+    let left, top;
+    if (innerWidth - (r.left + r.width) > cw + gap * 2) { left = r.left + r.width + gap; top = r.top; }      /* right of the part */
+    else if (r.left > cw + gap * 2) { left = r.left - cw - gap; top = r.top; }                                /* left of it */
+    else if (innerHeight - (r.top + r.height) > ch + gap) { left = r.left; top = r.top + r.height + gap; }   /* below */
+    else if (r.top - 56 > ch + gap) { left = r.left; top = r.top - ch - gap; }                                /* above */
+    else { left = r.left + r.width - cw - 16; top = r.top + r.height - ch - 16; }                             /* inside, bottom right */
+    card.style.left = Math.min(Math.max(left, 12), innerWidth - cw - 12) + 'px';
+    card.style.top = Math.min(Math.max(top, 64), innerHeight - ch - 12) + 'px';
+  }
+  function go(n) {
+    i = Math.max(0, Math.min(n, steps.length - 1));
+    const s = steps[i];
+    if (s.enter) s.enter();
+    $t('tourCount').textContent = `Step ${i + 1} of ${steps.length}`;
+    $t('tourBar').style.width = ((i + 1) / steps.length * 100) + '%';
+    $t('tourTitle').textContent = s.title; $t('tourText').textContent = s.text;
+    $t('tourBack').disabled = i === 0;
+    $t('tourNextText').textContent = i === steps.length - 1 ? 'Finish' : 'Next';
+    card.classList.remove('swap'); void card.offsetWidth; card.classList.add('swap');
+    const el = s.target && find(s.target);
+    if (el) {
+      const b = el.getBoundingClientRect(), phone = innerWidth < 760;
+      const room = phone ? innerHeight - card.offsetHeight - 70 : innerHeight - 70;
+      if (b.top < 64 || b.bottom > 56 + room) el.scrollIntoView({ block: phone || b.height > room ? 'start' : 'center', behavior: 'auto' });
+      if (phone) scrollBy(0, -64);
+    }
+    place(); setTimeout(place, 60); /* again once layout settles after the scroll */
+    $t('tourNext').focus({ preventScroll: true });
+  }
+  function close(done) {
+    open = false; document.documentElement.classList.remove('touring'); app.inert = false;
+    if (done) try { localStorage.setItem(key, '1'); } catch (e) {}
+    if (steps.onEnd) steps.onEnd();
+    (lastFocus || document.body).focus?.();
+  }
+  $t('tourNext').onclick = () => i === steps.length - 1 ? close(true) : go(i + 1);
+  $t('tourBack').onclick = () => go(i - 1);
+  $t('tourSkip').onclick = () => close(true);
+  addEventListener('keydown', e => {
+    if (!open) return;
+    if (e.key === 'Escape') close(true);
+    else if (e.key === 'ArrowRight') $t('tourNext').click();
+    else if (e.key === 'ArrowLeft' && i > 0) go(i - 1);
+    else if (e.key === 'Tab') { /* keep focus inside the card */
+      const f = [...card.querySelectorAll('button:not([disabled])')], a = f.indexOf(document.activeElement);
+      e.preventDefault(); f[(a + (e.shiftKey ? -1 : 1) + f.length) % f.length].focus();
+    }
+  });
+  addEventListener('resize', () => open && place());
+  addEventListener('scroll', () => open && place(), { passive: true });
+  new ResizeObserver(() => open && place()).observe(document.body); /* fonts or content changing the layout */
+  return {
+    start(cfg, at = 0) {
+      steps = cfg.steps; steps.onEnd = cfg.onEnd; key = cfg.key; open = true; lastFocus = document.activeElement;
+      document.documentElement.classList.add('touring'); app.inert = true;
+      for (let j = 0; j < at; j++) steps[j].enter?.(); /* a later start still sets up the page as the earlier steps would */
+      go(at);
+    },
+    firstVisit(cfg) {
+      const m = location.hash.match(/tour=(\d+)/);
+      if (m) return this.start(cfg, +m[1] - 1);
+      let seen = false; try { seen = localStorage.getItem(cfg.key) === '1'; } catch (e) {}
+      if (!seen) setTimeout(() => this.start(cfg), 600);
+    }
+  };
+})();
+
+</script>
 <script>
 const D={"stats":{"total":33,"success":3,"partial":30,"fail":0,"contacts":0,"probes":1583,"median_rmse":0.0305,"first":"2026-10-13","last":"2026-11-13"},"rows":[{"id":"20261113T125402Z_seed42","when":"2026-11-13 12:54","policy":"planned_survey","seed":42,"probes":20,"valid":20,"rmse":0.0433,"dry":0.0,"contacts":0,"minutes":12.9,"verdict":"PARTIAL","why":"the map found only 0% of the truly dry area (at least 30% is needed); map error (RMSE) is 0.0433 VWC (at most 0.035 is allowed)","scene":true},{"id":"20261113T114118Z_seed42","when":"2026-11-13 11:41","policy":"moisture_seeker","seed":42,"probes":30,"valid":30,"rmse":0.0395,"dry":0.0,"contacts":0,"minutes":30.7,"verdict":"PARTIAL","why":"the map found only 0% of the truly dry area (at least 30% is needed); map error (RMSE) is 0.0395 VWC (at most 0.035 is allowed)","scene":true},{"id":"20261113T113901Z_seed42","when":"2026-11-13 11:39","policy":"moisture_seeker","seed":42,"probes":30,"valid":30,"rmse":0.0395,"dry":0.0,"contacts":0,"minutes":30.7,"verdict":"PARTIAL","why":"the map found only 0% of the truly dry area (at least 30% is needed); map error (RMSE) is 0.0395 VWC (at most 0.035 is allowed)","scene":true},{"id":"20261113T113713Z_seed42","when":"2026-11-13 11:37","policy":"planned_survey","seed":42,"probes":30,"valid":28,"rmse":0.0426,"dry":0.04,"contacts":0,"minutes":16.0,"verdict":"PARTIAL","why":"the map found only 4% of the truly dry area (at least 30% is needed); map error (RMSE) is 0.0426 VWC (at most 0.035 is allowed)","scene":true},{"id":"20261113T113457Z_seed42","when":"2026-11-13 11:34","policy":"moisture_seeker","seed":42,"probes":30,"valid":30,"rmse":0.0395,"dry":0.0,"contacts":0,"minutes":30.7,"verdict":"PARTIAL","why":"the map found only 0% of the truly dry area (at least 30% is needed); map error (RMSE) is 0.0395 VWC (at most 0.035 is allowed)","scene":true},{"id":"20261113T113324Z_seed7","when":"2026-11-13 11:33","policy":"planned_survey","seed":7,"probes":60,"valid":59,"rmse":0.037,"dry":0.19,"contacts":0,"minutes":31.7,"verdict":"PARTIAL","why":"the map found only 19% of the truly dry area (at least 30% is needed); map error (RMSE) is 0.0370 VWC (at most 0.035 is allowed)","scene":true},{"id":"20261018T104754Z_seed7","when":"2026-10-18 10:47","policy":"planned_survey","seed":7,"probes":60,"valid":59,"rmse":0.0305,"dry":0.06,"contacts":0,"minutes":31.9,"verdict":"PARTIAL","why":"the map found only 6% of the truly dry area (at least 30% is needed)","scene":false},{"id":"20261018T101207Z_seed7","when":"2026-10-18 10:12","policy":"planned_survey","seed":7,"probes":60,"valid":59,"rmse":0.0305,"dry":0.06,"contacts":0,"minutes":31.9,"verdict":"PARTIAL","why":"the map found only 6% of the truly dry area (at least 30% is needed)","scene":false},{"id":"20261018T100443Z_seed7","when":"2026-10-18 10:04","policy":"planned_survey","seed":7,"probes":60,"valid":59,"rmse":0.0305,"dry":0.06,"contacts":0,"minutes":31.9,"verdict":"PARTIAL","why":"the map found only 6% of the truly dry area (at least 30% is needed)","scene":false},{"id":"20261016T100022Z_seed7","when":"2026-10-16 10:00","policy":"fixed_spacing","seed":7,"probes":60,"valid":59,"rmse":0.0299,"dry":0.12,"contacts":0,"minutes":47.1,"verdict":"PARTIAL","why":"the map found only 12% of the truly dry area (at least 30% is needed)","scene":true},{"id":"20261016T030621Z_seed7","when":"2026-10-16 03:06","policy":"fixed_spacing","seed":7,"probes":60,"valid":59,"rmse":0.0299,"dry":0.12,"contacts":0,"minutes":47.1,"verdict":"PARTIAL","why":"the map found only 12% of the truly dry area (at least 30% is needed)","scene":true},{"id":"20261015T183824Z_seed7","when":"2026-10-15 18:38","policy":"fixed_spacing","seed":7,"probes":60,"valid":59,"rmse":0.0299,"dry":0.12,"contacts":0,"minutes":47.1,"verdict":"PARTIAL","why":"the map found only 12% of the truly dry area (at least 30% is needed)","scene":true},{"id":"20261015T182103Z_seed7","when":"2026-10-15 18:21","policy":"fixed_spacing","seed":7,"probes":60,"valid":59,"rmse":0.0299,"dry":0.12,"contacts":0,"minutes":47.1,"verdict":"PARTIAL","why":"the map found only 12% of the truly dry area (at least 30% is needed)","scene":false},{"id":"20261015T180120Z_seed7","when":"2026-10-15 18:01","policy":"ppo","seed":7,"probes":30,"valid":29,"rmse":0.0348,"dry":0.01,"contacts":0,"minutes":34.3,"verdict":"PARTIAL","why":"the map found only 1% of the truly dry area (at least 30% is needed)","scene":false},{"id":"20261015T180037Z_seed7","when":"2026-10-15 18:00","policy":"fixed_spacing","seed":7,"probes":60,"valid":59,"rmse":0.0299,"dry":0.12,"contacts":0,"minutes":28.1,"verdict":"PARTIAL","why":"the map found only 12% of the truly dry area (at least 30% is needed)","scene":false},{"id":"20261015T175200Z_seed7","when":"2026-10-15 17:52","policy":"fixed_plus_recheck","seed":7,"probes":60,"valid":59,"rmse":0.0303,"dry":0.0,"contacts":0,"minutes":34.2,"verdict":"SUCCESS","why":"no plant was touched and every target was met","scene":true}]};
 const $=id=>document.getElementById(id);
@@ -249,6 +392,17 @@ $('theme').onclick=()=>{const cur=document.documentElement.dataset.theme||'syste
   if(nx==='system')delete document.documentElement.dataset.theme;else document.documentElement.dataset.theme=nx;
   try{nx==='system'?localStorage.removeItem('smc-theme'):localStorage.setItem('smc-theme',nx)}catch(e){}showTheme()};
 showTheme();
+
+const CON_TOUR={key:'smc-tour-console',steps:[
+ {target:null,title:'Welcome to the console',text:'The console is the record of every survey: what happened, why it got its verdict, and what to do next. Six short steps.'},
+ {target:'.sub',title:'Sections',text:'Runs lists every survey. Fields and Rovers hold what you survey and what does the work. Reports collects the debriefs. Settings is for admins.'},
+ {target:'#strip',title:'The whole record at a glance',text:'How many surveys there are, how many met every limit, and whether a plant has ever been touched. Here: 33 surveys, none touched a plant.'},
+ {target:'.body > section > table, .cards',title:'Every survey, newest first',text:'One row per survey. A number in orange is a reason the survey fell short. Use the filters above to narrow the list; click a row to open it.'},
+ {target:'#detail',title:'One survey, opened',text:'Why it got its verdict, its numbers, and what you can do with it: open the 3D replay, download the readings or the debrief, or run it again with the same settings.'},
+ {target:'.rules',title:'The limits behind every verdict',text:'These four numbers decide whether a survey succeeds. Admins change them here; new surveys use the new values and old verdicts stay as they were.'},
+ {target:'#tourBtn',title:'That is everything',text:'Open this tour again any time from here.'}]};
+$('tourBtn').onclick=()=>Tour.start(CON_TOUR);
+Tour.firstVisit(CON_TOUR);
 </script>
 </body>
 </html>

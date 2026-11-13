@@ -91,6 +91,34 @@ button,select,input{font:inherit;color:inherit}
   .theme span{display:none}
 }
 
+/* guided tour: the one place blur is allowed; it pushes back what the step is not about */
+.tour-veil{position:fixed;inset:0;z-index:50;opacity:0;pointer-events:none;transition:opacity var(--t-move) var(--in)}
+.tour-veil i{position:fixed;background:rgba(var(--shadow),.38);backdrop-filter:blur(3px) saturate(.7);-webkit-backdrop-filter:blur(3px) saturate(.7);
+  transition:left var(--t-move) var(--in),top var(--t-move) var(--in),width var(--t-move) var(--in),height var(--t-move) var(--in)}
+.tour-ring{position:fixed;z-index:51;border:2px solid var(--flag);border-radius:12px;pointer-events:none;opacity:0;
+  transition:left var(--t-move) var(--in),top var(--t-move) var(--in),width var(--t-move) var(--in),height var(--t-move) var(--in),opacity var(--t-fast) linear}
+.tour-card{position:fixed;z-index:52;width:340px;background:var(--surface);color:var(--ink);border:1px solid var(--line-2);border-radius:14px;padding:16px 18px 18px;
+  box-shadow:0 1px 2px rgba(var(--shadow),.35),0 12px 32px rgba(var(--shadow),.28);display:none;
+  transition:left var(--t-move) var(--in),top var(--t-move) var(--in)}
+.touring .tour-veil{opacity:1;pointer-events:auto}
+.touring .tour-card{display:block}
+.tour-card.centre{left:50%!important;top:50%!important;transform:translate(-50%,-50%);width:420px}
+.tour-card.swap h2,.tour-card.swap p{animation:tour-in var(--t-move) var(--in)}
+@keyframes tour-in{from{transform:translateY(8px);opacity:0}}
+.tour-meta{display:flex;justify-content:space-between;align-items:center}
+.tour-skip{background:none;border:0;padding:4px 0;color:var(--ink-2);font-size:13px;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.tour-bar{height:3px;border-radius:2px;background:var(--line);margin:8px 0 12px;overflow:hidden}
+.tour-bar i{display:block;height:100%;background:var(--leaf);transition:width var(--t-move) var(--in)}
+.tour-card h2{font:700 22px/1.2 var(--slab);letter-spacing:-.01em;margin:0 0 6px}
+.tour-card p{margin:0 0 16px;font-size:15px;line-height:1.5;color:var(--ink-2)}
+.tour-nav{display:flex;gap:8px;justify-content:space-between}
+.tour-nav .btn[disabled]{opacity:.4;cursor:default}
+.tour-next{width:auto;min-height:44px;font-size:16px;flex:1;max-width:190px}
+.tour-btn{height:34px;border:1px solid var(--line-2);border-radius:6px;background:transparent;padding:0 10px;font-size:13px;font-weight:700;color:var(--ink-2);cursor:pointer}
+@media (max-width:760px){
+  .tour-card,.tour-card.centre{left:8px!important;right:8px;top:auto!important;bottom:8px;width:auto;transform:none}
+}
+
 .sim{display:grid;grid-template-columns:320px minmax(0,1fr) 340px;min-height:calc(100vh - 56px)}
 /* setup rail */
 .setup{border-right:1px solid var(--line);padding:20px;display:flex;flex-direction:column;gap:20px;background:var(--ground)}
@@ -196,11 +224,13 @@ button,select,input{font:inherit;color:inherit}
 </style>
 </head>
 <body>
+<div id="app">
 <header class="top">
   <a class="brand" href="#">SMC <small>soil survey</small></a>
   <nav class="pages" aria-label="Pages"><a href="#" aria-current="page">Simulator</a><a href="console.html">Console</a></nav>
   <span class="sp"></span>
   <span class="status" role="status"><i></i><span id="statusText">Running · 43 of 60 stops</span></span>
+  <button class="tour-btn" id="tourBtn" aria-label="Take the tour of this page">Tour</button>
   <button class="theme" id="theme" aria-label="Switch colour theme"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M8 2a6 6 0 0 0 0 12z" fill="currentColor"/></svg><span id="themeLabel">System</span></button>
   <span class="who">Operator</span>
 </header>
@@ -277,6 +307,119 @@ button,select,input{font:inherit;color:inherit}
   </aside>
 </div>
 
+</div>
+<script>
+/* Guided tour, shared by both pages. Each page calls startTour({key, steps}) where a step is
+   {target: CSS selector or null for a centred card, title, text, enter: optional function run before the step}.
+   Everything but the target is dimmed and blurred; the clear hole moves from part to part. */
+const Tour = (() => {
+  let steps = [], key = '', i = 0, open = false, lastFocus = null;
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const app = document.getElementById('app');
+  const veil = document.createElement('div'); veil.className = 'tour-veil';
+  const ring = document.createElement('div'); ring.className = 'tour-ring';
+  const card = document.createElement('div'); card.className = 'tour-card';
+  card.setAttribute('role', 'dialog'); card.setAttribute('aria-modal', 'true'); card.setAttribute('aria-labelledby', 'tourTitle');
+  card.innerHTML = `<div class="tour-meta"><span class="over" id="tourCount"></span><button class="tour-skip" id="tourSkip">Skip tour</button></div>
+    <div class="tour-bar"><i id="tourBar"></i></div>
+    <h2 id="tourTitle"></h2><p id="tourText"></p>
+    <div class="tour-nav"><button class="btn" id="tourBack">Back</button><button class="go tour-next" id="tourNext"><span id="tourNextText">Next</span><span aria-hidden="true">→</span></button></div>`;
+  document.body.append(veil, ring, card);
+  const $t = id => card.querySelector('#' + id);
+  const find = sel => [...document.querySelectorAll(sel)].find(e => e.getClientRects().length); /* first visible match */
+
+  /* four blurred panels around the spotlight; no clip-path cut-out, which some renderers draw wrongly */
+  veil.innerHTML = '<i></i><i></i><i></i><i></i>';
+  const [pt, pb, pl, pr] = veil.children;
+  const box = (e, x, y, w, h) => Object.assign(e.style, { left: x + 'px', top: y + 'px', width: Math.max(w, 0) + 'px', height: Math.max(h, 0) + 'px' });
+  function hole(r) {
+    const W = innerWidth, H = innerHeight;
+    if (!r) { box(pt, 0, 0, W, H); box(pb, 0, H, W, 0); box(pl, 0, 0, 0, 0); box(pr, W, 0, 0, 0); return; }
+    const x = r.left, y = r.top, x2 = x + r.width, y2 = y + r.height;
+    box(pt, 0, 0, W, y); box(pb, 0, y2, W, H - y2); box(pl, 0, y, x, r.height); box(pr, x2, y, W - x2, r.height);
+  }
+  function rectOf(el) {
+    const b = el.getBoundingClientRect(), pad = 6, top = el.closest(".top") ? -4 : 56; /* never under the top bar, unless the part is in it */
+    const y = Math.max(b.top - pad, top + 4), y2 = Math.min(b.bottom + pad, innerHeight - 4);
+    return { left: Math.max(b.left - pad, 4), top: y, width: Math.min(b.width + pad * 2, innerWidth - 8), height: Math.max(y2 - y, 40) };
+  }
+  function place() {
+    const s = steps[i], el = s.target && find(s.target);
+    const phone = innerWidth < 760;
+    if (!el) { hole(null); ring.style.opacity = 0; card.classList.add('centre'); card.style.left = card.style.top = ''; return; }
+    card.classList.remove('centre');
+    const r = rectOf(el); hole(r);
+    Object.assign(ring.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px', opacity: 1 });
+    if (phone) { card.style.left = card.style.top = ''; return; } /* phone: card docks at the bottom (CSS) */
+    const cw = card.offsetWidth, ch = card.offsetHeight, gap = 14;
+    let left, top;
+    if (innerWidth - (r.left + r.width) > cw + gap * 2) { left = r.left + r.width + gap; top = r.top; }      /* right of the part */
+    else if (r.left > cw + gap * 2) { left = r.left - cw - gap; top = r.top; }                                /* left of it */
+    else if (innerHeight - (r.top + r.height) > ch + gap) { left = r.left; top = r.top + r.height + gap; }   /* below */
+    else if (r.top - 56 > ch + gap) { left = r.left; top = r.top - ch - gap; }                                /* above */
+    else { left = r.left + r.width - cw - 16; top = r.top + r.height - ch - 16; }                             /* inside, bottom right */
+    card.style.left = Math.min(Math.max(left, 12), innerWidth - cw - 12) + 'px';
+    card.style.top = Math.min(Math.max(top, 64), innerHeight - ch - 12) + 'px';
+  }
+  function go(n) {
+    i = Math.max(0, Math.min(n, steps.length - 1));
+    const s = steps[i];
+    if (s.enter) s.enter();
+    $t('tourCount').textContent = `Step ${i + 1} of ${steps.length}`;
+    $t('tourBar').style.width = ((i + 1) / steps.length * 100) + '%';
+    $t('tourTitle').textContent = s.title; $t('tourText').textContent = s.text;
+    $t('tourBack').disabled = i === 0;
+    $t('tourNextText').textContent = i === steps.length - 1 ? 'Finish' : 'Next';
+    card.classList.remove('swap'); void card.offsetWidth; card.classList.add('swap');
+    const el = s.target && find(s.target);
+    if (el) {
+      const b = el.getBoundingClientRect(), phone = innerWidth < 760;
+      const room = phone ? innerHeight - card.offsetHeight - 70 : innerHeight - 70;
+      if (b.top < 64 || b.bottom > 56 + room) el.scrollIntoView({ block: phone || b.height > room ? 'start' : 'center', behavior: 'auto' });
+      if (phone) scrollBy(0, -64);
+    }
+    place(); setTimeout(place, 60); /* again once layout settles after the scroll */
+    $t('tourNext').focus({ preventScroll: true });
+  }
+  function close(done) {
+    open = false; document.documentElement.classList.remove('touring'); app.inert = false;
+    if (done) try { localStorage.setItem(key, '1'); } catch (e) {}
+    if (steps.onEnd) steps.onEnd();
+    (lastFocus || document.body).focus?.();
+  }
+  $t('tourNext').onclick = () => i === steps.length - 1 ? close(true) : go(i + 1);
+  $t('tourBack').onclick = () => go(i - 1);
+  $t('tourSkip').onclick = () => close(true);
+  addEventListener('keydown', e => {
+    if (!open) return;
+    if (e.key === 'Escape') close(true);
+    else if (e.key === 'ArrowRight') $t('tourNext').click();
+    else if (e.key === 'ArrowLeft' && i > 0) go(i - 1);
+    else if (e.key === 'Tab') { /* keep focus inside the card */
+      const f = [...card.querySelectorAll('button:not([disabled])')], a = f.indexOf(document.activeElement);
+      e.preventDefault(); f[(a + (e.shiftKey ? -1 : 1) + f.length) % f.length].focus();
+    }
+  });
+  addEventListener('resize', () => open && place());
+  addEventListener('scroll', () => open && place(), { passive: true });
+  new ResizeObserver(() => open && place()).observe(document.body); /* fonts or content changing the layout */
+  return {
+    start(cfg, at = 0) {
+      steps = cfg.steps; steps.onEnd = cfg.onEnd; key = cfg.key; open = true; lastFocus = document.activeElement;
+      document.documentElement.classList.add('touring'); app.inert = true;
+      for (let j = 0; j < at; j++) steps[j].enter?.(); /* a later start still sets up the page as the earlier steps would */
+      go(at);
+    },
+    firstVisit(cfg) {
+      const m = location.hash.match(/tour=(\d+)/);
+      if (m) return this.start(cfg, +m[1] - 1);
+      let seen = false; try { seen = localStorage.getItem(cfg.key) === '1'; } catch (e) {}
+      if (!seen) setTimeout(() => this.start(cfg), 600);
+    }
+  };
+})();
+
+</script>
 <script>
 const P=[[21.3,6.0,1.0,0.211],[50.6,15.0,1.0,0.336],[81.9,25.0,1.0,0.232],[111.2,28.0,2.2,0.182],[132.5,23.0,2.2,0.213],[149.8,20.0,2.2,0.232],[165.1,18.0,2.2,0.219],[186.4,13.0,2.2,0.272],[205.7,9.0,2.2,0.193],[231.0,2.0,2.2,0.229],[260.7,4.0,4.6,0.17300000000000001],[288.0,12.0,4.6,0.292],[305.3,15.0,4.6,0.29],[322.6,18.0,4.6,0.228],[341.9,22.0,4.6,0.213],[357.2,24.0,4.6,0.17400000000000002],[374.5,27.0,4.6,0.162],[389.8,29.0,4.6,0.178],[414.6,28.0,8.2,0.214],[433.9,24.0,8.2,0.187],[453.2,20.0,8.2,0.23600000000000002],[472.5,16.0,8.2,0.319],[491.8,12.0,8.2,0.34700000000000003],[517.1,5.0,8.2,0.273],[560.8,8.0,5.8,0.267],[596.1,2.0,7.0,0.209],[635.8,9.0,9.4,0.359],[695.1,13.0,10.6,0.34],[740.4,2.0,11.8,null],[757.7,5.0,11.8,0.34500000000000003],[801.0,9.0,13.0,0.262],[860.3,13.0,14.2,0.272],[885.6,20.0,14.2,0.28],[912.9,28.0,14.2,0.309],[938.6,28.0,11.8,0.246],[955.9,25.0,11.8,0.28600000000000003],[975.2,21.0,11.8,0.176],[994.5,17.0,11.8,0.267],[1052.6,24.0,15.4,0.325],[1077.9,17.0,15.4,0.273],[1111.2,6.0,15.4,0.27],[1144.9,2.0,17.8,0.258],[1164.2,6.0,17.8,0.267],[1183.5,10.0,17.8,0.177],[1214.8,20.0,17.8,0.304],[1236.1,25.0,17.8,0.275],[1253.4,28.0,17.8,0.269],[1302.7,15.0,19.0,0.277],[1377.6,26.0,7.0,0.262],[1413.7,26.0,3.4,0.199],[1431.0,29.0,3.4,0.218],[1490.3,5.0,3.4,0.244],[1562.0,28.0,5.8,0.149],[1580.5,29.0,7.0,0.159],[1653.4,2.0,4.6,0.193],[1720.7,24.0,5.8,0.17200000000000001],[1762.0,23.0,7.0,0.156],[1809.7,22.0,9.4,0.20800000000000002],[1859.4,22.0,7.0,0.179],[1903.1,25.0,4.6,0.257]], T=1903.1, ERR=[null, 0.07301, 0.05516, 0.05313, 0.05683, 0.05308, 0.05445, 0.0572, 0.056, 0.0585, 0.05864, 0.06105, 0.05685, 0.05443, 0.0548, 0.05518, 0.05634, 0.05784, 0.05839, 0.05803, 0.05937, 0.05835, 0.0531, 0.04569, 0.04177, 0.04149, 0.04257, 0.0386, 0.03797, 0.03838, 0.03879, 0.0381, 0.03891, 0.03664, 0.03625, 0.03614, 0.03554, 0.03671, 0.03678, 0.03723, 0.03726, 0.03759, 0.03778, 0.03781, 0.03741, 0.03749, 0.03714, 0.03704, 0.037, 0.03695, 0.03735, 0.03751, 0.03823, 0.03826, 0.03807, 0.03788, 0.03769, 0.03763, 0.03731, 0.03732, 0.03701];
 const $=id=>document.getElementById(id), sim=$('sim');
@@ -341,6 +484,27 @@ document.querySelectorAll('.stops button').forEach(b=>b.onclick=()=>{$('stops').
 
 show(k,false);
 if(location.hash.includes('done')){k=P.length;show(k,false)}
+
+/* tour: the page is shown in the state each step talks about */
+function setIdle(){stop();k=0;sim.className='sim';show(0,false);['last','driest','err'].forEach(id=>$(id).textContent='—');['lastAt','driestAt'].forEach(id=>$(id).textContent='no reading yet');
+  $('goText').textContent='Start survey';$('goArrow').textContent='→';$('statusText').textContent='Ready';}
+function setRunning(){stop();sim.className='sim locked running';$('goArrow').textContent='';k=43;show(43,false)}
+function setDone(){stop();sim.className='sim locked running';k=P.length;show(k,false)}
+const SIM_TOUR={key:'smc-tour-simulator',onEnd:setIdle,steps:[
+ {target:null,enter:setIdle,title:'Welcome to the simulator',text:'This page runs one soil-moisture survey of a tomato field and shows it as it happens. A small rover drives between the rows and stops to push a probe into the soil. This tour takes about a minute.'},
+ {target:'.setup > div.step:nth-of-type(1)',title:'1. Choose the field',text:'Each field is a 30 by 20 m block of tomato rows with its own soil and weather. Start with Drip-irrigated: it has a couple of dry patches for the rover to find.'},
+ {target:'.setup > div.step:nth-of-type(2)',title:'2. Choose how the rover probes',text:'Planned survey spreads stops evenly over every lane. Spatial coverage goes where the map is least sure. Moisture seeker follows readings toward dry ground.'},
+ {target:'.setup > div.step:nth-of-type(3)',title:'3. Choose how many stops',text:'Each stop is one soil reading and takes about 10 seconds. More stops make a better map but a longer survey: 60 stops take about 32 minutes.'},
+ {target:'#go',title:'Start the survey',text:'Yellow always means "go forward". Press it and the button turns into a progress bar while the rover works.'},
+ {target:'.view',enter:setRunning,title:'The field in 3D',text:'This is the survey in progress. Rings are the stops so far and the thin line is the rover\'s path. The ground colour is the rover\'s moisture map: orange is dry, blue is wet.'},
+ {target:'.chips',title:'Change what the ground shows',text:'Rover\'s map is what the rover believes. Real moisture is the truth, which only the simulator knows. Map error shows where the two disagree; Uncertainty shows where the rover is unsure.'},
+ {target:'.timebar',title:'The time bar',text:'Each mark is one stop; the brown ones read dry (below 0.18). Press play to watch the rest of the survey, or change the speed on the right.'},
+ {target:'.live',title:'Live numbers',text:'Stops done, the latest reading and the driest one so far. Two limits decide success: map error must end at or below 0.0350, and the rover must never touch a plant.'},
+ {target:'.live',enter:setDone,title:'The verdict, then the debrief',text:'When the survey ends, the code compares the numbers with the limits and gives the verdict and its reasons. Only then does the AI write the debrief underneath: the verdict never comes from the AI.'},
+ {target:'.pages',title:'Every survey is kept',text:'The Console page holds every survey: compare them, export the readings, and change the limits that decide a verdict.'},
+ {target:'#tourBtn',title:'That is everything',text:'Open this tour again any time from here. Next: press Start survey.'}]};
+$('tourBtn').onclick=()=>Tour.start(SIM_TOUR);
+Tour.firstVisit(SIM_TOUR);
 </script>
 </body>
 </html>

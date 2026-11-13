@@ -40,7 +40,7 @@ Dark mode follows the system (`prefers-color-scheme`) and can be overridden by a
 ## Shape and surface
 
 - Radius is a hierarchy: 6 px buttons and chips, 8 px inputs, 10 px choice tiles, 14 px sheets and the verdict band, 50% only for the play button and step numbers.
-- No glass, no blur. Panels over the 3D view are solid `--ground`.
+- No glass, no blur. Panels over the 3D view are solid `--ground`. The one exception is the guided tour: it dims and blurs everything except the part it is explaining, because there the blur's job is to push the rest of the page back.
 - Shadows only on things that float over the 3D view or slide over content (chips, the phone sheet, the toast): `0 1px 2px` of the ink colour at 35%, light from above.
 - Cards only for things that are discrete and comparable: field choices, strategy choices. Lists and tables have no card around them.
 
@@ -63,8 +63,17 @@ Motion explains something or confirms something. Durations: 120 ms state change,
 | The debrief text appears as the model writes it | It is being written; waiting is visible. |
 | Theme switch crossfades colours (200 ms) | Avoids a flash. |
 | The phone sheet follows the finger and settles (220 ms) | It is a physical object. |
+| Tour: the clear spotlight and its yellow ring move from part to part (220 ms); the card's text slides in | Shows where the explanation now points. |
 
 **Does not animate:** tables, sorting, page tabs, scrolling, hover on rows, numbers in the console, the console's charts. Nothing fades in on scroll. With `prefers-reduced-motion: reduce`, every transition above becomes an instant change, the debrief appears whole, and the 3D camera cuts instead of flying.
+
+## Guided tour
+
+First-time users get a short tour on each page (12 steps on the Simulator, 7 on the Console). It starts by itself on the first visit, can be skipped at any step, and can be opened again from the Tour button in the top bar.
+- One part at a time is in focus; the rest is dimmed and blurred by four panels around it (not a clip-path cut-out, which some renderers draw wrongly).
+- The page shows the state the step talks about: setup steps show the empty setup, the 3D steps show a survey in progress, the verdict step shows a finished one. The page is left ready for a first survey at the end.
+- The card sits beside the part on a desk and docks at the bottom on a phone. Keys: right and left arrows move, Escape closes, Tab stays inside the card. The page behind is inert while the tour is open.
+- Copy is plain: what the part is, what to do with it, one number where it helps (60 stops take about 32 minutes; the map error limit is 0.0350).
 
 ## Commercial use: what the real app needs beyond the mock-ups
 
