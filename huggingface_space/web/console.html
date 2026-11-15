@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Console · SMC survey</title>
+<!-- The console: every stored run and the verdict rules. Direction C "Row marker", light and dark; rules in design/DESIGN.md. Data from the JSON routes in ../app.py. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;700&family=Zilla+Slab:wght@500;700&display=swap" rel="stylesheet">
+<script>try{const t=localStorage.getItem('smc-theme');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="stylesheet" href="/web/app.css">
+<style>
+.wrap{max-width:1400px;margin:0 auto;padding:0 24px}
+.head{display:flex;align-items:end;justify-content:space-between;gap:16px;padding:26px 0 18px}
+.head h1{font:700 40px/1.05 var(--slab);letter-spacing:-.02em;margin:0}
+.strip{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.strip div{padding:14px 16px 14px 0}
+.strip div + div{padding-left:16px;border-left:1px solid var(--line)}
+.strip b{display:block;font:700 30px/1.1 var(--slab);font-variant-numeric:lining-nums tabular-nums;margin-top:2px}
+.strip .small{display:block}
+.body{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:28px;padding:22px 0 60px}
+.filters{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.filters input,.filters select{height:38px;border:1px solid var(--line-2);border-radius:8px;background:var(--surface);color:var(--ink);padding:0 12px;font-size:14px}
+.filters input{width:220px}
+.filters .seg{width:270px}
+.filters .count{margin-left:auto}
+.list{max-height:70vh;overflow:auto}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{font:700 11px/1.3 var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);text-align:left;padding:10px 10px;border-bottom:1px solid var(--line-2);white-space:nowrap;position:sticky;top:0;background:var(--ground)}
+th.n,td.n{text-align:right}
+td{padding:10px;border-bottom:1px solid var(--line);font-variant-numeric:lining-nums tabular-nums;white-space:nowrap}
+td.miss{color:var(--dry)}
+tbody tr{cursor:pointer}
+tbody tr:hover{background:var(--ground-2)}
+tbody tr[aria-selected=true]{background:var(--leaf-soft);box-shadow:inset 3px 0 0 var(--leaf)}
+.pol{color:var(--ink-2)}
+.detail{border-left:1px solid var(--line);padding-left:28px;display:flex;flex-direction:column;gap:16px}
+.detail h2{font:700 24px/1.2 var(--slab);margin:4px 0 0}
+.detail img{width:100%;border-radius:10px;display:block}
+.noimg{border:1px dashed var(--line-2);border-radius:10px;padding:28px 16px;text-align:center}
+.why{margin:0;padding:0;list-style:none}
+.why li{padding:8px 0;border-top:1px solid var(--line);font-size:14px}
+.why li:first-child{border-top:0}
+.kv{display:grid;grid-template-columns:1fr auto;gap:6px 12px;font-size:14px;font-variant-numeric:lining-nums tabular-nums;margin:0}
+.kv dt{color:var(--ink-2)} .kv dd{margin:0;text-align:right}
+.acts{display:flex;flex-wrap:wrap;gap:8px}
+.acts a{text-decoration:none}
+.acts .go{min-height:46px;font-size:15px}
+.rules{margin-top:36px;border-top:1px solid var(--line);padding-top:20px;display:grid;grid-template-columns:260px minmax(0,1fr);gap:24px}
+.rules h2{font:700 22px/1.2 var(--slab);margin:0 0 6px}
+.rgrid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
+.rgrid label{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--ink-2)}
+.rgrid input{height:42px;border:1px solid var(--line-2);border-radius:8px;background:var(--surface);color:var(--ink);padding:0 12px;font:700 18px var(--slab);font-variant-numeric:lining-nums}
+.rgrid .who input{font:400 15px var(--sans)}
+.rgrid .wide{grid-column:span 2}
+.saved{grid-column:1/-1;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.log{grid-column:1/-1;margin:0;padding:0;list-style:none;font-size:13px;color:var(--ink-2)}
+.log li{padding:6px 0;border-top:1px solid var(--line)}
+.toast{position:fixed;left:50%;bottom:20px;transform:translate(-50%,20px);opacity:0;background:var(--ink);color:var(--ground);padding:10px 16px;border-radius:8px;font-size:14px;box-shadow:0 1px 2px rgba(var(--shadow),.35);transition:transform var(--t-enter) var(--in),opacity var(--t-enter) var(--in);pointer-events:none}
+.toast.on{transform:translate(-50%,0);opacity:1}
+.cards{display:none}
+
+@media (max-width:1180px){
+  .body{grid-template-columns:minmax(0,1fr)}
+  .detail{border-left:0;padding-left:0;border-top:1px solid var(--line);padding-top:20px}
+  .col-time,.col-valid{display:none}
+  .rgrid{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media (max-width:760px){
+  .wrap{padding:0 16px}
+  .head{flex-direction:column;align-items:start;gap:4px;padding:20px 0 14px}
+  .head h1{font-size:32px}
+  .strip{grid-template-columns:1fr 1fr}
+  .strip div,.strip div + div{padding:12px 0;border-left:0;border-bottom:1px solid var(--line)}
+  .strip div:nth-child(even){padding-left:14px;border-left:1px solid var(--line)}
+  .strip div:last-child{grid-column:1/-1;border-bottom:0}
+  .filters input,.filters .seg,.filters select{width:100%}
+  .filters .count{margin-left:0}
+  table{display:none}
+  .cards{display:block;list-style:none;margin:0;padding:0}
+  .cards li{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:12px 0;border-bottom:1px solid var(--line);cursor:pointer}
+  .cards li[aria-selected=true]{background:var(--leaf-soft);box-shadow:inset 3px 0 0 var(--leaf);padding-left:10px}
+  .cards b{font:700 16px/1.2 var(--slab)}
+  .rules{grid-template-columns:1fr}
+  .rgrid{grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+<body>
+<div id="app">
+<header class="top">
+  <a class="brand" href="/">SMC <small>soil survey</small></a>
+  <nav class="pages" aria-label="Pages"><a href="/">Simulator</a><a href="/console" aria-current="page">Console</a></nav>
+  <span class="sp"></span>
+  <span class="status" role="status"><i></i><span id="statusText">Simulator</span></span>
+  <button class="tour-btn" id="tourBtn" aria-label="Take the tour of this page">Tour</button>
+  <button class="theme" id="theme" aria-label="Switch colour theme"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M8 2a6 6 0 0 0 0 12z" fill="currentColor"/></svg><span id="themeLabel">System</span></button>
+  <span class="who">Admin</span>
+</header>
+
+<main class="wrap">
+  <div class="head"><h1>Runs</h1><span class="small" id="span"></span></div>
+  <div class="strip" id="strip"></div>
+
+  <div class="body">
+    <section aria-label="Run history">
+      <div class="filters">
+        <input type="search" id="q" placeholder="Search seed, strategy, field" aria-label="Search runs">
+        <div class="seg" role="group" aria-label="Verdict" id="vf"><button data-v="" aria-pressed="true">All</button><button data-v="SUCCESS">Success</button><button data-v="PARTIAL">Partial</button><button data-v="FAIL">Fail</button></div>
+        <select aria-label="Strategy" id="pf"><option value="">All strategies</option></select>
+        <span class="small count" id="count" aria-live="polite"></span>
+      </div>
+      <div class="list"><table><thead><tr><th>When (UTC)</th><th>Field</th><th>Strategy</th><th class="n">Stops</th><th class="n col-valid">Readings</th><th class="n">Map error</th><th class="n">Dry found</th><th class="n col-time">Time</th><th>Verdict</th></tr></thead><tbody id="rows"></tbody></table>
+      <ul class="cards" id="cards"></ul></div>
+
+      <section class="rules" aria-labelledby="rh">
+        <div><h2 id="rh">Verdict rules</h2><p class="small">The code decides every verdict from these. Each change is logged and applies to new runs only: stored runs keep the verdict they were given.</p></div>
+        <form class="rgrid" id="rform">
+          <label>Map error at most (m³/m³)<input name="max_rmse" inputmode="decimal" required></label>
+          <label>Dry ground found at least (%)<input name="min_dry_recall" inputmode="numeric" data-pct required></label>
+          <label>Dry-zone F1 at least<input name="min_dry_f1" inputmode="decimal" required></label>
+          <label>Probes with a value at least (%)<input name="min_probe_success" inputmode="numeric" data-pct required></label>
+          <label>Plant contacts at most<input name="max_plant_contacts" inputmode="numeric" required></label>
+          <label class="who">Your name<input name="by" required maxlength="80" autocomplete="name"></label>
+          <label class="who wide">Why (kept in the change log)<input name="note" maxlength="500"></label>
+          <label class="who" id="pwBox" hidden>Admin password<input name="password" type="password" autocomplete="current-password"></label>
+          <div class="saved"><button class="btn" id="save" type="submit">Save rules</button><span class="small" id="ruleNote" role="status"></span></div>
+          <ul class="log" id="log" aria-label="Change log"></ul>
+        </form>
+      </section>
+    </section>
+
+    <aside class="detail" id="detail" aria-live="polite"><p class="small">No run selected.</p></aside>
+  </div>
+</main>
+<div class="toast" id="toast" role="status"></div>
+
+</div>
+<script src="/web/tour.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+const NAMES={planned_survey:'Planned survey',moisture_seeker:'Moisture seeker',spatial_coverage:'Spatial coverage',fixed_spacing:'Fixed spacing',fixed_plus_recheck:'Fixed + recheck',ppo:'PPO (learned)'};
+const FIELDS={'scenarios/drip_irrigation.yaml':'Drip-irrigated','demo.yaml':'Demo field','scenarios/rain_shower.yaml':'Rain shower','scenarios/hot_afternoon.yaml':'Hot afternoon'};
+const WORD={SUCCESS:'Success',PARTIAL:'Partly done',FAIL:'Failed'};
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>'&#'+c.charCodeAt(0)+';');
+const f4=v=>v==null?"n/a":v.toFixed(4);
+const pct=v=>v==null?'n/a':Math.round(v*100)+'%';
+const field=r=>r.field?(FIELDS[r.field]||r.field.replace(/^scenarios\/|\.yaml$/g,'')):'seed '+r.seed;
+let RUNS=[], sel=null, RULES=null;
+async function api(url,opt){const r=await fetch(url,opt);const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(typeof j.detail==='string'?j.detail:Array.isArray(j.detail)?j.detail.map(d=>d.msg).join('; '):`HTTP ${r.status}`);return j}
+function toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('on');setTimeout(()=>t.classList.remove('on'),2600)}
+
+function rowOf(r){const m=r.metrics.map,u=r.metrics.run;return{...r,when:r.created.slice(0,16).replace('T',' '),rmse:m.rmse,dry:m.dry_recall,probes:u.probes_used,valid:u.valid_probes,contacts:u.plant_contacts,minutes:(u.mission_time_s/60).toFixed(1)}}
+
+function stats(){
+  const n=RUNS.length,c=v=>RUNS.filter(r=>r.verdict===v).length,e=RUNS.map(r=>r.rmse).filter(v=>v!=null).sort((a,b)=>a-b);
+  const m=e.length,med=m?(m%2?e[(m-1)/2]:(e[m/2-1]+e[m/2])/2):null;
+  $('span').textContent=n?`${RUNS[n-1].when.slice(0,10)} to ${RUNS[0].when.slice(0,10)} · simulator runs`:'No runs yet';
+  $('strip').innerHTML=[['Runs on record',n,'saved with config, seed and readings'],['Success',c('SUCCESS'),'met every rule'],['Partly done',c('PARTIAL'),'missed one rule or more'],
+    ['Plants hit',RUNS.reduce((a,r)=>a+r.contacts,0),'across all runs'],['Median map error',med==null?'—':med.toFixed(4),`${RUNS.reduce((a,r)=>a+r.probes,0).toLocaleString('en')} probe stops in all`]]
+    .map(([a,b,d])=>`<div><span class="over">${a}</span><b>${b}</b><span class="small">${d}</span></div>`).join('');
+}
+function render(){
+  const q=$('q').value.trim().toLowerCase(),v=document.querySelector('#vf [aria-pressed=true]').dataset.v,p=$('pf').value;
+  const shown=RUNS.filter(r=>(!v||r.verdict===v)&&(!p||r.policy===p)&&(!q||`${r.seed} ${r.policy} ${NAMES[r.policy]||''} ${field(r)} ${r.id}`.toLowerCase().includes(q)));
+  $('count').textContent=`${shown.length} of ${RUNS.length}`;
+  $('rows').innerHTML=shown.map(r=>`<tr data-id="${esc(r.id)}" tabindex="0" aria-selected="${r.id===sel}"><td>${r.when}</td><td>${esc(field(r))}</td><td class="pol">${esc(NAMES[r.policy]||r.policy)}</td><td class="n">${r.probes}</td><td class="n col-valid">${r.valid}</td>
+<td class="n ${r.why.includes('map error')?'miss':''}">${f4(r.rmse)}</td><td class="n ${/dry/.test(r.why)?'miss':''}">${pct(r.dry)}</td><td class="n col-time">${r.minutes} min</td><td><span class="badge ${r.verdict}">${r.verdict}</span></td></tr>`).join('');
+  $('cards').innerHTML=shown.map(r=>`<li data-id="${esc(r.id)}" tabindex="0" aria-selected="${r.id===sel}"><b>${esc(NAMES[r.policy]||r.policy)}, ${esc(field(r))}</b><span class="badge ${r.verdict}">${r.verdict}</span><span class="small">${r.when} · ${r.probes} stops · error ${f4(r.rmse)}</span></li>`).join('');
+  document.querySelectorAll('[data-id]').forEach(e=>{e.onclick=()=>pick(e.dataset.id);e.onkeydown=ev=>{if(ev.key==='Enter')pick(e.dataset.id)}});
+}
+async function pick(id){
+  sel=id;document.querySelectorAll('[data-id]').forEach(e=>e.setAttribute('aria-selected',e.dataset.id===id));
+  const r=RUNS.find(x=>x.id===id);if(!r)return;history.replaceState(null,'','#'+encodeURIComponent(id));
+  const one=await api('/api/run?id='+encodeURIComponent(id)).catch(()=>({}));
+  const q=encodeURIComponent(id),reasons=r.verdict==='SUCCESS'?['No plant was touched and every rule was met.']:r.why.split('; ').map(s=>s[0].toUpperCase()+s.slice(1)+'.');
+  const again=r.field&&r.seed!=null;
+  $('detail').innerHTML=`<div><span class="over">${r.when} UTC · ${esc(r.id)}</span><h2>${WORD[r.verdict]}: ${esc(NAMES[r.policy]||r.policy)}</h2></div>
+  ${one.maps?`<img src="/api/run/maps.png?id=${q}" alt="True moisture, the rover's map and its uncertainty for this run.">`:`<div class="noimg small">No map image was saved for this run.</div>`}
+  <ul class="why">${reasons.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>
+  <dl class="kv"><dt>Field</dt><dd>${esc(field(r))}</dd><dt>Seed</dt><dd>${r.seed??'—'}</dd><dt>Stops, readings</dt><dd>${r.probes}, ${r.valid}</dd><dt>Map error</dt><dd>${f4(r.rmse)}</dd><dt>Dry ground found</dt><dd>${pct(r.dry)}</dd><dt>Plants hit</dt><dd>${r.contacts}</dd><dt>Survey time</dt><dd>${r.minutes} min</dd><dt>Judged with rules</dt><dd>version ${r.rules_version}</dd></dl>
+  <div class="acts">${one.scene?`<a class="btn" target="_blank" rel="noopener" href="/viewer/index.html?scene=${encodeURIComponent('/api/run/scene.json?id='+q)}">Open replay</a>`:`<button class="btn" disabled>No replay saved</button>`}<a class="btn" href="/api/run/readings.csv?id=${q}" download>Readings CSV</a></div>
+  ${again?`<button class="go" id="again">Run again with these settings <span aria-hidden="true">→</span></button>`:`<p class="small">Started from the command line: run it again there with seed ${r.seed??'?'}.</p>`}`;
+  if(again)$('again').onclick=()=>runAgain(r);
+}
+async function runAgain(r){
+  const b=$('again');b.disabled=true;b.firstChild.textContent='Running the survey… ';$('statusText').textContent='Running a survey';
+  try{const {job}=await api('/api/runs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({field:r.field,policy:r.policy,stops:r.probes,seed:r.seed})});
+    let s;do{await new Promise(z=>setTimeout(z,500));s=await api('/api/jobs/'+job)}while(s.state==='queued'||s.state==='running');
+    if(s.state==='error')throw new Error(s.error);
+    await loadRuns();pick(s.run);toast('Survey stored. It was judged with the current rules.')}
+  catch(e){toast('The survey did not run: '+e.message);b.disabled=false}
+  $('statusText').textContent='Simulator';
+}
+async function loadRuns(){
+  RUNS=(await api('/api/runs')).runs.map(rowOf);stats();
+  const pols=[...new Set(RUNS.map(r=>r.policy))],cur=$('pf').value;
+  $('pf').innerHTML='<option value="">All strategies</option>'+pols.map(p=>`<option value="${esc(p)}">${esc(NAMES[p]||p)}</option>`).join('');$('pf').value=cur;
+  render();
+}
+$('q').oninput=render;$('pf').onchange=render;
+document.querySelectorAll('#vf button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#vf button').forEach(x=>x.setAttribute('aria-pressed',x===b));render()});
+
+/* verdict rules: percentages shown as whole numbers */
+function showRules(d){
+  RULES=d;const f=$('rform');
+  for(const [k,v] of Object.entries(d.rules)){const i=f.elements[k];if(i)i.value=i.dataset.pct!==undefined?Math.round(v*100):v}
+  $('pwBox').hidden=!d.password;
+  $('ruleNote').textContent=d.locked?'Locked on this server: no admin password is set.':`Version ${d.version}. New runs use these values.`;
+  $('save').disabled=d.locked;
+  $('log').innerHTML=d.changes.slice().reverse().slice(0,5).map(c=>`<li>${esc(c.at)} · ${esc(c.by)}: ${esc(c.note)}</li>`).join('');
+}
+$('rform').onsubmit=async e=>{
+  e.preventDefault();const f=e.target,rules={...RULES.rules};
+  for(const k of Object.keys(rules)){const i=f.elements[k];if(!i)continue;const n=Number(i.value);if(!Number.isFinite(n)){i.focus();return toast('Enter a number.')}rules[k]=i.dataset.pct!==undefined?n/100:n}
+  try{showRules(await api('/api/rules',{method:'POST',headers:{'Content-Type':'application/json','X-Admin-Password':f.elements.password.value},body:JSON.stringify({rules,by:f.elements.by.value,note:f.elements.note.value})}));
+    f.elements.note.value='';f.elements.password.value='';toast('Rules saved. New runs use them.')}
+  catch(err){toast('Not saved: '+err.message)}
+};
+
+const modes=['system','light','dark'];
+function showTheme(){const t=document.documentElement.dataset.theme||'system';$('themeLabel').textContent=t[0].toUpperCase()+t.slice(1)}
+$('theme').onclick=()=>{const cur=document.documentElement.dataset.theme||'system',nx=modes[(modes.indexOf(cur)+1)%3];
+  if(nx==='system')delete document.documentElement.dataset.theme;else document.documentElement.dataset.theme=nx;
+  try{nx==='system'?localStorage.removeItem('smc-theme'):localStorage.setItem('smc-theme',nx)}catch(e){}showTheme()};
+showTheme();
+
+const CON_TOUR={key:'smc-tour-console',steps:[
+ {target:null,title:'Welcome to the console',text:'The console is the record of every survey: what happened, why it got its verdict, and what to do next. Six short steps.'},
+ {target:'#strip',title:'The whole record at a glance',text:'How many surveys there are, how many met every rule, and whether a plant has ever been touched.'},
+ {target:'.list',title:'Every survey, newest first',text:'One row per survey. A number in orange is a reason the survey fell short. Use the filters above to narrow the list; click a row to open it.'},
+ {target:'#detail',title:'One survey, opened',text:'Why it got its verdict, its numbers, and what you can do with it: open the 3D replay, download the readings, or run it again with the same settings.'},
+ {target:'.rules',title:'The rules behind every verdict',text:'These numbers decide whether a survey succeeds. Change them here with your name and a reason; new surveys use the new values and old verdicts stay as they were.'},
+ {target:'.pages',title:'Back to the simulator',text:'Start a new survey on the Simulator page. It appears here when it ends.'},
+ {target:'#tourBtn',title:'That is everything',text:'Open this tour again any time from here.'}]};
+$('tourBtn').onclick=()=>Tour.start(CON_TOUR);
+
+(async()=>{
+  try{await loadRuns();showRules(await api('/api/rules'));
+    const want=decodeURIComponent(location.hash.slice(1));if(RUNS.length)await pick(RUNS.some(r=>r.id===want)?want:RUNS[0].id)}
+  catch(e){$('detail').innerHTML=`<p class="small">Cannot reach the server: ${esc(e.message)}</p>`}
+  Tour.firstVisit(CON_TOUR);
+})();
+</script>
+</body>
+</html>

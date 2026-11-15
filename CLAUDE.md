@@ -65,6 +65,7 @@ Python 3.13 via `uv`. numpy, scipy, shapely, pydantic v2, PyYAML, PyKrige, rerun
     uv run agrisim run --config configs/demo.yaml --seed 7 --rerun
     uv run agrisim bench --config configs/demo.yaml --seeds 0-49
     uv run agrisim suite --tier quick --workers 8   # agribench, see benchmarks/README.md
+    uv run --with gradio==6.32.0 python huggingface_space/app.py   # the app: http://127.0.0.1:7860 (Simulator), /console
 
 A task is done only when ruff, mypy, pytest and the licence gate all pass. A change to a strategy, mapper, sensor or the simulator also runs `agrisim suite --tier quick`: no hard fail, no regression.
 

@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simulator · SMC survey</title>
+<!-- The operator page. Direction C "Row marker", light and dark; rules in design/DESIGN.md. Data from the JSON routes in ../app.py. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;700&family=Zilla+Slab:wght@500;700&display=swap" rel="stylesheet">
+<script>/* theme before paint: saved choice, else the system */try{const t=localStorage.getItem('smc-theme');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="stylesheet" href="/web/app.css">
+<style>
+.sim{display:grid;grid-template-columns:320px minmax(0,1fr) 340px;min-height:calc(100vh - 56px)}
+/* setup rail */
+.setup{border-right:1px solid var(--line);padding:20px;display:flex;flex-direction:column;gap:20px;background:var(--ground)}
+.setup h1{font:700 28px/1.1 var(--slab);letter-spacing:-.01em;margin:0}
+.step{display:flex;flex-direction:column;gap:8px}
+.step-h{display:flex;align-items:center;gap:8px;font:700 17px/1.2 var(--slab)}
+.step-h span{width:22px;height:22px;border-radius:50%;background:var(--ink);color:var(--ground);display:grid;place-items:center;font:700 12px/1 var(--sans)}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.tile{text-align:left;border:1px solid var(--line-2);border-radius:10px;background:var(--surface);padding:9px 11px;cursor:pointer;transition:border-color var(--t-fast) var(--in),background-color var(--t-fast) var(--in)}
+.tile b{display:block;font:500 15px/1.2 var(--slab)}
+.tile span{font-size:12px;color:var(--ink-2)}
+.tile[aria-pressed=true]{border:2px solid var(--leaf);padding:8px 10px;background:var(--leaf-soft)}
+.radios{display:flex;flex-direction:column;gap:6px}
+.radio{display:grid;grid-template-columns:18px 1fr;gap:8px;padding:9px 11px;border:1px solid var(--line-2);border-radius:10px;cursor:pointer;background:var(--surface);transition:border-color var(--t-fast) var(--in)}
+.radio input{margin:2px 0 0;accent-color:var(--leaf)}
+.radio:has(input:checked){border:2px solid var(--leaf);padding:8px 10px;background:var(--leaf-soft)}
+.stops{display:flex;align-items:center;justify-content:space-between;border:1px solid var(--line-2);border-radius:10px;padding:8px 8px 8px 14px;background:var(--surface)}
+.stops output{font:700 34px/1 var(--slab)}
+.stops div{display:flex;gap:6px}
+.stops button{width:42px;height:42px;border-radius:6px;border:1px solid var(--line-2);background:var(--ground);font:700 20px/1 var(--sans);cursor:pointer;color:var(--ink)}
+.go .fill{position:absolute;left:0;bottom:0;height:5px;width:0;background:var(--leaf);transition:width var(--t-move) linear}
+.go .lbl{position:relative;display:flex;justify-content:space-between;width:100%}
+.running .go{background:var(--ground-2);color:var(--ink);box-shadow:none;cursor:default}
+.running .go .lbl{color:var(--ink)}
+.computing .go .fill{width:100%!important;opacity:.35;animation:pulse 1s steps(2) infinite}
+.summary{display:none;font-size:14px;color:var(--ink-2)}
+.locked .summary{display:block}
+.locked .step{display:none}
+.running .cancel{display:block}
+.cancel{display:none;background:none;border:0;padding:0;color:var(--ink-2);text-decoration:underline;text-underline-offset:3px;cursor:pointer;font-size:13px;align-self:flex-start}
+.error{color:var(--dry);font-size:14px;margin:0}
+
+/* centre: view and time */
+.stage{display:flex;flex-direction:column;min-width:0;background:var(--ground-2)}
+.view{position:relative;flex:1;min-height:420px;overflow:hidden;background:#2B3324}
+.view iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.empty{position:absolute;inset:0;display:grid;place-items:center;padding:24px;text-align:center;color:#E3E8D8;font-size:15px}
+.timebar{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto;gap:14px;align-items:center;padding:12px 16px;border-top:1px solid var(--line);background:var(--ground)}
+.play{width:46px;height:46px;border-radius:50%;border:0;background:var(--ink);display:grid;place-items:center;cursor:pointer}
+.play svg{width:14px;height:16px;fill:var(--ground)}
+.play:disabled{opacity:.4;cursor:default}
+.clock{font:700 20px/1 var(--slab);font-variant-numeric:lining-nums tabular-nums;min-width:118px}
+.clock small{font:400 13px var(--sans);color:var(--ink-3)}
+.track{position:relative;height:44px}
+.track .rail{position:absolute;left:0;right:0;top:20px;height:4px;border-radius:2px;background:var(--line)}
+.track .done{position:absolute;left:0;top:20px;height:4px;border-radius:2px;background:var(--leaf);transition:width var(--t-move) linear}
+.track .head{position:absolute;top:2px;width:6px;height:40px;margin-left:-3px;border-radius:3px;background:var(--ink);transition:left var(--t-move) linear}
+.tick{position:absolute;bottom:22px;width:2px;margin-left:-1px;height:12px;background:var(--ink-3);transform-origin:bottom;opacity:.45}
+.tick.past{opacity:1;background:var(--leaf)}
+.tick.dry{width:6px;margin-left:-3px;height:18px;border-radius:3px;background:var(--dry);opacity:.5}
+.tick.dry.past{opacity:1}
+.tick.none{background:transparent;border:1px solid var(--ink-3);width:5px;margin-left:-2.5px;height:8px;opacity:1}
+.tick.new{animation:grow 160ms var(--in)}
+@keyframes grow{from{transform:scaleY(0)}}
+.speed{width:190px}
+
+/* right: live readouts, verdict, debrief */
+.live{border-left:1px solid var(--line);padding:20px;display:flex;flex-direction:column;gap:16px;overflow:auto;background:var(--ground)}
+.now b{display:block;font:700 44px/1 var(--slab);font-variant-numeric:lining-nums tabular-nums}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:14px 16px}
+.pair b{display:block;font:700 24px/1.1 var(--slab);font-variant-numeric:lining-nums tabular-nums;overflow:hidden}
+.pair .dry b{color:var(--dry)}
+.roll{display:inline-block;animation:roll var(--t-move) var(--in)}
+@keyframes roll{from{transform:translateY(60%);opacity:0}}
+.verdict{display:none;background:var(--leaf);color:var(--on-leaf);border-radius:14px;padding:18px}
+.done .verdict{display:block;animation:enter var(--t-enter) var(--in)}
+@keyframes enter{from{transform:translateY(24px);opacity:0}}
+.verdict .w{font:700 40px/1 var(--slab);letter-spacing:-.015em;margin:4px 0 10px}
+.verdict .over{color:var(--leaf-mute)}
+:root[data-theme=dark] .verdict .over{color:#294022}
+.verdict li{list-style:none;padding:8px 0;border-top:1px solid var(--leaf-line);font-size:14px;line-height:1.4}
+.verdict ul{margin:0;padding:0}
+.debrief{display:none}
+.done .debrief{display:block}
+.debrief p{margin:6px 0 0;font-size:14px;max-width:62ch;white-space:pre-line}
+.actions{display:none;gap:8px;flex-wrap:wrap}
+.done .actions{display:flex}
+.actions a{text-decoration:none}
+.grab{display:none}
+
+@media (max-width:1180px){
+  .sim{grid-template-columns:280px minmax(0,1fr)}
+  .live{grid-column:1/-1;border-left:0;border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:start}
+}
+@media (max-width:760px){
+  .sim{display:flex;flex-direction:column}
+  .setup{order:1;border-right:0;border-bottom:1px solid var(--line);padding:16px;gap:16px}
+  .stage{order:2}
+  .view{min-height:0;aspect-ratio:4/3.1;flex:none}
+  .timebar{grid-template-columns:auto 1fr;gap:8px 12px;padding:10px 16px}
+  .timebar .track{grid-column:1/-1;order:3}
+  .speed{display:none}
+  .live{order:3;display:flex;align-items:stretch;border-top:0;border-radius:16px 16px 0 0;margin-top:-14px;position:relative;z-index:3;box-shadow:0 -2px 8px rgba(var(--shadow),.18);padding:16px}
+  .grab{display:block;width:40px;height:4px;border-radius:2px;background:var(--line-2);margin:-6px auto 0}
+}
+</style>
+</head>
+<body>
+<div id="app">
+<header class="top">
+  <a class="brand" href="/">SMC <small>soil survey</small></a>
+  <nav class="pages" aria-label="Pages"><a href="/" aria-current="page">Simulator</a><a href="/console">Console</a></nav>
+  <span class="sp"></span>
+  <span class="status" role="status"><i></i><span id="statusText">Ready</span></span>
+  <button class="tour-btn" id="tourBtn" aria-label="Take the tour of this page">Tour</button>
+  <button class="theme" id="theme" aria-label="Switch colour theme"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M8 2a6 6 0 0 0 0 12z" fill="currentColor"/></svg><span id="themeLabel">System</span></button>
+  <span class="who">Operator</span>
+</header>
+
+<div class="sim" id="sim">
+  <aside class="setup" aria-label="Survey setup">
+    <h1>Survey</h1>
+    <p class="summary" id="summary"></p>
+    <div class="step">
+      <div class="step-h"><span>1</span>Field</div>
+      <div class="tiles" role="group" aria-label="Field">
+        <button class="tile" data-field="scenarios/drip_irrigation.yaml" aria-pressed="true"><b>Drip-irrigated</b><span>30 × 20 m, dry patches</span></button>
+        <button class="tile" data-field="demo.yaml" aria-pressed="false"><b>Demo field</b><span>30 × 20 m</span></button>
+        <button class="tile" data-field="scenarios/rain_shower.yaml" aria-pressed="false"><b>Rain shower</b><span>rain mid-run</span></button>
+        <button class="tile" data-field="scenarios/hot_afternoon.yaml" aria-pressed="false"><b>Hot afternoon</b><span>soil drying</span></button>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-h"><span>2</span>How it probes</div>
+      <div class="radios" role="radiogroup" aria-label="Strategy">
+        <label class="radio"><input type="radio" name="s" value="planned_survey" checked><span><b>Planned survey</b><br><span class="small">Even stops on every lane.</span></span></label>
+        <label class="radio"><input type="radio" name="s" value="spatial_coverage"><span><b>Spatial coverage</b><br><span class="small">Where the map is least sure.</span></span></label>
+        <label class="radio"><input type="radio" name="s" value="moisture_seeker"><span><b>Moisture seeker</b><br><span class="small">Toward dry ground.</span></span></label>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-h"><span>3</span>Stops</div>
+      <div class="stops"><output id="stops" class="num">60</output><div><button data-d="-10" aria-label="10 fewer stops">−</button><button data-d="10" aria-label="10 more stops">+</button></div></div>
+      <span class="small" id="stopsTime">About 32 minutes of driving.</span>
+    </div>
+    <button class="go" id="go"><span class="fill" id="fill"></span><span class="lbl"><span id="goText">Start survey</span><span aria-hidden="true" id="goArrow">→</span></span></button>
+    <button class="cancel" id="cancel">Stop watching</button>
+    <p class="error" id="error" role="alert" hidden></p>
+  </aside>
+
+  <section class="stage" aria-label="3D view">
+    <div class="view" id="view">
+      <div class="empty" id="empty">No survey yet. Choose a field and press Start survey.</div>
+    </div>
+    <div class="timebar">
+      <button class="play" id="play" aria-label="Play" disabled><svg viewBox="0 0 14 16" id="playIcon"><path d="M1 0L14 8 1 16z"/></svg></button>
+      <span class="clock" id="clock">00:00 <small>/ 00:00</small></span>
+      <div class="track" id="track" role="slider" tabindex="0" aria-label="Mission time" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0" aria-valuetext="0 minutes"><div class="rail"></div><div class="done" id="done"></div><div class="head" id="head"></div></div>
+      <div class="seg speed" role="group" aria-label="Speed"><button data-x="20">20×</button><button data-x="60" aria-pressed="true">60×</button><button data-x="200">200×</button><button data-x="600">600×</button></div>
+    </div>
+  </section>
+
+  <aside class="live" aria-label="Live readouts" aria-live="polite">
+    <div class="grab" aria-hidden="true"></div>
+    <div class="now"><span class="over">Stops done</span><b><span id="n">0</span> of <span id="of">0</span></b></div>
+    <div class="pair">
+      <div><span class="over">Last reading</span><b id="last">—</b><span class="small" id="lastAt">no reading yet</span></div>
+      <div class="dry"><span class="over">Driest so far</span><b id="driest">—</b><span class="small" id="driestAt">no reading yet</span></div>
+      <div><span class="over">Map error</span><b id="err">—</b><span class="small" id="errLimit">limit —</span></div>
+      <div><span class="over">Plants hit</span><b id="hit">—</b><span class="small" id="hitLimit">limit —</span></div>
+    </div>
+    <div class="verdict" id="verdict">
+      <span class="over">Verdict · decided in code</span>
+      <div class="w" id="word"></div>
+      <ul id="why"></ul>
+    </div>
+    <div class="debrief" id="debrief"><span class="over">Debrief · AI, under the verdict</span><p id="dtext"></p></div>
+    <div class="actions"><a class="btn" id="csv" href="#" download>Export readings</a><a class="btn" id="open" href="/console">Open in console</a></div>
+  </aside>
+</div>
+
+</div>
+<script src="/web/tour.js"></script>
+<script>
+const $=id=>document.getElementById(id), sim=$('sim'), track=$('track');
+const mmss=s=>String(Math.floor(s/60)).padStart(2,'0')+':'+String(Math.floor(s%60)).padStart(2,'0');
+const WORD={SUCCESS:'Success',PARTIAL:'Partly done',FAIL:'Failed'};
+const NAMES={'scenarios/drip_irrigation.yaml':'Drip-irrigated block','demo.yaml':'Demo field','scenarios/rain_shower.yaml':'Rain shower','scenarios/hot_afternoon.yaml':'Hot afternoon',planned_survey:'planned survey',spatial_coverage:'spatial coverage',moisture_seeker:'moisture seeker'};
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+let R=null, P=[], T=1, ERR=[], t=0, speed=60, timer=null, RULES=null;
+
+/* theme: system → light → dark, saved per browser */
+const modes=['system','light','dark'];
+function showTheme(){const m=document.documentElement.dataset.theme||'system';$('themeLabel').textContent=m[0].toUpperCase()+m.slice(1)}
+$('theme').onclick=()=>{const cur=document.documentElement.dataset.theme||'system',nx=modes[(modes.indexOf(cur)+1)%3];
+  if(nx==='system')delete document.documentElement.dataset.theme;else document.documentElement.dataset.theme=nx;
+  try{nx==='system'?localStorage.removeItem('smc-theme'):localStorage.setItem('smc-theme',nx)}catch(e){}showTheme()};
+showTheme();
+
+async function api(url,opt){const r=await fetch(url,opt);const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(typeof j.detail==='string'?j.detail:`HTTP ${r.status}`);return j}
+const limits=()=>{if(!RULES)return;$('errLimit').textContent='limit '+RULES.max_rmse.toFixed(4);$('hitLimit').textContent='limit '+RULES.max_plant_contacts};
+
+/* a stored run: its stops drive the time bar and readouts, its scene the 3D view */
+function load(run){
+  R=run;P=run.stops;T=(run.metrics.run.mission_time_s)||(P.length?P[P.length-1][0]:1);ERR=run.rmse||[];
+  track.querySelectorAll('.tick').forEach(e=>e.remove());
+  P.forEach(([s,,,v],i)=>{const d=document.createElement('i');d.className='tick'+(v===null?' none':v<0.18?' dry':'');d.style.left=(s/T*100)+'%';d.id='k'+i;track.appendChild(d)});
+  track.setAttribute('aria-valuemax',Math.round(T));$('of').textContent=P.length;
+  $('view').querySelector('iframe')?.remove();$('empty').hidden=!!run.scene;
+  if(!run.scene)$('empty').textContent='No 3D replay was saved for this run.';
+  else{const f=document.createElement('iframe');f.title='3D replay of the survey';f.src='/viewer/index.html?scene='+encodeURIComponent('/api/run/scene.json?id='+encodeURIComponent(run.id));$('view').appendChild(f)}
+  $('hit').textContent=run.metrics.run.plant_contacts;$('csv').href='/api/run/readings.csv?id='+encodeURIComponent(run.id);$('open').href='/console#'+encodeURIComponent(run.id);
+  $('summary').textContent=`${NAMES[run.field]||run.field||'Field from the command line'} · ${NAMES[run.policy]||run.policy} · ${P.length} stops · seed ${run.seed}. Started ${run.created.slice(11,16)} UTC.`;
+  $('word').textContent=WORD[run.verdict]||run.verdict;
+  $('why').innerHTML='';(run.verdict==='SUCCESS'?['No plant was touched and every rule was met']:run.why.split('; ')).forEach(s=>{const li=document.createElement('li');li.textContent=s[0].toUpperCase()+s.slice(1)+'.';$('why').appendChild(li)});
+  $('play').disabled=false;
+}
+
+function show(time,animate){ /* state at mission time `time` */
+  t=Math.min(time,T);const i=P.filter(p=>p[0]<=t).length, pct=t/T*100;
+  $('done').style.width=pct+'%';$('head').style.left=pct+'%';
+  $('clock').innerHTML=mmss(t)+' <small>/ '+mmss(T)+'</small>';
+  track.setAttribute('aria-valuenow',Math.round(t));track.setAttribute('aria-valuetext',`${Math.floor(t/60)} minutes ${Math.floor(t%60)} seconds, ${i} stops`);
+  const was=+$('n').textContent;
+  P.forEach((p,j)=>{const e=$('k'+j);e.classList.toggle('past',j<i);if(animate&&j===i-1&&i!==was&&!reduce){e.classList.remove('new');void e.offsetWidth;e.classList.add('new')}});
+  const n=$('n');n.textContent=i;if(animate&&i!==was&&!reduce){n.classList.remove('roll');void n.offsetWidth;n.classList.add('roll')}
+  const got=P.slice(0,i).filter(p=>p[3]!==null);
+  if(got.length){const l=got[got.length-1],dr=got.reduce((a,b)=>b[3]<a[3]?b:a);
+    $('last').textContent=l[3].toFixed(3);$('lastAt').textContent=`x ${l[1].toFixed(1)}, y ${l[2].toFixed(1)}`;
+    $('driest').textContent=dr[3].toFixed(3);$('driestAt').textContent=`x ${dr[1].toFixed(1)}, y ${dr[2].toFixed(1)}`;}
+  else{['last','driest'].forEach(id=>$(id).textContent='—');['lastAt','driestAt'].forEach(id=>$(id).textContent='no reading yet')}
+  $('err').textContent=i&&ERR.length?(ERR[Math.min(i,ERR.length-1)]).toFixed(4):i&&R.metrics.map.rmse!=null?R.metrics.map.rmse.toFixed(4):'—';
+  if(sim.classList.contains('running')){$('fill').style.width=(i/P.length*100)+'%';$('goText').textContent=`${i} of ${P.length} stops`;$('statusText').textContent=`Running · ${i} of ${P.length} stops`}
+  if(t>=T)finish();
+}
+function finish(){
+  stop();sim.className='sim done';
+  $('goText').textContent='Start a new survey';$('goArrow').textContent='→';$('fill').style.width='0';
+  $('statusText').textContent=`Finished · ${P.length} of ${P.length} stops`;
+  const text=R.debrief?R.debrief.split('(AI-generated)').pop().split('\n---')[0].replace(/\*\*/g,'').trim():'No debrief for this run. The verdict above is complete; the AI debrief is not connected to this app yet.';
+  $('dtext').textContent=text;
+}
+function play(){if(timer)return stop();if(t>=T)show(0,false);$('playIcon').innerHTML='<path d="M1 0h4v16H1zM9 0h4v16H9z"/>';$('play').setAttribute('aria-label','Pause');
+  timer=setInterval(()=>show(t+speed*0.1,true),100)}
+function stop(){clearInterval(timer);timer=null;$('playIcon').innerHTML='<path d="M1 0L14 8 1 16z"/>';$('play').setAttribute('aria-label','Play')}
+$('play').onclick=play;
+track.onkeydown=e=>{if(!R)return;const d={ArrowRight:30,ArrowLeft:-30}[e.key];if(d){stop();show(Math.max(0,t+d),false);e.preventDefault()}};
+track.onclick=e=>{if(!R)return;const b=track.getBoundingClientRect();stop();show((e.clientX-b.left)/b.width*T,false)};
+
+/* start: the server runs the survey, then the page plays its stops */
+const pick=()=>({field:document.querySelector('.tile[aria-pressed=true]').dataset.field,policy:document.querySelector('.radio input:checked').value,stops:+$('stops').textContent});
+$('go').onclick=async()=>{
+  if(sim.classList.contains('running'))return;
+  const req=pick();$('error').hidden=true;stop();
+  sim.className='sim locked running computing';$('goText').textContent='Driving the survey…';$('goArrow').textContent='';
+  $('summary').textContent=`${NAMES[req.field]} · ${NAMES[req.policy]} · ${req.stops} stops.`;$('statusText').textContent='Running · computing the survey';
+  try{
+    const {job}=await api('/api/runs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(req)});
+    let s;do{await new Promise(r=>setTimeout(r,500));s=await api('/api/jobs/'+job);if(s.state==='queued')$('statusText').textContent='Waiting · another survey is running'}while(s.state==='queued'||s.state==='running');
+    if(s.state==='error')throw new Error(s.error);
+    load(await api('/api/run?id='+encodeURIComponent(s.run)));
+    sim.className='sim locked running';show(0,false);play();
+  }catch(e){sim.className='sim';$('goText').textContent='Start survey';$('goArrow').textContent='→';$('statusText').textContent='Failed';$('error').textContent='The survey did not run: '+e.message;$('error').hidden=false}
+};
+$('cancel').onclick=()=>{if(sim.classList.contains('computing'))return;show(T,false);$('statusText').textContent='Finished · the run is saved in the Console'};
+
+document.querySelectorAll('.tiles .tile,.speed button').forEach(b=>b.addEventListener('click',()=>b.parentElement.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x===b))));
+document.querySelectorAll('.speed button').forEach(b=>b.addEventListener('click',()=>speed=+b.dataset.x));
+document.querySelectorAll('.stops button').forEach(b=>b.onclick=()=>{const n=Math.min(100,Math.max(10,+$('stops').textContent+ +b.dataset.d));$('stops').textContent=n;$('stopsTime').textContent=`About ${Math.round(n*0.53)} minutes of driving.`});
+
+/* tour: the page is shown in the state each step talks about (the latest stored run, if any) */
+function setIdle(){stop();sim.className='sim';if(R)show(0,false);$('goText').textContent='Start survey';$('goArrow').textContent='→';$('fill').style.width='0';$('statusText').textContent='Ready'}
+function setRunning(){if(!R)return;stop();sim.className='sim locked running';show(T*0.7,false)}
+function setDone(){if(!R)return;stop();sim.className='sim locked running';show(T,false)}
+const SIM_TOUR={key:'smc-tour-simulator',onEnd:setIdle,steps:[
+ {target:null,enter:setIdle,title:'Welcome to the simulator',text:'This page runs one soil-moisture survey of a tomato field and plays it back. A small rover drives between the rows and stops to push a probe into the soil. This tour takes about a minute.'},
+ {target:'.setup > div.step:nth-of-type(1)',title:'1. Choose the field',text:'Each field is a 30 by 20 m block of tomato rows with its own soil and weather. Start with Drip-irrigated: it has a couple of dry patches for the rover to find.'},
+ {target:'.setup > div.step:nth-of-type(2)',title:'2. Choose how the rover probes',text:'Planned survey spreads stops evenly over every lane. Spatial coverage goes where the map is least sure. Moisture seeker follows readings toward dry ground.'},
+ {target:'.setup > div.step:nth-of-type(3)',title:'3. Choose how many stops',text:'Each stop is one soil reading. More stops make a better map but a longer survey: 60 stops take about 32 minutes of driving.'},
+ {target:'#go',title:'Start the survey',text:'Yellow always means "go forward". Press it: the simulator drives the whole survey in a few seconds, then the page plays it back stop by stop.'},
+ {target:'.view',enter:setRunning,title:'The field in 3D',text:'The 3D replay of the survey. Its own panels change what the ground shows: the rover\'s map, the real moisture (only the simulator knows it), the map error and the uncertainty.'},
+ {target:'.timebar',title:'The time bar',text:'Each mark is one stop; the brown ones read dry (below 0.18), hollow ones returned nothing. Press play, click or use the arrow keys to move, and pick a speed on the right.'},
+ {target:'.live',title:'Live numbers',text:'Stops done, the latest reading and the driest one so far. The limits under each number are the verdict rules an admin sets in the Console.'},
+ {target:'.live',enter:setDone,title:'The verdict, then the debrief',text:'When the survey ends, the code compares the numbers with the rules and gives the verdict and its reasons. An AI debrief, when there is one, sits underneath: the verdict never comes from the AI.'},
+ {target:'.actions',title:'Take the readings with you',text:'Export readings downloads every stop as a CSV. Open in console shows this survey with every other one.'},
+ {target:'.pages',title:'Every survey is kept',text:'The Console page holds every survey: compare them, export the readings, and change the rules that decide a verdict.'},
+ {target:'#tourBtn',title:'That is everything',text:'Open this tour again any time from here. Next: press Start survey.'}]};
+$('tourBtn').onclick=()=>Tour.start(SIM_TOUR);
+
+/* open on the latest stored survey, finished, so there is something to look at */
+(async()=>{
+  try{RULES=(await api('/api/rules')).rules;limits();
+    const {runs,busy}=await api('/api/runs');if(busy)$('statusText').textContent='Busy · a survey is running';
+    if(runs.length){load(await api('/api/run?id='+encodeURIComponent(runs[0].id)));show(T,false)}}
+  catch(e){$('error').textContent='Cannot reach the server: '+e.message;$('error').hidden=false}
+  Tour.firstVisit(SIM_TOUR);
+})();
+</script>
+</body>
+</html>
