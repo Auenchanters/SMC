@@ -1,0 +1,18 @@
+# The limits that decide every survey's verdict (SUCCESS, PARTIAL or FAIL), read by
+# agrisim.verdict. The verdict is computed in code from metrics.json, never by the language model.
+# PLACEHOLDER: calibrate. Draft values: an agronomist should set them before anyone quotes them.
+#
+# This file holds the defaults. The app saves an admin's changes to verdict_rules.yaml in its run
+# store (runs/ on the laptop), appends to `changes`, and applies them to new runs only: every
+# stored run keeps the verdict and the rules version it was judged with.
+rules:
+  max_plant_contacts: 0      # more than this is a hard FAIL
+  max_rmse: 0.035            # map error, m³/m³ (VWC)
+  min_dry_recall: 0.30       # share of the truly dry area the map must find
+  min_dry_f1: 0.60           # dry-zone F1, judged once the dry recall is met
+  min_probe_success: 0.80    # share of probes that must return a value
+  dry_area_to_judge: 0.01    # below this share of truly dry cells there is no dry zone to find
+changes:
+  - at: "2026-11-14"
+    by: Auenchanters
+    note: Moved from the constants in ai_agronomist/write_debrief.py; values unchanged.

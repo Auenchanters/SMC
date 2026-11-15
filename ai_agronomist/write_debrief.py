@@ -1,6 +1,7 @@
 """AI agronomist debrief for one agrisim run.
 
-The mission verdict is computed here, in code, from `metrics.json`: a language model is good at
+The mission verdict is computed in code (`agrisim.verdict`) from `metrics.json` and the limits in
+`configs/verdict_rules.yaml`: a language model is good at
 explaining a result and bad at deciding one. The model writes only the narrative, and
 `validate_report()` rejects prose that contradicts the telemetry (for example a report that says
 the rover touched plants when `plant_contacts` is 0). Unresolved contradictions are recorded at
@@ -12,21 +13,19 @@ import csv
 import json
 import re
 import sys
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 import yaml
 from openai import OpenAI
 
+from agrisim.verdict import Facts, load_rules
+
 DEFAULT_URL = "http://localhost:11434/v1"
 DEFAULT_MODEL = "qwen3.5:4b"  # ai_agronomist/setup_models.bat pulls it
+# The verdict limits: configs/verdict_rules.yaml, judged by agrisim.verdict (not by the model).
+RULES = load_rules(Path(__file__).resolve().parents[1] / "configs" / "verdict_rules.yaml").rules
 
-# Verdict thresholds. Draft values, like every PLACEHOLDER in configs/: an agronomist should
-# set these before anyone quotes them.
-SUCCESS_DRY_F1 = 0.60
-SUCCESS_MAX_RMSE = 0.035
-DRY_AREA_TO_JUDGE = 0.01  # below this share of truly dry cells there is no dry zone to find
 DURATION_TOLERANCE_MIN = 1.0
 
 # Prose that contradicts a survey in which no plant was touched.
@@ -40,112 +39,22 @@ VERDICT_LINE = r"\bmission status\b[^.\n]{0,60}"
 DURATION = re.compile(r"(\d+(?:\.\d+)?)\s*(?:minutes|minute|min)\b", re.IGNORECASE)
 
 
-@dataclass(frozen=True)
-class Facts:
-    """Everything the narrative is allowed to assert, taken from the run's telemetry."""
-
-    policy: str
-    minutes: float
-    path_m: float
-    plant_contacts: int
-    rmse: float
-    dry_f1: float
-    dry_recall: float
-    calibration_95: float
-    truth_dry_fraction: float
-    probes_used: int
-    valid_probes: int
-    lane_coverage: float
-
-    @classmethod
-    def from_metrics(cls, metrics: dict[str, Any]) -> "Facts":
-        map_m = metrics.get("map") or {}
-        run_m = metrics.get("run") or {}
-
-        def num(source: dict[str, Any], key: str) -> float:
-            value = source.get(key)
-            return float(value) if value is not None else 0.0
-
-        return cls(
-            policy=str(metrics.get("policy", "unknown")),
-            minutes=num(run_m, "mission_time_s") / 60.0,
-            path_m=num(run_m, "path_length_m"),
-            plant_contacts=int(num(run_m, "plant_contacts")),
-            rmse=num(map_m, "rmse"),
-            dry_f1=num(map_m, "dry_f1"),
-            dry_recall=num(map_m, "dry_recall"),
-            calibration_95=num(map_m, "calibration_95"),
-            truth_dry_fraction=num(map_m, "truth_dry_fraction"),
-            probes_used=int(num(run_m, "probes_used")),
-            valid_probes=int(num(run_m, "valid_probes")),
-            lane_coverage=num(run_m, "lane_coverage"),
-        )
-
-    @property
-    def probe_success(self) -> float:
-        """Share of probes that returned a value (0.0 when nothing was probed)."""
-        return self.valid_probes / self.probes_used if self.probes_used else 0.0
-
-    @property
-    def verdict(self) -> str:
-        """SUCCESS, PARTIAL or FAIL, decided from the metrics alone.
-
-        A plant contact is a hard FAIL. SUCCESS means no shortfall at all. Anything else is
-        PARTIAL.
-        """
-        if self.plant_contacts > 0:
-            return "FAIL"
-        return "PARTIAL" if self.shortfalls else "SUCCESS"
-
-    @property
-    def shortfalls(self) -> list[str]:
-        """Why the mission is not a SUCCESS, in plain words (empty for a SUCCESS). The model is
-        given these: left to guess, it invents a reason (it once blamed "0 plant contacts")."""
-        out = []
-        if self.plant_contacts > 0:
-            out.append(f"the rover touched plants {self.plant_contacts} time(s); the limit is 0")
-        # A field with no dry zone has no dry scores (metrics.json holds null): not a shortfall.
-        if self.truth_dry_fraction > DRY_AREA_TO_JUDGE:
-            if self.dry_recall < 0.3:
-                out.append(
-                    f"the map found only {self.dry_recall:.0%} of the truly dry area "
-                    "(at least 30% is needed)"
-                )
-            elif self.dry_f1 < SUCCESS_DRY_F1:
-                out.append(
-                    f"dry-zone F1 is {self.dry_f1:.2f} (at least {SUCCESS_DRY_F1:.2f} is needed)"
-                )
-        if self.probes_used and self.probe_success < 0.8:
-            out.append(
-                f"only {self.valid_probes} of {self.probes_used} probes returned a value "
-                "(at least 80% is needed)"
-            )
-        if self.rmse > SUCCESS_MAX_RMSE:
-            out.append(
-                f"map error (RMSE) is {self.rmse:.4f} VWC (at most {SUCCESS_MAX_RMSE} is allowed)"
-            )
-        return out
-
-    @property
-    def why(self) -> str:
-        """One sentence explaining the verdict."""
-        return "; ".join(self.shortfalls) or "no plant was touched and every target was met"
-
-    def as_block(self) -> str:
-        return f"""### VERIFIED TELEMETRY (computed in code; do not contradict or recompute)
-- Mission verdict: {self.verdict}, because: {self.why}
-- Policy used: {self.policy}
-- Plant contacts: {self.plant_contacts} (the rover must never touch a plant: 0 is the goal)
-- Mission time: {self.minutes:.2f} minutes
-- Path length: {self.path_m:.2f} metres
-- Probes that returned a value: {self.valid_probes} of {self.probes_used}
-  ({self.probe_success:.0%})
-- Share of the lanes driven: {self.lane_coverage:.0%}
-- Map error (RMSE): {self.rmse:.4f} VWC
-- Dry-zone F1: {self.dry_f1:.2f}
-- Dry-cell recall: {self.dry_recall:.2f}
-- Calibration (95% band): {self.calibration_95:.2f}
-- Truth dry fraction: {self.truth_dry_fraction:.2%}
+def facts_block(facts: Facts) -> str:
+    """The verified telemetry, as the prompt states it."""
+    return f"""### VERIFIED TELEMETRY (computed in code; do not contradict or recompute)
+- Mission verdict: {facts.verdict}, because: {facts.why}
+- Policy used: {facts.policy}
+- Plant contacts: {facts.plant_contacts} (the rover must never touch a plant: 0 is the goal)
+- Mission time: {facts.minutes:.2f} minutes
+- Path length: {facts.path_m:.2f} metres
+- Probes that returned a value: {facts.valid_probes} of {facts.probes_used}
+  ({facts.probe_success:.0%})
+- Share of the lanes driven: {facts.lane_coverage:.0%}
+- Map error (RMSE): {facts.rmse:.4f} VWC
+- Dry-zone F1: {facts.dry_f1:.2f}
+- Dry-cell recall: {facts.dry_recall:.2f}
+- Calibration (95% band): {facts.calibration_95:.2f}
+- Truth dry fraction: {facts.truth_dry_fraction:.2%}
 
 Rules: use only the numbers above; do not invent a duration, a target, or an event that is not
 listed; if the telemetry does not say something, write that it is unknown. Do not claim a plant
@@ -184,7 +93,7 @@ def generate_prompt(facts: Facts, hotspots: list[dict[str, str]]) -> str:
 You are an Expert AI Agronomist and Precision Irrigation Consultant.
 You have just received the mission telemetry from an autonomous soil-moisture survey rover.
 
-{facts.as_block()}
+{facts_block(facts)}
 
 ### DETECTED HOTSPOTS (driest probes)
 {chr(10).join(lines) if lines else "- none: every probe failed"}
@@ -351,7 +260,7 @@ def main() -> int:
     if not isinstance(metrics, dict) or "map" not in metrics:
         print(f"Error: {run_path} has no usable metrics.json.", file=sys.stderr)
         return 2
-    facts = Facts.from_metrics(metrics)
+    facts = Facts.from_metrics(RULES, metrics)
     print(f"Verified verdict: {facts.verdict} (plant contacts {facts.plant_contacts})")
 
     if args.print_prompt:

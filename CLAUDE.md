@@ -18,12 +18,12 @@ Claude must never appear as an author, committer or contributor of this reposito
 ## Repository map (where to look)
 | Path | What it holds |
 |---|---|
-| `src/agrisim/` | The simulator package, one job per module: `config` (YAML models and validation), `field`, `soil` (hidden truth), `weather` (rain, drying, the physical soil model, drip), `sensor`, `rover`, `planning`, `control`, `safety`, `mapping`, `metrics` (may read the truth), `policies` (every probing strategy), `sim` (`run_survey`), `bench`, `suite` (agribench), `env` (Gymnasium, PPO), `io`, `viz` (Rerun, map colours), `view3d` and `viewer3d/` (3D replay), `cli` |
+| `src/agrisim/` | The simulator package, one job per module: `config` (YAML models and validation), `field`, `soil` (hidden truth), `weather` (rain, drying, the physical soil model, drip), `sensor`, `rover`, `planning`, `control`, `safety`, `mapping`, `metrics` (may read the truth), `verdict` (the verdict from `configs/verdict_rules.yaml`), `store` (the run store: run folders plus a SQLite index), `policies` (every probing strategy), `sim` (`run_survey`), `bench`, `suite` (agribench), `env` (Gymnasium, PPO), `io`, `viz` (Rerun, map colours), `view3d` and `viewer3d/` (3D replay), `cli` |
 | `tests/` | pytest, files named after what they test; `test_robustness.py` holds the regressions from reviews |
 | `configs/` | `demo.yaml` and `scenarios/*.yaml` (each one `extends:` the demo) |
 | `benchmarks/` | agribench: `README.md` (protocol), `solution.yaml` (our entry), `v1/` (frozen) |
 | `ai_agronomist/` | The AI debrief layer, outside the package: `write_debrief.py`, `run_mission.py`, `control_centre_app.py` (Streamlit), `demo_pipeline.py`, `setup_models.bat`, `modelfiles/`. Run its scripts from the repository root |
-| `huggingface_space/` | The hosted app (Space `Auenchanters/SMC`): `app.py`, a trimmed `requirements.txt`, the Space `README.md`. Deploy with `scripts/deploy_huggingface_space.py`, which adds `src/agrisim` and `configs/` |
+| `huggingface_space/` | The app (Space `Auenchanters/SMC`, and the laptop): `app.py` (`gr.Server`: pages plus JSON routes), `web/` (the Simulator and Console pages), a trimmed `requirements.txt`, the Space `README.md`. Deploy with `scripts/deploy_huggingface_space.py`, which adds `src/agrisim` and `configs/` |
 | `scripts/` | One-off tools: `calibrate_cookfarm.py`, `soil_timelapse.py`, `make_media.py`, `demo_video/`, the demo and licence-check scripts |
 | `hardware/` | Rover designs in Node.js; most files are generated from `model.mjs` |
 | `docs/` | `CALIBRATION.md`, `FUTURE_SCOPE.md`, `PRODUCTION_PLAN.md`, `LLM_COMPARISON.md`, `pitch/` (funding pitch and low-cost prototype plan) |
@@ -82,6 +82,7 @@ A task is done only when ruff, mypy, pytest and the licence gate all pass. A cha
 - Only `metrics.py` and the training reward in `env.py` may read ground truth. Policies and mappers see probe readings only.
 
 ## Do not
-- Do not add ROS, Gazebo, Unity, Isaac, Fields2Cover or web-dashboard code in this phase.
+- Do not add ROS, Gazebo, Unity, Isaac or Fields2Cover code in this phase.
+- Web app code lives only in `huggingface_space/`: one `gr.Server` app (`app.py`) and plain HTML, CSS and JS pages in `huggingface_space/web/` (direction C, `design/DESIGN.md`). No React or other front-end build step, no front-end package manager.
 - Do not weaken or delete tests to make them pass; fix the code or record the issue in the ExecPlan.
 - Do not claim results in docs that were not produced by `agrisim bench`.

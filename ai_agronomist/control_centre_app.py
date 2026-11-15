@@ -23,7 +23,7 @@ selected_model = st.sidebar.selectbox(
 
 def _field_configs() -> list[str]:
     """Every field config on disk: the ones in configs/ and the scenarios under it."""
-    found = sorted(Path("configs").glob("*.yaml"))
+    found = sorted(p for p in Path("configs").glob("*.yaml") if p.name != "verdict_rules.yaml")
     found += sorted(Path("configs/scenarios").glob("*.yaml"))
     return [p.as_posix() for p in found] or ["configs/demo.yaml"]
 
